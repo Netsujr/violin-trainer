@@ -1,21 +1,20 @@
+import { localTitle, t } from "../i18n";
 import { parseQuickText } from "../music/parse";
 import { noteLabels } from "../music/notes";
 import { allPieces, deletePiece, getSettings, savePiece, saveSettings } from "../storage";
 import { h, type Screen } from "./dom";
 
-export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
   const settings = getSettings();
   const list = h("div");
-  const title = h("input", { placeholder: "Title", oninput: () => preview() });
+  const title = h("input", { placeholder: t.pieceTitle, oninput: () => preview() });
   const text = h("textarea", {
     rows: 6,
     placeholder: "D4 E4 F#4 G4 | A4 B4 C#5 D5",
     oninput: () => preview(),
   });
   const previewView = h("div");
-  const saveButton = h("button", { textContent: "Save piece", disabled: true, onclick: save });
+  const saveButton = h("button", { textContent: t.savePiece, disabled: true, onclick: save });
 
   function targetDaySelect(pieceId: string) {
     const select = h(
@@ -27,8 +26,8 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
           saveSettings();
         },
       },
-      h("option", { value: "", textContent: "No target day" }),
-      ...DAYS.map((day, index) =>
+      h("option", { value: "", textContent: t.noTargetDay }),
+      ...t.days.map((day, index) =>
         h("option", { value: String(index), selected: settings.targetDays[pieceId] === index, textContent: day }),
       ),
     );
@@ -41,12 +40,12 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
         h(
           "div",
           { className: "row piece" },
-          h("strong", {}, piece.title),
-          h("span", {}, piece.subtitle ?? `${piece.notes.length} notes`),
-          h("button", { textContent: "Practice", className: "outline", onclick: () => goPractice(piece.id) }),
+          h("strong", {}, localTitle(piece.id, piece.title)),
+          h("span", {}, t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length)),
+          h("button", { textContent: t.screens.Practice, className: "outline", onclick: () => goPractice(piece.id) }),
           targetDaySelect(piece.id),
           ...(piece.source === "imported"
-            ? [h("button", { textContent: "Delete", className: "secondary outline", onclick: () => remove(piece.id) })]
+            ? [h("button", { textContent: t.deletePiece, className: "secondary outline", onclick: () => remove(piece.id) })]
             : []),
         ),
       ),
@@ -68,7 +67,7 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
         {},
         ...notes.map((note) => {
           const { solfege, letter } = noteLabels(note.pitch);
-          return h("li", {}, `${solfege} / ${letter} · ${note.string} string · finger ${note.finger ?? "?"}`);
+          return h("li", {}, `${solfege} / ${letter} · ${t.stringFinger(t.strings[note.string!], t.finger(note.finger ?? "?"))}`);
         }),
       ),
     );
@@ -89,9 +88,9 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
     element: h(
       "section",
       {},
-      h("h2", {}, "Library"),
+      h("h2", {}, t.screens.Library),
       list,
-      h("h2", {}, "Add piece"),
+      h("h2", {}, t.addPiece),
       h("div", { className: "add-piece" }, title, text, saveButton),
       previewView,
     ),

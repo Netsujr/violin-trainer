@@ -1,24 +1,24 @@
+import { centsText, localNumber, localTitle, t } from "../i18n";
 import { pieceTrends, plannedThisWeek, weekMinutes, type LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording } from "../storage";
 import { h, type Screen } from "./dom";
-import { DAYS } from "./library";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
 
 const describeSession = (entry: LogEntry) =>
   [
-    new Date(entry.startedAt).toLocaleString(),
-    entry.pieceTitle,
-    `${entry.minutes.toFixed(1)} min`,
-    `${entry.passes} ${entry.passes === 1 ? "pass" : "passes"}`,
-    `${entry.notesHit} hit, ${entry.notesSkipped} skipped`,
-    entry.averageCents === null ? null : `${entry.averageCents.toFixed(0)} cents off`,
-    entry.slowest.length ? `slowest ${entry.slowest.map((note) => `${note.pitch} ${note.seconds.toFixed(1)} s`).join(", ")}` : null,
+    new Date(entry.startedAt).toLocaleString(t.locale),
+    localTitle(entry.pieceId, entry.pieceTitle),
+    `${localNumber(entry.minutes, 1)} min`,
+    t.passes(entry.passes),
+    t.hitSkipped(entry.notesHit, entry.notesSkipped),
+    entry.averageCents === null ? null : t.centsOff(Math.round(entry.averageCents)),
+    entry.slowest.length ? t.slowestLower(entry.slowest.map((note) => `${note.pitch} ${localNumber(note.seconds, 1)} s`).join(", ")) : null,
   ]
     .filter(Boolean)
     .join(" · ");
 
-const recordingName = (entry: LogEntry) => `${entry.pieceTitle} ${entry.startedAt.slice(0, 16).replace(":", "-")}.webm`;
+const recordingName = (entry: LogEntry) => `${localTitle(entry.pieceId, entry.pieceTitle)} ${entry.startedAt.slice(0, 16).replace(":", "-")}.webm`;
 
 function makeSeekable(audio: HTMLAudioElement) {
   audio.addEventListener(
@@ -54,9 +54,9 @@ function recordingPlayer(entry: LogEntry, recording: Recording, urls: string[], 
     "div",
     {},
     audio,
-    h("a", { href: url, download: recordingName(entry), textContent: "Download" }),
+    h("a", { href: url, download: recordingName(entry), textContent: t.download }),
     " ",
-    h("button", { textContent: "Delete recording", className: "secondary outline", onclick: onDelete }),
+    h("button", { textContent: t.deleteRecording, className: "secondary outline", onclick: onDelete }),
     h("div", { className: "row" }, ...markers),
   );
 }
@@ -69,7 +69,7 @@ export function logScreen(): Screen {
 
   async function showStorage() {
     const { usage = 0 } = await navigator.storage.estimate();
-    storage.textContent = `Storage used: ${(usage / 1024 / 1024).toFixed(1)} MB`;
+    storage.textContent = t.storageUsed(localNumber(usage / 1024 / 1024, 1));
     storage.className = usage > STORAGE_WARNING_BYTES ? "warning" : "";
   }
 
@@ -93,7 +93,8 @@ export function logScreen(): Screen {
 
   const week = weekMinutes(entries, today);
   const longestDay = Math.max(1, ...week.map((day) => day.minutes));
-  const planned = plannedThisWeek(allPieces(), getSettings().targetDays, entries, today);
+  const localPieces = allPieces().map((piece) => ({ ...piece, title: localTitle(piece.id, piece.title) }));
+  const planned = plannedThisWeek(localPieces, getSettings().targetDays, entries, today);
   const trends = pieceTrends(entries);
 
   showStorage();
@@ -102,30 +103,30 @@ export function logScreen(): Screen {
     element: h(
       "section",
       {},
-      h("h2", {}, "This week"),
+      h("h2", {}, t.thisWeek),
       ...week.map(({ day, minutes }) =>
         h(
           "div",
           { className: "row" },
-          h("span", { className: "day" }, day.toLocaleDateString(undefined, { weekday: "short" })),
+          h("span", { className: "day" }, day.toLocaleDateString(t.locale, { weekday: "short" })),
           h("progress", { max: longestDay, value: minutes }),
-          `${minutes.toFixed(1)} min`,
+          `${localNumber(minutes, 1)} min`,
         ),
       ),
-      ...(planned.length ? [h("h3", {}, "Planned")] : []),
-      ...planned.map(({ title, day, practised }) => h("p", {}, `${practised ? "✓" : "○"} ${title} (${DAYS[day]})`)),
-      h("h2", {}, "Trends"),
+      ...(planned.length ? [h("h3", {}, t.planned)] : []),
+      ...planned.map(({ title, day, practised }) => h("p", {}, `${practised ? "✓" : "○"} ${title} (${t.days[day]})`)),
+      h("h2", {}, t.trends),
       ...trends.map(({ title, sessions }) =>
         h(
           "p",
           {},
-          `${title}: `,
-          sessions.map((session) => `${session.averageCents!.toFixed(0)} cents`).join(" → "),
-          " · per pass: ",
-          sessions.map((session) => (session.averagePassSeconds === null ? "–" : `${session.averagePassSeconds.toFixed(0)} s`)).join(" → "),
+          `${localTitle(sessions[0].pieceId, title)}: `,
+          sessions.map((session) => centsText(Math.round(session.averageCents!))).join(" → "),
+          ` · ${t.perPass}: `,
+          sessions.map((session) => (session.averagePassSeconds === null ? "–" : `${localNumber(session.averagePassSeconds, 0)} s`)).join(" → "),
         ),
       ),
-      h("h2", {}, "Sessions"),
+      h("h2", {}, t.sessions),
       storage,
       h("ul", {}, ...entries.map(sessionRow)),
     ),

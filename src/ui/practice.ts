@@ -1,4 +1,5 @@
 import { playReference, REFERENCE_MS } from "../audio/reference";
+import { localNumber, localTitle, t } from "../i18n";
 import { midiOf, noteLabels } from "../music/notes";
 import { createJudge } from "../practice/judge";
 import { buildEntry } from "../practice/log";
@@ -39,21 +40,23 @@ export function practiceScreen(pieceId?: string): Screen {
     staff.element.hidden = !settings.toggles.staff;
     staff.draw(piece.notes.map(({ pitch }) => pitch), index);
     progress.textContent = note
-      ? `Note ${index + 1} of ${piece.notes.length}${note.bar ? ` · bar ${note.bar}` : ""}`
-      : `All ${piece.notes.length} notes done`;
+      ? `${t.noteOf(index + 1, piece.notes.length)}${note.bar ? t.bar(note.bar) : ""}`
+      : t.allDone(piece.notes.length);
     highway.draw(piece.notes, index, holdProgress);
   }
 
   function showStats(session: Session) {
     const entry = buildEntry(session, performance.now());
     const slowest = entry.slowest
-      .map((note) => `${noteLabels(note.pitch).solfege} (${note.seconds.toFixed(1)} s)`)
+      .map((note) => `${noteLabels(note.pitch).solfege} (${localNumber(note.seconds, 1)} s)`)
       .join(", ");
+    const seconds = localNumber(session.lastRunSeconds, 0);
+    const cents = Math.round(entry.averageCents ?? 0);
     stats.replaceChildren(
-      h("p", {}, `${startIndex === 0 ? `Pass ${entry.passes}` : `Note ${startIndex + 1} to the end`} done in ${session.lastRunSeconds.toFixed(0)} s.`),
-      h("p", {}, `This session: ${entry.notesHit} hit, ${entry.notesSkipped} skipped, ${(entry.averageCents ?? 0).toFixed(0)} cents off on average.`),
-      h("p", {}, `Slowest: ${slowest || "none"}`),
-      h("button", { textContent: "Play again", onclick: () => startFrom(startIndex) }),
+      h("p", {}, startIndex === 0 ? t.passDone(entry.passes, seconds) : t.partialDone(startIndex + 1, seconds)),
+      h("p", {}, t.summary(t.hitSkipped(entry.notesHit, entry.notesSkipped), cents)),
+      h("p", {}, t.slowest(slowest || t.slowestNone)),
+      h("button", { textContent: t.playAgain, onclick: () => startFrom(startIndex) }),
     );
   }
 
@@ -82,7 +85,7 @@ export function practiceScreen(pieceId?: string): Screen {
       const verdict = judge.update(now < mutedUntil ? null : frequency, now);
       holdProgress = verdict.progress;
       needle.show(verdict.cents);
-      hertz.textContent = frequency === null ? "" : `${frequency.toFixed(1)} Hz`;
+      hertz.textContent = frequency === null ? "" : `${localNumber(frequency, 1)} Hz`;
       if (verdict.hit) {
         const previousMidi = session.currentMidi;
         session.hit(verdict.averageCents, now);
@@ -122,12 +125,12 @@ export function practiceScreen(pieceId?: string): Screen {
       },
     },
     ...pieces.map((candidate) =>
-      h("option", { value: candidate.id, selected: candidate === piece, textContent: candidate.title }),
+      h("option", { value: candidate.id, selected: candidate === piece, textContent: localTitle(candidate.id, candidate.title) }),
     ),
   );
 
   const referenceButton = h("button", {
-    textContent: "Play reference",
+    textContent: t.playReference,
     className: "secondary outline",
     onclick() {
       const note = piece.notes[currentIndex()];
@@ -139,7 +142,7 @@ export function practiceScreen(pieceId?: string): Screen {
   });
 
   const skipButton = h("button", {
-    textContent: "Skip",
+    textContent: t.skip,
     className: "secondary outline",
     disabled: true,
     onclick() {

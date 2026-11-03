@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { Piece } from "../music/notes";
 import { startRun, type Run } from "../practice/run";
 import { h } from "./dom";
@@ -8,7 +9,7 @@ export function createRunControls(options: {
   onStart?: () => void;
   onStop?: () => void;
 }) {
-  const button = h("button", { textContent: "Start", onclick: () => (run ? stop() : start()) });
+  const button = h("button", { textContent: t.start, onclick: () => (run ? stop() : start()) });
   const record = h("input", { type: "checkbox", role: "switch" });
   const message = h("span", { className: "warning" });
   let run: Run | null = null;
@@ -16,7 +17,7 @@ export function createRunControls(options: {
   let left = false;
 
   const showRunning = () => {
-    button.textContent = run ? "Stop" : "Start";
+    button.textContent = run ? t.stop : t.start;
     button.classList.toggle("secondary", run !== null);
     record.disabled = run !== null;
   };
@@ -35,7 +36,7 @@ export function createRunControls(options: {
       showRunning();
       options.onStart?.();
     } catch (error) {
-      message.textContent = `Microphone unavailable: ${(error as Error).message}`;
+      message.textContent = t.micUnavailable((error as Error).message);
     }
     button.disabled = false;
   }
@@ -54,7 +55,7 @@ export function createRunControls(options: {
   }
 
   return {
-    element: h("span", { className: "row" }, button, h("label", {}, record, " Record"), message),
+    element: h("span", { className: "row" }, button, h("label", {}, record, ` ${t.record}`), message),
     stop,
     leave() {
       left = true;

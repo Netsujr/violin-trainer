@@ -1,10 +1,12 @@
 import { del, get, set } from "idb-keyval";
 import scales from "./content/scales.json";
 import { fillFingering } from "./music/fingering";
+import type { Language } from "./i18n";
 import type { Piece, PieceNote } from "./music/notes";
 import type { LogEntry } from "./practice/log";
 
 export type Settings = {
+  language: Language;
   toleranceCents: number;
   holdMs: number;
   minRms: number;
@@ -15,7 +17,7 @@ export type Settings = {
 export type Marker = { pitch: string; seconds: number };
 export type Recording = { blob: Blob; markers: Marker[] };
 
-const DEFAULT_SETTINGS: Settings = {
+const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   toleranceCents: 40,
   holdMs: 200,
   minRms: 0.01,
@@ -32,7 +34,7 @@ const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.st
 let settings: Settings | undefined;
 
 export function getSettings() {
-  settings ??= { ...DEFAULT_SETTINGS, ...read("settings", {}) };
+  settings ??= { language: navigator.language.startsWith("pt") ? "pt" : "en", ...DEFAULT_SETTINGS, ...read("settings", {}) };
   return settings;
 }
 

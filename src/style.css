@@ -54,12 +54,13 @@ header {
   font-size: 1.125rem;
 }
 
-nav [role="group"] {
+header [role="group"] {
+  width: auto;
   margin: 0;
 }
 
 /* Pico keeps a glow on the group after a mouse click. Keep it for keyboard focus only. */
-nav [role="group"]:not(:has(:focus-visible)) {
+header [role="group"]:not(:has(:focus-visible)) {
   box-shadow: none;
 }
 
@@ -67,7 +68,23 @@ nav [role="group"] button {
   --pico-form-element-spacing-horizontal: 1.25rem;
 }
 
-nav button:not([aria-current]) {
+header .language {
+  margin-left: auto;
+}
+
+header .language button {
+  --pico-form-element-spacing-horizontal: 0.625rem;
+  font-size: 0.875rem;
+}
+
+.language button[aria-pressed="true"] {
+  --pico-background-color: var(--pico-secondary-background);
+  --pico-border-color: var(--pico-secondary-background);
+  --pico-color: var(--pico-color);
+}
+
+nav button:not([aria-current]),
+.language button[aria-pressed="false"] {
   --pico-background-color: var(--pico-card-background-color);
   --pico-border-color: var(--pico-muted-border-color);
   --pico-color: var(--pico-muted-color);
@@ -75,7 +92,7 @@ nav button:not([aria-current]) {
 
 header details {
   position: relative;
-  margin: 0 0 0 auto;
+  margin: 0;
 }
 
 header details[open] > summary {
@@ -162,8 +179,16 @@ section > ul > li {
   min-width: 120px;
   height: 12px;
   border-radius: 6px;
+  /* One cent is 1% of the track. --tolerance comes from Settings: green is its inner half, yellow the rest. */
   background: linear-gradient(var(--pico-color), var(--pico-color)) center / 2px 100% no-repeat,
-    var(--pico-muted-border-color);
+    linear-gradient(
+      to right,
+      var(--pico-muted-border-color) calc(50% - var(--tolerance)),
+      #6e5c1c calc(50% - var(--tolerance)) calc(50% - var(--tolerance) / 2),
+      #1f6e42 calc(50% - var(--tolerance) / 2) calc(50% + var(--tolerance) / 2),
+      #6e5c1c calc(50% + var(--tolerance) / 2) calc(50% + var(--tolerance)),
+      var(--pico-muted-border-color) calc(50% + var(--tolerance))
+    );
 }
 
 .needle i {
@@ -173,11 +198,15 @@ section > ul > li {
   height: 20px;
   margin-left: -3px;
   border-radius: 3px;
-  background: #e0a030;
+  background: #e0603b;
   transition: left 80ms linear;
 }
 
-.needle.in-tune i {
+.needle[data-zone="yellow"] i {
+  background: #f2cc3d;
+}
+
+.needle[data-zone="green"] i {
   background: #4cd07d;
 }
 

@@ -1,3 +1,4 @@
+import { centsText, localNumber, t } from "../i18n";
 import { fingerOn, LOWEST_MIDI, stringFor } from "../music/fingering";
 import { centsFrom, nearestMidi, noteLabels, pitchOf } from "../music/notes";
 import { getSettings } from "../storage";
@@ -16,10 +17,13 @@ export function createNeedle() {
   const value = h("span", { textContent: "—" });
   const track = h("div", { className: "needle" }, mark);
   const show = (cents: number | null) => {
-    track.classList.toggle("in-tune", cents !== null && Math.abs(cents) <= getSettings().toleranceCents);
+    // Green and yellow both clear a note in Practice. Only the outer edge of yellow, Tolerance, decides that.
+    const off = Math.abs(cents ?? Infinity);
+    const { toleranceCents } = getSettings();
+    track.dataset.zone = off <= toleranceCents / 2 ? "green" : off <= toleranceCents ? "yellow" : "out";
     mark.hidden = cents === null;
     mark.style.left = `${50 + Math.max(-50, Math.min(50, cents ?? 0))}%`;
-    value.textContent = cents === null ? "—" : `${cents > 0 ? "+" : ""}${Math.round(cents)} cents`;
+    value.textContent = cents === null ? "—" : `${cents > 0 ? "+" : ""}${centsText(Math.round(cents))}`;
   };
   show(null);
 
@@ -27,11 +31,11 @@ export function createNeedle() {
 }
 
 function positionGuess(midi: number) {
-  if (midi < LOWEST_MIDI) return "Below the open G string";
+  if (midi < LOWEST_MIDI) return t.belowOpenG;
 
   const string = stringFor(midi);
   const finger = fingerOn(string, midi);
-  return finger ? `Likely ${string} string, finger ${finger}` : "Above first position";
+  return finger ? t.likely(t.strings[string], t.finger(finger)) : t.aboveFirstPosition;
 }
 
 export function listenScreen(): Screen {
@@ -52,7 +56,7 @@ export function listenScreen(): Screen {
     staff.element.hidden = !toggles.staff;
     position.hidden = !toggles.fingers;
     if (midi === null) {
-      big.textContent = controls.session ? "Listening…" : "Press Start and play";
+      big.textContent = controls.session ? t.listening : t.pressStart;
       position.textContent = "";
       staff.draw([]);
       return;
@@ -76,7 +80,7 @@ export function listenScreen(): Screen {
     }
 
     needle.show(centsFrom(frequency, heardMidi));
-    hertz.textContent = `${frequency.toFixed(1)} Hz`;
+    hertz.textContent = `${localNumber(frequency, 1)} Hz`;
 
     const { solfege, letter, octave } = noteLabels(pitchOf(heardMidi));
     const label = `${solfege}${octave} (${letter})`;
@@ -117,7 +121,7 @@ export function listenScreen(): Screen {
       needle.element,
       hertz,
       staff.element,
-      h("h3", {}, "Recent notes"),
+      h("h3", {}, t.recentNotes),
       trailView,
     ),
     leave: controls.leave,

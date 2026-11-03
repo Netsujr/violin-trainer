@@ -1,4 +1,5 @@
 import { Note } from "tonal";
+import { t } from "../i18n";
 
 export type StringName = "G" | "D" | "A" | "E";
 
@@ -17,7 +18,6 @@ export type Piece = {
   notes: PieceNote[];
 };
 
-const SOLFEGE: Record<string, string> = { C: "Do", D: "Ré", E: "Mi", F: "Fa", G: "Sol", A: "Lá", B: "Si" };
 const ACCIDENTAL: Record<string, string> = { "": "", "#": "♯", b: "♭" };
 
 export const midiOf = (pitch: string) => Note.midi(pitch)!;
@@ -28,5 +28,5 @@ export const centsFrom = (frequency: number, midi: number) => 1200 * Math.log2(f
 
 export function noteLabels(pitch: string) {
   const { letter, acc, oct } = Note.get(pitch);
-  return { solfege: SOLFEGE[letter] + ACCIDENTAL[acc], letter: letter + ACCIDENTAL[acc], octave: oct as number };
+  return { solfege: t.solfege[letter] + ACCIDENTAL[acc], letter: letter + ACCIDENTAL[acc], octave: oct as number };
 }

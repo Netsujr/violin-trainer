@@ -1,8 +1,11 @@
+import { t } from "../i18n";
 import { getSettings, saveSettings } from "../storage";
 import { h } from "./dom";
 
 export function createSettingsPanel() {
   const settings = getSettings();
+  const showTolerance = () => document.documentElement.style.setProperty("--tolerance", `${settings.toleranceCents}%`);
+  showTolerance();
 
   const slider = (
     label: string,
@@ -12,7 +15,8 @@ export function createSettingsPanel() {
     step: number,
     unit: string,
   ) => {
-    const value = h("output", { textContent: `${settings[key]} ${unit}` });
+    const show = () => `${settings[key].toLocaleString(t.locale)} ${unit}`;
+    const value = h("output", { textContent: show() });
     const input = h("input", {
       type: "range",
       min: String(min),
@@ -21,8 +25,9 @@ export function createSettingsPanel() {
       value: String(settings[key]),
       oninput: () => {
         settings[key] = Number(input.value);
-        value.textContent = `${settings[key]} ${unit}`;
+        value.textContent = show();
         saveSettings();
+        showTolerance();
       },
     });
     return h("label", { className: "setting" }, `${label} `, input, " ", value);
@@ -31,13 +36,13 @@ export function createSettingsPanel() {
   return h(
     "details",
     {},
-    h("summary", {}, "Settings"),
+    h("summary", {}, t.settings),
     h(
       "div",
       { className: "settings-panel" },
-      slider("Tolerance", "toleranceCents", 10, 50, 1, "cents"),
-      slider("Hold time", "holdMs", 100, 500, 10, "ms"),
-      slider("Mic sensitivity (volume gate, raise it in a noisy room)", "minRms", 0.002, 0.05, 0.001, "RMS"),
+      slider(t.tolerance, "toleranceCents", 10, 50, 1, "cents"),
+      slider(t.holdTime, "holdMs", 100, 500, 10, "ms"),
+      slider(t.micSensitivity, "minRms", 0.002, 0.05, 0.001, "RMS"),
     ),
   );
 }

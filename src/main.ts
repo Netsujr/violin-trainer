@@ -1,5 +1,7 @@
 import "@picocss/pico/css/pico.pumpkin.min.css";
 import "./style.css";
+import { setLanguage, t, type Language } from "./i18n";
+import { getSettings, saveSettings } from "./storage";
 import { h, type Screen } from "./ui/dom";
 import { libraryScreen } from "./ui/library";
 import { listenScreen } from "./ui/listen";
@@ -10,8 +12,15 @@ import { createSettingsPanel } from "./ui/settings";
 const SCREEN_NAMES = ["Listen", "Practice", "Library", "Log"] as const;
 type ScreenName = (typeof SCREEN_NAMES)[number];
 
+const LANGUAGES: [Language, string][] = [
+  ["en", "EN"],
+  ["pt", "PT"],
+];
+
+const header = h("header");
 const main = h("main");
-const navButtons = SCREEN_NAMES.map((name) => h("button", { textContent: name, onclick: () => show(name) }));
+let navButtons: HTMLButtonElement[] = [];
+let currentName: ScreenName = "Listen";
 let current: Screen | undefined;
 
 function build(name: ScreenName, pieceId?: string) {
@@ -23,23 +32,46 @@ function build(name: ScreenName, pieceId?: string) {
 
 async function show(name: ScreenName, pieceId?: string) {
   await current?.leave();
+  currentName = name;
   current = build(name, pieceId);
   main.replaceChildren(current.element);
-  navButtons.forEach((button) => (button.ariaCurrent = button.textContent === name ? "page" : null));
+  navButtons.forEach((button, index) => (button.ariaCurrent = SCREEN_NAMES[index] === name ? "page" : null));
 }
 
-document
-  .querySelector("#app")!
-  .append(
+function renderHeader() {
+  document.documentElement.lang = t.locale;
+  document.title = t.appName;
+  navButtons = SCREEN_NAMES.map((name) => h("button", { textContent: t.screens[name], onclick: () => show(name) }));
+  header.replaceChildren(
+    h("strong", { className: "brand" }, t.appName),
+    h("nav", {}, h("div", { role: "group" }, ...navButtons)),
     h(
-      "header",
-      {},
-      h("strong", { className: "brand" }, "Violin Note Trainer"),
-      h("nav", {}, h("div", { role: "group" }, ...navButtons)),
-      createSettingsPanel(),
+      "div",
+      { role: "group", className: "language", ariaLabel: t.language },
+      ...LANGUAGES.map(([language, label]) =>
+        h("button", {
+          textContent: label,
+          ariaPressed: String(language === getSettings().language),
+          onclick: () => changeLanguage(language),
+        }),
+      ),
     ),
-    main,
+    createSettingsPanel(),
   );
+}
+
+// ponytail: rebuilding the screen ends a running session (logged and saved) and returns Practice to its first piece.
+function changeLanguage(language: Language) {
+  getSettings().language = language;
+  saveSettings();
+  setLanguage(language);
+  renderHeader();
+  return show(currentName);
+}
+
+setLanguage(getSettings().language);
+renderHeader();
+document.querySelector("#app")!.append(header, main);
 
 addEventListener("pagehide", () => current?.leave());
 

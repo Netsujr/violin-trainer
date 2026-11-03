@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { fillFingering, LOWEST_MIDI } from "./fingering";
 import { midiOf, type PieceNote, type StringName } from "./notes";
 
@@ -15,14 +16,14 @@ export function parseQuickText(text: string) {
   for (const token of text.replaceAll("|", " ").split(/\s+/).filter(Boolean)) {
     const match = plainToken(token).match(TOKEN);
     if (!match) {
-      errors.push(`Can't read "${token}"`);
+      errors.push(t.cantRead(token));
       continue;
     }
 
     const [, name, accidental, octave, finger, string] = match;
     const pitch = (LETTERS[name.toLowerCase()] ?? name.toUpperCase()) + accidental + octave;
     if (midiOf(pitch) < LOWEST_MIDI) {
-      errors.push(`"${token}" is below the open G string`);
+      errors.push(t.tokenBelowOpenG(token));
       continue;
     }
 
@@ -31,7 +32,7 @@ export function parseQuickText(text: string) {
       ...(string && { string: string.toUpperCase() as StringName }),
       ...(finger && { finger: finger.toUpperCase() }),
     });
-    if (!note.finger) flagged.push(`"${token}" is outside first position: add a finger like ${pitch}/4`);
+    if (!note.finger) flagged.push(t.outsideFirstPosition(token, pitch));
 
     notes.push(note);
   }

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { PieceNote, StringName } from "../music/notes";
 import { noteLabels } from "../music/notes";
 import { getSettings } from "../storage";
@@ -36,7 +37,7 @@ export function createHighway(onPick: (noteIndex: number) => void) {
       className: "highway-scroll",
       tabIndex: 0,
       role: "region",
-      ariaLabel: "Note timeline. Scroll to a note and press Enter to start from it.",
+      ariaLabel: t.timelineLabel,
       onscroll: paint,
       onclick(event) {
         const noteIndex = noteAt(event);
@@ -79,7 +80,7 @@ export function createHighway(onPick: (noteIndex: number) => void) {
       context.fillStyle = LANE_LABEL_COLOR;
       context.font = "bold 18px system-ui";
       context.textAlign = "left";
-      context.fillText(lane, 12, index * LANE_HEIGHT + LANE_HEIGHT / 2 + 6);
+      context.fillText(t.strings[lane], 12, index * LANE_HEIGHT + LANE_HEIGHT / 2 + 6);
     });
     context.fillStyle = HIT_LINE_COLOR;
     context.fillRect(HIT_X - 1, 0, 2, HEIGHT);
