@@ -14,7 +14,7 @@ npm test      # 97 unit tests, all passing
 
 - **Spec:** the "Violin Note Trainer — Build Handoff" doc. It is not in this repo, so paste it in if a question about intent comes up.
 - **Reference for scales, fingers and the look:** `~/Downloads/violin_scales.pdf`. All six scales and their fingers are tested against it.
-- **Git:** `main` has one "Initial commit" and no remote. Everything since then is uncommitted: nine changed files, this one and `e2e/`.
+- **Git:** `main` has two commits and no remote. The UI restyle in section 6 is uncommitted.
 - **Built:** milestones 1-4. Tempo mode is not built, because the spec marks it "Later".
 
 ## What we're checking
@@ -57,15 +57,20 @@ Synthetic result: a 305 s recording, 4.6 MB, 467 markers, with every sampled jum
 - [ ] Paste it into Library > Add piece and check the preview
 - [ ] The piece clears end to end, with any fixes made to its data
 
-### 6. Visual pass (last)
+### 6. Visual pass (in progress)
 
-Styling is deliberately plain so far. Noticed already:
+Styling now uses Pico.css, with a warm palette and the layout in `src/style.css`. The canvas can't read CSS, so `src/ui/highway.ts` repeats a few of those colours.
 
-- The hold ring is clipped at the top and bottom lanes
-- The canvas isn't scaled for Retina, so tile text may look soft (not checked on a real screen)
+Done:
+
+- The hold ring now traces the tile, so it no longer clips at the top and bottom lanes
+- The canvas scales for Retina (checked at an emulated 2x, not yet on a real screen)
+
+Still open:
+
 - The staff marks accidentals on each note, while the PDF uses a key signature
 - Listen prints a raw `L2`, tiles show a red `2`, and the PDF adds a small "low" under it
-- The spec says lane colours should match the PDF, but the PDF has none, so they need choosing
+- The spec says lane colours should match the PDF, but the PDF has none. They are now warm browns, so confirm they work
 
 ## If a check fails
 
