@@ -32,8 +32,12 @@ export function createSettingsPanel() {
     "details",
     {},
     h("summary", {}, "Settings"),
-    slider("Tolerance", "toleranceCents", 10, 50, 1, "cents"),
-    slider("Hold time", "holdMs", 100, 500, 10, "ms"),
-    slider("Mic sensitivity (volume gate, raise it in a noisy room)", "minRms", 0.002, 0.05, 0.001, "RMS"),
+    h(
+      "div",
+      { className: "settings-panel" },
+      slider("Tolerance", "toleranceCents", 10, 50, 1, "cents"),
+      slider("Hold time", "holdMs", 100, 500, 10, "ms"),
+      slider("Mic sensitivity (volume gate, raise it in a noisy room)", "minRms", 0.002, 0.05, 0.001, "RMS"),
+    ),
   );
 }

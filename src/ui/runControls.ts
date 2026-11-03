@@ -9,7 +9,7 @@ export function createRunControls(options: {
   onStop?: () => void;
 }) {
   const button = h("button", { textContent: "Start", onclick: () => (run ? stop() : start()) });
-  const record = h("input", { type: "checkbox" });
+  const record = h("input", { type: "checkbox", role: "switch" });
   const message = h("span", { className: "warning" });
   let run: Run | null = null;
   let saving: Promise<void> = Promise.resolve();
@@ -17,6 +17,7 @@ export function createRunControls(options: {
 
   const showRunning = () => {
     button.textContent = run ? "Stop" : "Start";
+    button.classList.toggle("secondary", run !== null);
     record.disabled = run !== null;
   };
 

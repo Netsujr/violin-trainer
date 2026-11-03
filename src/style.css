@@ -1,104 +1,323 @@
+/* Pico, imported first in main.ts, styles the native elements. This file sets the palette and the layout. */
 :root {
-  color-scheme: dark;
-  font-family: system-ui, sans-serif;
-  background: #15151a;
-  color: #e8e2d6;
+  --pico-font-size: 100%; /* Pico grows text with the viewport, which pushes the highway below the fold. */
+  --pico-form-element-spacing-vertical: 0.5rem;
+  --pico-form-element-spacing-horizontal: 0.875rem;
 }
 
-body {
+/* Warm tones to sit with the cream tiles. The canvas can't read these, so highway.ts repeats a few. */
+[data-theme="dark"] {
+  --pico-background-color: #16130f;
+  --pico-color: #e8e2d6;
+  --pico-muted-color: #a39a8b;
+  --pico-muted-border-color: #3a3228;
+  --pico-h2-color: #f3ead9;
+  --pico-h3-color: #e8e2d6;
+  --pico-secondary: #b8ac9a;
+  --pico-secondary-background: #4a4036;
+  --pico-secondary-underline: rgba(184, 172, 154, 0.5);
+  --pico-secondary-hover: #d8cfc0;
+  --pico-secondary-hover-background: #5a4e42;
+  --pico-secondary-focus: rgba(184, 172, 154, 0.25);
+  --pico-card-background-color: #211c16;
+  --pico-form-element-background-color: #211c16;
+  --pico-form-element-active-background-color: #211c16;
+  --pico-form-element-selected-background-color: #3a3228;
+  --pico-form-element-border-color: #4a4036;
+  --pico-form-element-color: #e8e2d6;
+  --pico-form-element-placeholder-color: #a39a8b;
+  --pico-switch-background-color: #4a4036;
+  --pico-switch-checked-background-color: #8a7355; /* Quieter than the accent, so Start stands out. */
+  --pico-range-border-color: #3a3228;
+  --pico-range-active-border-color: #4a4036;
+  --pico-progress-background-color: #3a3228;
+}
+
+#app {
+  max-width: calc(960px + 2rem);
+  margin-inline: auto;
+  padding: 1rem;
+}
+
+/* Header */
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid #6b3a1e;
+}
+
+.brand {
+  font-size: 1.125rem;
+}
+
+nav [role="group"] {
   margin: 0;
-  padding: 16px;
 }
 
-main {
-  margin-top: 16px;
+/* Pico keeps a glow on the group after a mouse click. Keep it for keyboard focus only. */
+nav [role="group"]:not(:has(:focus-visible)) {
+  box-shadow: none;
 }
 
-button {
-  padding: 6px 12px;
-  cursor: pointer;
+nav [role="group"] button {
+  --pico-form-element-spacing-horizontal: 1.25rem;
 }
 
-button.active {
-  background: #e8e2d6;
-  color: #15151a;
+nav button:not([aria-current]) {
+  --pico-background-color: var(--pico-card-background-color);
+  --pico-border-color: var(--pico-muted-border-color);
+  --pico-color: var(--pico-muted-color);
 }
 
-a {
-  color: inherit;
+header details {
+  position: relative;
+  margin: 0 0 0 auto;
 }
 
-canvas {
-  max-width: 100%;
+header details[open] > summary {
+  margin: 0;
 }
 
+.settings-panel {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 1.75rem);
+  right: 0;
+  width: min(22rem, 90vw);
+  padding: 1rem;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.setting input {
+  margin-block: 0.25rem 0;
+}
+
+.setting + .setting {
+  margin-top: 0.75rem;
+}
+
+/* Shared */
 .row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-block: 8px;
+  gap: 0.75rem;
+  margin-block: 0.5rem;
 }
 
-.big-note {
-  font-size: 64px;
-  font-weight: 700;
-  min-height: 80px;
+.row .row {
+  margin-block: 0;
+}
+
+.row label {
+  margin: 0;
+}
+
+.row > select {
+  width: auto;
+  margin: 0;
+}
+
+.toggles {
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+}
+
+section h2:not(:first-child),
+section h3 {
+  margin-top: 1.75rem;
+}
+
+.warning {
+  color: var(--pico-del-color);
+}
+
+.piece,
+.stats:not(:empty),
+section > ul > li {
+  padding: 0.75rem 1rem;
+  margin-block: 0.5rem;
+  list-style: none;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+/* Tuning needle */
+.row:has(> .needle) {
+  flex: 1;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .needle {
   position: relative;
-  width: 300px;
-  height: 20px;
-  background: #2b2b33;
-  background-image: linear-gradient(#e8e2d6, #e8e2d6);
-  background-size: 2px 100%;
-  background-position: center;
-  background-repeat: no-repeat;
+  flex: 1;
+  min-width: 120px;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(var(--pico-color), var(--pico-color)) center / 2px 100% no-repeat,
+    var(--pico-muted-border-color);
 }
 
 .needle i {
   position: absolute;
-  width: 4px;
-  height: 100%;
-  margin-left: -2px;
+  top: -4px;
+  width: 6px;
+  height: 20px;
+  margin-left: -3px;
+  border-radius: 3px;
   background: #e0a030;
+  transition: left 80ms linear;
 }
 
 .needle.in-tune i {
   background: #4cd07d;
 }
 
+.needle ~ span {
+  min-width: 6em;
+  font-size: 1rem;
+}
+
+/* Staff and highway */
 .staff {
   width: fit-content;
+  padding-inline: 0.5rem;
   background: #f3ead9;
-  margin-block: 8px;
+  border-radius: var(--pico-border-radius);
 }
 
-.warning {
-  color: #f08070;
-}
-
-.setting {
+.staff svg {
   display: block;
-  margin-block: 8px;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  margin-block: 1rem;
+  border-radius: var(--pico-border-radius);
+}
+
+/* Listen */
+.listen {
+  text-align: center;
+}
+
+.listen .row {
+  justify-content: center;
+}
+
+.listen .row:has(> .needle) {
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+.listen .staff {
+  margin: 1rem auto;
+}
+
+.big-note {
+  margin-block: 1.5rem 0.5rem;
+  font-size: clamp(3rem, 9vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  color: #f3ead9;
+}
+
+.big-note.idle {
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 3.025;
+  color: var(--pico-muted-color);
+}
+
+/* Practice: the staff sits beside the progress and needle, to keep the highway on screen. */
+.practice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1.5rem;
+}
+
+.practice > * {
+  grid-column: 1 / -1;
+}
+
+.practice > p {
+  grid-column: 1;
+  align-self: end;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.practice > .tuning {
+  grid-column: 1;
+  align-self: start;
+}
+
+.practice > .staff {
+  grid-column: 2;
+  grid-row: 3 / span 2;
+}
+
+@media (max-width: 720px) {
+  .practice {
+    display: block;
+  }
+}
+
+/* Library */
+.piece > strong {
+  min-width: 11rem;
+}
+
+.piece > span {
+  flex: 1;
+  color: var(--pico-muted-color);
 }
 
 .add-piece {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   max-width: 600px;
 }
 
+.add-piece textarea {
+  font-family: var(--pico-font-family-monospace);
+}
+
+/* Log */
 .day {
   width: 40px;
 }
 
-.piece > strong {
-  min-width: 160px;
+.row > progress {
+  flex: 1;
+  margin: 0;
+}
+
+section > ul {
+  padding: 0;
+}
+
+audio {
+  display: block;
+  width: 100%;
+  margin-block: 0.75rem;
+}
+
+a[download] {
+  margin-right: 0.75rem;
 }
 
 .marker {
-  padding: 2px 6px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.875rem;
 }

@@ -1,3 +1,4 @@
+import "@picocss/pico/css/pico.pumpkin.min.css";
 import "./style.css";
 import { h, type Screen } from "./ui/dom";
 import { libraryScreen } from "./ui/library";
@@ -24,12 +25,21 @@ async function show(name: ScreenName, pieceId?: string) {
   await current?.leave();
   current = build(name, pieceId);
   main.replaceChildren(current.element);
-  navButtons.forEach((button) => button.classList.toggle("active", button.textContent === name));
+  navButtons.forEach((button) => (button.ariaCurrent = button.textContent === name ? "page" : null));
 }
 
 document
   .querySelector("#app")!
-  .append(h("header", { className: "row" }, h("nav", { className: "row" }, ...navButtons), createSettingsPanel()), main);
+  .append(
+    h(
+      "header",
+      {},
+      h("strong", { className: "brand" }, "Violin Note Trainer"),
+      h("nav", {}, h("div", { role: "group" }, ...navButtons)),
+      createSettingsPanel(),
+    ),
+    main,
+  );
 
 addEventListener("pagehide", () => current?.leave());
 

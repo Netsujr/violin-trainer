@@ -43,10 +43,10 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
           { className: "row piece" },
           h("strong", {}, piece.title),
           h("span", {}, piece.subtitle ?? `${piece.notes.length} notes`),
-          h("button", { textContent: "Practice", onclick: () => goPractice(piece.id) }),
+          h("button", { textContent: "Practice", className: "outline", onclick: () => goPractice(piece.id) }),
           targetDaySelect(piece.id),
           ...(piece.source === "imported"
-            ? [h("button", { textContent: "Delete", onclick: () => remove(piece.id) })]
+            ? [h("button", { textContent: "Delete", className: "secondary outline", onclick: () => remove(piece.id) })]
             : []),
         ),
       ),

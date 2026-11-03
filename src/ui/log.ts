@@ -42,7 +42,7 @@ function recordingPlayer(entry: LogEntry, recording: Recording, urls: string[], 
   const markers = recording.markers.map((marker) =>
     h("button", {
       textContent: marker.pitch,
-      className: "marker",
+      className: "marker secondary outline",
       onclick() {
         audio.currentTime = marker.seconds;
         audio.play();
@@ -56,7 +56,7 @@ function recordingPlayer(entry: LogEntry, recording: Recording, urls: string[], 
     audio,
     h("a", { href: url, download: recordingName(entry), textContent: "Download" }),
     " ",
-    h("button", { textContent: "Delete recording", onclick: onDelete }),
+    h("button", { textContent: "Delete recording", className: "secondary outline", onclick: onDelete }),
     h("div", { className: "row" }, ...markers),
   );
 }

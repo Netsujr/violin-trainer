@@ -6,33 +6,40 @@ import { h } from "./dom";
 const LANES: StringName[] = ["E", "A", "D", "G"];
 const WIDTH = 960;
 const LANE_HEIGHT = 84;
+const HEIGHT = LANE_HEIGHT * LANES.length;
 const HIT_X = 130;
 const SPACING = 120;
 const TILE_WIDTH = 92;
 const TILE_HEIGHT = 74;
-const RING_RADIUS = 62;
+const RING_GAP = 3;
+const RING_CORNER = 11;
 const SLIDE_RATE = 0.18;
 const LOW_FINGER_COLOR = "#b03020";
 const NAME_COLOR = "#6b3a1e";
 const LETTER_COLOR = "#666";
 const TILE_COLOR = "#f3ead9";
+// Matches the palette in style.css.
+const LANE_COLORS = ["#211c16", "#1b1712"];
+const LANE_LABEL_COLOR = "#a39a8b";
+const HIT_LINE_COLOR = "#e8e2d6";
 
 export function createHighway() {
-  const canvas = h("canvas", { width: WIDTH, height: LANE_HEIGHT * LANES.length });
+  const canvas = h("canvas", { width: WIDTH * devicePixelRatio, height: HEIGHT * devicePixelRatio });
   const context = canvas.getContext("2d")!;
+  context.scale(devicePixelRatio, devicePixelRatio);
   let position = 0;
 
   function drawLanes() {
     LANES.forEach((lane, index) => {
-      context.fillStyle = index % 2 ? "#26262e" : "#1f1f26";
+      context.fillStyle = LANE_COLORS[index % 2];
       context.fillRect(0, index * LANE_HEIGHT, WIDTH, LANE_HEIGHT);
-      context.fillStyle = "#9a8f80";
+      context.fillStyle = LANE_LABEL_COLOR;
       context.font = "bold 18px system-ui";
       context.textAlign = "left";
       context.fillText(lane, 12, index * LANE_HEIGHT + LANE_HEIGHT / 2 + 6);
     });
-    context.fillStyle = "#e8e2d6";
-    context.fillRect(HIT_X - 1, 0, 2, canvas.height);
+    context.fillStyle = HIT_LINE_COLOR;
+    context.fillRect(HIT_X - 1, 0, 2, HEIGHT);
   }
 
   const laneCenter = (note: PieceNote) => (LANES.indexOf(note.string!) + 0.5) * LANE_HEIGHT;
@@ -65,18 +72,23 @@ export function createHighway() {
   }
 
   function drawHoldRing(note: PieceNote, x: number, progress: number) {
+    const width = TILE_WIDTH + RING_GAP * 2;
+    const height = TILE_HEIGHT + RING_GAP * 2;
+    const perimeter = 2 * (width + height);
     context.strokeStyle = "#4cd07d";
-    context.lineWidth = 5;
+    context.lineWidth = 4;
+    context.setLineDash([progress * perimeter, perimeter]);
     context.beginPath();
-    context.arc(x, laneCenter(note), RING_RADIUS, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+    context.roundRect(x - width / 2, laneCenter(note) - height / 2, width, height, RING_CORNER);
     context.stroke();
+    context.setLineDash([]);
   }
 
   return {
     element: canvas,
     draw(notes: PieceNote[], index: number, holdProgress: number) {
       position += (index - position) * SLIDE_RATE;
-      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.clearRect(0, 0, WIDTH, HEIGHT);
       drawLanes();
       notes.forEach((note, noteIndex) => {
         const x = HIT_X + (noteIndex - position) * SPACING;

@@ -16,6 +16,7 @@
     "vitest": "^4.1.12"
   },
   "dependencies": {
+    "@picocss/pico": "^2.1.1",
     "idb-keyval": "^6.3.0",
     "pitchy": "^4.1.0",
     "tonal": "^6.5.1",

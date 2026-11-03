@@ -12,13 +12,14 @@ export function createToggles(onChange: () => void) {
   const { toggles } = getSettings();
   return h(
     "div",
-    { className: "row" },
+    { className: "row toggles" },
     ...TOGGLES.map(([key, label]) =>
       h(
         "label",
         {},
         h("input", {
           type: "checkbox",
+          role: "switch",
           checked: toggles[key],
           onchange: (event) => {
             toggles[key] = (event.target as HTMLInputElement).checked;

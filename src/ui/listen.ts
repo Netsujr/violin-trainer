@@ -48,6 +48,7 @@ export function listenScreen(): Screen {
   let stableSince = 0;
 
   function renderNote() {
+    big.classList.toggle("idle", midi === null);
     staff.element.hidden = !toggles.staff;
     position.hidden = !toggles.fingers;
     if (midi === null) {
@@ -108,7 +109,7 @@ export function listenScreen(): Screen {
   return {
     element: h(
       "section",
-      {},
+      { className: "listen" },
       createToggles(renderNote),
       controls.element,
       big,

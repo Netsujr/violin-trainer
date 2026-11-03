@@ -121,6 +121,7 @@ export function practiceScreen(pieceId?: string): Screen {
 
   const referenceButton = h("button", {
     textContent: "Play reference",
+    className: "secondary outline",
     onclick() {
       const note = piece.notes[currentIndex()];
       if (!note) return;
@@ -132,6 +133,7 @@ export function practiceScreen(pieceId?: string): Screen {
 
   const skipButton = h("button", {
     textContent: "Skip",
+    className: "secondary outline",
     disabled: true,
     onclick() {
       const session = controls.session!;
@@ -148,11 +150,11 @@ export function practiceScreen(pieceId?: string): Screen {
   return {
     element: h(
       "section",
-      {},
+      { className: "practice" },
       createToggles(renderNotes),
       h("div", { className: "row" }, pieceSelect, controls.element, referenceButton, skipButton),
       progress,
-      h("div", { className: "row" }, needle.element, hertz),
+      h("div", { className: "row tuning" }, needle.element, hertz),
       staff.element,
       highway.element,
       stats,
