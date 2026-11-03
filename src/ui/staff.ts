@@ -13,8 +13,9 @@ const BAR_BEATS = 4;
 const BAR_NOTE_WIDTH = 40;
 const MAX_BARS_PER_LINE = 6;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 2: "h", 4: "w" };
-// Collapsed, the first note starts under the timeline's hit line: 130 of its 960 width.
-const COLLAPSED_NOTE_START = 130;
+// Collapsed, the first notehead lands under the timeline's hit line, 130 of its 960 width, with room for the clef.
+const COLLAPSED_NOTE_START = 118;
+const COLLAPSED_MARGIN = 16;
 const HIT_LINE_SHARE = 130 / 960;
 const COLLAPSED_BEAT_WIDTH = 72;
 
@@ -106,7 +107,8 @@ export function createStaff(width = 300, startCollapsed = false) {
 
     const allNotes: StaveNote[] = [];
     lines.forEach((line, lineIndex) => {
-      const stave = new Stave(0, TOP + lineIndex * LINE_HEIGHT, fullWidth - 1).addClef("treble");
+      const staveX = collapsed ? COLLAPSED_MARGIN : 0;
+      const stave = new Stave(staveX, TOP + lineIndex * LINE_HEIGHT, fullWidth - staveX - 1).addClef("treble");
       if (collapsed) stave.setNoteStartX(COLLAPSED_NOTE_START);
       stave.setContext(context).draw();
       const lineNotes = line.flat();

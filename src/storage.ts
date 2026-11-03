@@ -11,9 +11,11 @@ export type Settings = {
   holdMs: number;
   minRms: number;
   tempoOn: boolean;
+  metronomeOn: boolean;
   bpm: number;
   pattern: number;
   staffOpen: boolean;
+  optionsOpen: boolean;
   toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean };
   targetDays: Record<string, number>;
 };
@@ -26,9 +28,11 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   holdMs: 200,
   minRms: 0.01,
   tempoOn: false,
+  metronomeOn: false,
   bpm: 60,
   pattern: 0,
   staffOpen: false,
+  optionsOpen: true,
   toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true },
   targetDays: {},
 };

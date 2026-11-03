@@ -4,8 +4,10 @@ export const REFERENCE_MS = 1000;
 
 let context: AudioContext | undefined;
 
+export const sharedAudioContext = () => (context ??= new AudioContext());
+
 export function playReference(midi: number) {
-  context ??= new AudioContext();
+  const context = sharedAudioContext();
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   const seconds = REFERENCE_MS / 1000;

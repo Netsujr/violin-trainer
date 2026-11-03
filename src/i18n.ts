@@ -20,6 +20,7 @@ const en = {
   finger: (finger: string) => finger,
 
   settings: "Settings",
+  options: "Options",
   tolerance: "Tolerance",
   holdTime: "Hold time",
   micSensitivity: "Mic sensitivity (volume gate, raise it in a noisy room)",
@@ -35,6 +36,7 @@ const en = {
   stop: "Stop",
   record: "Record",
   tempo: "Tempo",
+  metronome: "Metronome",
   pattern: "Pattern",
   showFullSheet: "Show the full sheet",
   collapseSheet: "Collapse to one moving line",
@@ -109,6 +111,7 @@ const pt: Strings = {
   finger: (finger) => finger.replace(/^L(\d)$/, "$1 baixo").replace(/^H(\d)$/, "$1 alto"),
 
   settings: "Configurações",
+  options: "Opções",
   tolerance: "Tolerância",
   holdTime: "Tempo de sustentação",
   micSensitivity: "Sensibilidade do microfone (limite de volume, aumente em um ambiente barulhento)",
@@ -124,6 +127,7 @@ const pt: Strings = {
   stop: "Parar",
   record: "Gravar",
   tempo: "Andamento",
+  metronome: "Metrônomo",
   pattern: "Padrão",
   showFullSheet: "Mostrar a partitura inteira",
   collapseSheet: "Recolher em uma linha contínua",

@@ -15,7 +15,6 @@ export function createToggles(onChange: () => void, extra: (keyof Settings["togg
         {},
         h("input", {
           type: "checkbox",
-          role: "switch",
           checked: toggles[key],
           onchange: (event) => {
             toggles[key] = (event.target as HTMLInputElement).checked;

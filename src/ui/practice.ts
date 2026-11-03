@@ -1,3 +1,4 @@
+import { createMetronome } from "../audio/metronome";
 import { playReference, REFERENCE_MS } from "../audio/reference";
 import { localNumber, localTitle, t } from "../i18n";
 import { midiOf, noteLabels } from "../music/notes";
@@ -40,6 +41,7 @@ export function practiceScreen(pieceId?: string): Screen {
       return holdMs();
     },
   });
+  const metronome = createMetronome();
   const needle = createNeedle();
   const staff = createStaff(STAFF_WIDTH, !settings.staffOpen);
   const highway = createHighway(startFrom, staff.follow);
@@ -139,7 +141,10 @@ export function practiceScreen(pieceId?: string): Screen {
   function glideToNextNote(session: Session, cents: number, now: number) {
     const noteMs = (session.current.beats ?? 1) * beatMs();
     const gridMs = Math.min(noteMs, beatMs());
-    const due = (lastBeat ?? now - holdMs()) + noteMs;
+    // With the metronome on, the first note joins its beat instead of setting one.
+    const attack = now - holdMs();
+    const clickBeat = settings.metronomeOn ? metronome.nearestBeat(attack, settings.bpm) : null;
+    const due = (lastBeat ?? clickBeat ?? attack) + noteMs;
     lastBeat = due + Math.max(0, Math.ceil((now + MIN_GLIDE_BEATS * gridMs - due) / gridMs)) * gridMs;
     pendingHit = { cents, at: now, arrivesAt: lastBeat };
     judge.setTarget(session.currentMidi, session.currentMidi);
@@ -172,6 +177,7 @@ export function practiceScreen(pieceId?: string): Screen {
 
   function onReading(frequency: number | null, now: number) {
     const session = controls.session!;
+    if (settings.metronomeOn) metronome.tick(now, settings.bpm);
     if (!session.finished) {
       if (pendingHit && now >= pendingHit.arrivesAt) arriveOnBeat(session);
       const verdict = judge.update(now < mutedUntil ? null : frequency, now);
@@ -195,6 +201,7 @@ export function practiceScreen(pieceId?: string): Screen {
     piece: () => piece,
     onReading,
     onStart() {
+      metronome.reset();
       skipButton.disabled = false;
       highway.jumpTo(startIndex);
       startFrom(startIndex);
@@ -258,11 +265,12 @@ export function practiceScreen(pieceId?: string): Screen {
       type: "range",
       min: "30",
       max: "120",
-      step: "5",
+      step: "1",
       value: String(settings.bpm),
       oninput(event) {
         settings.bpm = Number((event.target as HTMLInputElement).value);
         bpmValue.textContent = `${settings.bpm} BPM`;
+        lastBeat = null;
         saveSettings();
       },
     }),
@@ -273,21 +281,44 @@ export function practiceScreen(pieceId?: string): Screen {
     {},
     h("input", {
       type: "checkbox",
-      role: "switch",
       checked: settings.tempoOn,
       onchange(event) {
         settings.tempoOn = (event.target as HTMLInputElement).checked;
-        showBpm();
         saveSettings();
       },
     }),
     ` ${t.tempo}`,
   );
-  // Patterns need a beat length even with tempo off.
-  const showBpm = () => {
-    bpmControl.hidden = !settings.tempoOn && settings.pattern === 0;
-  };
-  showBpm();
+  const metronomeSwitch = h(
+    "label",
+    {},
+    h("input", {
+      type: "checkbox",
+      checked: settings.metronomeOn,
+      onchange(event) {
+        settings.metronomeOn = (event.target as HTMLInputElement).checked;
+        lastBeat = null;
+        saveSettings();
+      },
+    }),
+    ` ${t.metronome}`,
+  );
+  const toggles = createToggles(renderNotes, ["grid"]);
+  toggles.append(tempoSwitch, metronomeSwitch);
+  const optionsPanel = h(
+    "details",
+    {
+      className: "options",
+      open: settings.optionsOpen,
+      ontoggle() {
+        settings.optionsOpen = optionsPanel.open;
+        saveSettings();
+      },
+    },
+    h("summary", {}, t.options),
+    toggles,
+    h("div", { className: "row" }, pieceSelect, controls.recordLabel, bpmControl),
+  );
 
   const patternButtons = PATTERNS.map((_, pattern) =>
     h("button", {
@@ -299,7 +330,6 @@ export function practiceScreen(pieceId?: string): Screen {
         settings.pattern = pattern;
         saveSettings();
         patternButtons.forEach((button, index) => (button.ariaPressed = String(index === pattern)));
-        showBpm();
         loadPiece();
       },
     }),
@@ -311,9 +341,9 @@ export function practiceScreen(pieceId?: string): Screen {
     element: h(
       "section",
       { className: "practice" },
-      createToggles(renderNotes, ["grid"]),
-      h("div", { className: "row" }, pieceSelect, controls.element, referenceButton, skipButton, tempoSwitch, bpmControl),
+      optionsPanel,
       progress,
+      h("div", { className: "row actions" }, controls.startButton, referenceButton, skipButton, controls.message),
       h("div", { className: "row tuning" }, needle.element, hertz),
       highway.element,
       stats,
