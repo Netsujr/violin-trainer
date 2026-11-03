@@ -89,11 +89,13 @@ export function practiceScreen(pieceId?: string): Screen {
     piece: () => piece,
     onReading,
     onStart() {
+      skipButton.disabled = false;
       stats.replaceChildren();
       judge.setTarget(controls.session!.currentMidi);
       renderNotes();
     },
     onStop() {
+      skipButton.disabled = true;
       holdProgress = 0;
       needle.show(null);
       hertz.textContent = "";
@@ -130,9 +132,10 @@ export function practiceScreen(pieceId?: string): Screen {
 
   const skipButton = h("button", {
     textContent: "Skip",
+    disabled: true,
     onclick() {
-      const session = controls.session;
-      if (!session || session.finished) return;
+      const session = controls.session!;
+      if (session.finished) return;
 
       const previousMidi = session.currentMidi;
       session.skip(performance.now());

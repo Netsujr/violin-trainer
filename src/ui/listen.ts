@@ -15,15 +15,15 @@ export function createNeedle() {
   const mark = h("i");
   const value = h("span", { textContent: "—" });
   const track = h("div", { className: "needle" }, mark);
-  return {
-    element: h("div", { className: "row" }, "♭", track, "♯", value),
-    show(cents: number | null) {
-      track.classList.toggle("in-tune", cents !== null && Math.abs(cents) <= getSettings().toleranceCents);
-      mark.hidden = cents === null;
-      mark.style.left = `${50 + Math.max(-50, Math.min(50, cents ?? 0))}%`;
-      value.textContent = cents === null ? "—" : `${cents > 0 ? "+" : ""}${Math.round(cents)} cents`;
-    },
+  const show = (cents: number | null) => {
+    track.classList.toggle("in-tune", cents !== null && Math.abs(cents) <= getSettings().toleranceCents);
+    mark.hidden = cents === null;
+    mark.style.left = `${50 + Math.max(-50, Math.min(50, cents ?? 0))}%`;
+    value.textContent = cents === null ? "—" : `${cents > 0 ? "+" : ""}${Math.round(cents)} cents`;
   };
+  show(null);
+
+  return { element: h("div", { className: "row" }, "♭", track, "♯", value), show };
 }
 
 function positionGuess(midi: number) {

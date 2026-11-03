@@ -12,6 +12,7 @@ export function createRunControls(options: {
   const record = h("input", { type: "checkbox" });
   const message = h("span", { className: "warning" });
   let run: Run | null = null;
+  let saving: Promise<void> = Promise.resolve();
   let left = false;
 
   const showRunning = () => {
@@ -39,13 +40,14 @@ export function createRunControls(options: {
   }
 
   async function stop() {
-    if (!run) return;
+    if (!run) return saving;
 
     const finishing = run;
     run = null;
     button.disabled = true;
     showRunning();
-    await finishing.stop();
+    saving = finishing.stop();
+    await saving;
     button.disabled = false;
     options.onStop?.();
   }

@@ -10,7 +10,7 @@ const describeSession = (entry: LogEntry) =>
     new Date(entry.startedAt).toLocaleString(),
     entry.pieceTitle,
     `${entry.minutes.toFixed(1)} min`,
-    `${entry.passes} passes`,
+    `${entry.passes} ${entry.passes === 1 ? "pass" : "passes"}`,
     `${entry.notesHit} hit, ${entry.notesSkipped} skipped`,
     entry.averageCents === null ? null : `${entry.averageCents.toFixed(0)} cents off`,
     entry.slowest.length ? `slowest ${entry.slowest.map((note) => `${note.pitch} ${note.seconds.toFixed(1)} s`).join(", ")}` : null,

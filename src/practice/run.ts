@@ -20,6 +20,7 @@ export async function startRun(
   return {
     session,
     async stop() {
+      // ponytail: closing the tab mid-recording loses the audio, the log entry stays. Flush chunks to IndexedDB if that bites.
       const recordingId = recorder ? crypto.randomUUID() : undefined;
       appendLog(buildEntry(session, performance.now(), recordingId));
       const recorded = recorder?.stop();
