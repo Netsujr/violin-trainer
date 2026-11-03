@@ -20,6 +20,8 @@ const REFERENCE_ECHO_MS = 150;
 const MIN_GLIDE_BEATS = 0.25;
 // With tempo on, a pattern note clears after this share of its length, leaving the rest for the glide to the next beat.
 const TEMPO_HOLD_SHARE = 0.5;
+// Otherwise it clears just short of its full length, because the mic takes a moment to hear a note start.
+const FULL_HOLD_SHARE = 0.9;
 const STAFF_SIDE_PADDING = 16;
 
 export function practiceScreen(pieceId?: string): Screen {
@@ -112,7 +114,7 @@ export function practiceScreen(pieceId?: string): Screen {
     if (!beats) return settings.holdMs;
 
     const noteMs = beats * beatMs();
-    return settings.tempoOn && index < piece.notes.length - 1 ? noteMs * TEMPO_HOLD_SHARE : noteMs;
+    return noteMs * (settings.tempoOn && index < piece.notes.length - 1 ? TEMPO_HOLD_SHARE : FULL_HOLD_SHARE);
   }
 
   function loadPiece() {
@@ -144,12 +146,12 @@ export function practiceScreen(pieceId?: string): Screen {
       .map((note) => `${noteLabels(note.pitch).solfege} (${localNumber(note.seconds, 1)} s)`)
       .join(", ");
     const seconds = localNumber(session.lastRunSeconds, 0);
-    const cents = Math.round(entry.averageCents ?? 0);
+    const cents = entry.averageCents === null ? null : Math.round(entry.averageCents);
     stats.replaceChildren(
       h("p", {}, runSummary(entry.passes, seconds)),
       h("p", {}, t.summary(t.hitSkipped(entry.notesHit, entry.notesSkipped), cents)),
       h("p", {}, t.slowest(slowest || t.slowestNone)),
-      h("button", { textContent: t.playAgain, onclick: () => startFrom(startIndex) }),
+      h("button", { textContent: t.playAgain, onclick: () => (controls.session ? startFrom(startIndex) : controls.startButton.click()) }),
     );
   }
 
@@ -200,7 +202,11 @@ export function practiceScreen(pieceId?: string): Screen {
 
   function moveOn(session: Session, previousMidi?: number) {
     holdProgress = 0;
-    if (session.finished) showStats(session);
+    if (session.finished) {
+      needle.show(null);
+      hertz.textContent = "";
+      showStats(session);
+    }
     // Fast bow changes are too short to detect, so inside a pattern the beat and hold time separate repeated notes.
     else judge.setTarget(session.currentMidi, piece.pattern ? undefined : previousMidi);
     renderNotes();

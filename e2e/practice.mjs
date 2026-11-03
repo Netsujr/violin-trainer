@@ -1,8 +1,7 @@
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, progress, OUT } from "./lib.mjs";
 
 const D_MAJOR = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
-const progress = (page) => page.locator("section > p").first().innerText();
 const indexOf = (text) => Number(text.match(/Note (\d+) of/)?.[1] ?? 99);
 
 // Full D major, looped
@@ -38,6 +37,54 @@ wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), 
   console.log("  log:", JSON.stringify(log[0]));
   check("log entry written", log.length === 1 && log[0].passes === 1 && log[0].notesHit === 15 && log[0].slowest.length === 3);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}
+
+// Finishing, then stopping
+{
+  const s = await open(OUT + "silent.wav");
+  await nav(s.page, "Practice");
+  await start(s.page);
+  await s.page.waitForSelector('button:text-is("Stop")');
+  for (let i = 0; i < 15; i++) await s.page.click('button:text-is("Skip")');
+  await sleep(150);
+  const stats = await s.page.locator(".stats").innerText();
+  check("with no hits, stats don't claim an accuracy", stats.includes("0 hit, 15 skipped") && !stats.includes("cents off") && stats.includes("Slowest: none"), stats.replaceAll("\n", " / "));
+  await stop(s.page);
+  await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
+  await s.page.click('button:text-is("Play again")');
+  await s.page.waitForSelector('button:text-is("Stop")');
+  check("Play again after Stop starts a new run", (await progress(s.page)).startsWith("Note 1 of") && (await s.page.locator(".stats").innerText()) === "");
+  await stop(s.page);
+  await sleep(150);
+  check("that made a second log entry", (await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")).length)) === 2);
+  await s.close();
+}
+wav(OUT + "ended.wav", [note(62, 3)]);
+{
+  const s = await open(OUT + "ended.wav");
+  await s.page.evaluate(() => localStorage.setItem("pieces", JSON.stringify([{ id: "one", title: "One", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }] }])));
+  await s.page.reload();
+  await s.page.waitForSelector("nav button");
+  await nav(s.page, "Practice");
+  await s.page.locator("select").selectOption("one");
+  await start(s.page);
+  await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 5000 });
+  await sleep(300);
+  const needle = await s.page.evaluate(() => ({ hidden: document.querySelector(".needle i").hidden, value: document.querySelector(".needle ~ span").textContent, hz: document.querySelector(".tuning > span").textContent }));
+  check("finishing clears the needle, even with the note still sounding", needle.hidden && needle.value === "—" && needle.hz === "", JSON.stringify(needle));
+  await s.close();
+}
+{
+  const s = await open(OUT + "ended.wav");
+  await nav(s.page, "Practice");
+  await start(s.page);
+  await s.page.waitForSelector('button:text-is("Stop")');
+  await sleep(600);
+  await s.page.locator("select").selectOption("g-major-2oct");
+  await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
+  const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")));
+  check("changing piece ends the session and logs it under the old piece", log.length === 1 && log[0].pieceTitle === "D major" && (await progress(s.page)).endsWith("of 29"), JSON.stringify(log.map((entry) => entry.pieceTitle)));
   await s.close();
 }
 

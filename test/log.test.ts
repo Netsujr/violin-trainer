@@ -20,6 +20,23 @@ const entry = (startedAt: string, minutes: number, pieceId = "p", notesHit = 1):
 });
 
 describe("session and log entry", () => {
+  it("in tempo mode, starts the next note on the beat but keeps the real time of the hit", () => {
+    const session = new Session(piece, 0);
+    session.hit(10, 300, 1000);
+    expect(session.hits[0]).toMatchObject({ ms: 300, at: 300 });
+    session.hit(10, 1250, 2000);
+    expect(session.hits[1].ms).toBe(250);
+  });
+
+  it("does not time a rhythm pattern as a pass, so pass times stay comparable", () => {
+    const session = new Session({ ...piece, pattern: 3 }, 0);
+    session.jumpTo(0, 0);
+    for (const now of [1000, 2000, 3000, 4000]) session.hit(10, now);
+    expect(session.finished).toBe(true);
+    expect(session.lastRunSeconds).toBe(4);
+    expect(session.passSeconds).toEqual([]);
+  });
+
   it("jumps without counting a hit or a skip, and times a partial run but not as a pass", () => {
     const session = new Session(piece, 0);
     session.hit(10, 1000);

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browser": "s=0; for f in listen practice library extra race timeline sections language tempo flows; do echo \"== $f\"; node e2e/$f.mjs || s=1; done; exit $s"
   },
   "devDependencies": {
     "playwright-core": "^1.64.1",

@@ -75,5 +75,14 @@ document.querySelector("#app")!.append(header, main);
 
 addEventListener("pagehide", () => current?.leave());
 
+// The Settings panel covers the run buttons, so anything outside it closes it, as a menu would.
+const closeSettings = () => header.querySelector("details")?.removeAttribute("open");
+addEventListener("click", (event) => {
+  if (!header.querySelector("details")?.contains(event.target as Node)) closeSettings();
+});
+addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeSettings();
+});
+
 await document.fonts.load("30px Bravura");
 show("Listen");

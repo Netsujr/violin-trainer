@@ -20,6 +20,24 @@ const newJudge = (target = A4, previous?: number) => {
 };
 
 describe("judge", () => {
+  it("reports when a note has stopped sounding, which tempo mode needs for repeated notes", () => {
+    const judge = newJudge(A4, A4);
+    expect(judge.released).toBe(false);
+    stream(judge, 0, 200, inTune);
+    expect(judge.released).toBe(false);
+    stream(judge, 200, 100, null);
+    expect(judge.released).toBe(true);
+  });
+
+  it("reads its hold time live, so a pattern note can have its own", () => {
+    const options = { toleranceCents: 40, holdMs: 200 };
+    const judge = createJudge(options);
+    judge.setTarget(A4);
+    options.holdMs = 1000;
+    expect(stream(judge, 0, 500, inTune).hit).toBe(false);
+    expect(stream(judge, 500, 600, inTune).hit).toBe(true);
+  });
+
   it("hits only after the hold time", () => {
     expect(stream(newJudge(), 0, 150, inTune).hit).toBe(false);
     expect(stream(newJudge(), 0, 220, inTune).hit).toBe(true);

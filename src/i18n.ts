@@ -58,7 +58,8 @@ const en = {
   passDone: (pass: number, seconds: string) => `Pass ${pass} done in ${seconds} s.`,
   partialDone: (note: number, seconds: string) => `Note ${note} to the end done in ${seconds} s.`,
   hitSkipped: (hit: number, skipped: number) => `${hit} hit, ${skipped} skipped`,
-  summary: (hitSkipped: string, cents: number) => `This session: ${hitSkipped}, ${centsText(cents)} off on average.`,
+  summary: (hitSkipped: string, cents: number | null) =>
+    `This session: ${hitSkipped}${cents === null ? "" : `, ${centsText(cents)} off on average`}.`,
   slowest: (notes: string) => `Slowest: ${notes}`,
   slowestNone: "none",
   playAgain: "Play again",
@@ -151,7 +152,7 @@ const pt: Strings = {
   passDone: (pass, seconds) => `Passada ${pass} concluída em ${seconds} s.`,
   partialDone: (note, seconds) => `Da nota ${note} até o fim em ${seconds} s.`,
   hitSkipped: (hit, skipped) => `${plural(hit, "acerto", "acertos")}, ${plural(skipped, "pulada", "puladas")}`,
-  summary: (hitSkipped, cents) => `Nesta sessão: ${hitSkipped}, ${centsText(cents)} de desvio em média.`,
+  summary: (hitSkipped, cents) => `Nesta sessão: ${hitSkipped}${cents === null ? "" : `, ${centsText(cents)} de desvio em média`}.`,
   slowest: (notes) => `Mais lentas: ${notes}`,
   slowestNone: "nenhuma",
   playAgain: "Tocar de novo",

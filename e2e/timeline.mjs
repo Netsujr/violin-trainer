@@ -58,6 +58,16 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await start(page);
   await page.waitForSelector('button:text-is("Stop")');
   await sleep(1500);
+  const finishing = await open(OUT + "silent.wav");
+  await nav(finishing.page, "Practice");
+  await start(finishing.page);
+  await finishing.page.waitForSelector('button:text-is("Stop")');
+  for (let i = 0; i < 15; i++) await finishing.page.click('button:text-is("Skip")');
+  await finishing.page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 0));
+  await sleep(150);
+  await clickTile(finishing.page, 3, "D");
+  check("clicking a note after finishing carries on from it", (await progress(finishing.page)) === "Note 4 of 15" && (await finishing.page.locator(".stats").innerText()) === "" && (await finishing.page.locator('button:text-is("Stop")').count()) === 1, await progress(finishing.page));
+  await finishing.close();
   check("Start plays from the picked note, and it can be hit", (await progress(page)) === "Note 7 of 15", await progress(page));
 
   await page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 14 * 120));
@@ -94,6 +104,10 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await page.locator("select").selectOption(twoOctaves);
   check("changing piece goes back to note 1", (await progress(page)).startsWith("Note 1 of"), await progress(page));
   const count = Number((await progress(page)).match(/of (\d+)/)[1]);
+  const closed = await page.locator(".staff").evaluate((el) => ({ staves: el.querySelectorAll(".vf-stave").length, notes: el.querySelectorAll(".vf-stavenote").length, scrolls: el.scrollWidth > el.clientWidth }));
+  check("the closed staff is one long line of every note", closed.staves === 1 && closed.notes === count && closed.scrolls, JSON.stringify(closed));
+  await page.click(".staff-toggle");
+  await sleep(200);
   const staff = await page.locator(".staff").evaluate((el) => {
     const box = el.getBoundingClientRect();
     // Glyph boxes include the font's tall line box, so the vertical check uses each notehead's baseline.
@@ -116,9 +130,6 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await page.screenshot({ path: OUT + "practice-gmajor.png", fullPage: true });
   const red = await page.locator(".staff .vf-stavenote.current .vf-notehead text").evaluate((t) => getComputedStyle(t).fill);
   check("the current note is red on the staff", red === "rgb(176, 48, 32)", red);
-  await page.locator('label:has-text("Staff") input').uncheck();
-  check("the Staff switch hides it", await page.locator(".staff").isHidden());
-  await page.locator('label:has-text("Staff") input').check();
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
