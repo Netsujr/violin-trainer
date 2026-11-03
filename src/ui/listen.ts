@@ -67,7 +67,7 @@ export function listenScreen(): Screen {
     const names = [toggles.noteNames && `${solfege}${octave}`, toggles.letterNames && `${letter}${octave}`];
     big.textContent = names.filter(Boolean).join(" / ");
     position.textContent = positionGuess(midi);
-    staff.draw([pitch]);
+    staff.draw([{ pitch }]);
   }
 
   function hear(frequency: number, now: number) {

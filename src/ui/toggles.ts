@@ -1,15 +1,15 @@
 import { t } from "../i18n";
-import { getSettings, saveSettings } from "../storage";
+import { getSettings, saveSettings, type Settings } from "../storage";
 import { h } from "./dom";
 
 const TOGGLES = ["fingers", "noteNames", "letterNames", "staff"] as const;
 
-export function createToggles(onChange: () => void) {
+export function createToggles(onChange: () => void, extra: (keyof Settings["toggles"])[] = []) {
   const { toggles } = getSettings();
   return h(
     "div",
     { className: "row toggles" },
-    ...TOGGLES.map((key) =>
+    ...[...TOGGLES, ...extra].map((key) =>
       h(
         "label",
         {},

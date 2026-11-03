@@ -1,10 +1,11 @@
 import { playReference, REFERENCE_MS } from "../audio/reference";
 import { localNumber, localTitle, t } from "../i18n";
 import { midiOf, noteLabels } from "../music/notes";
+import { PATTERNS, withPattern } from "../music/patterns";
 import { createJudge } from "../practice/judge";
 import { buildEntry } from "../practice/log";
 import type { Session } from "../practice/session";
-import { allPieces, getSettings } from "../storage";
+import { allPieces, getSettings, saveSettings } from "../storage";
 import { h, type Screen } from "./dom";
 import { createHighway } from "./highway";
 import { createNeedle } from "./listen";
@@ -13,36 +14,95 @@ import { createStaff } from "./staff";
 import { createToggles } from "./toggles";
 
 const REFERENCE_ECHO_MS = 150;
+// A hit closer to the beat than this waits for the following beat, so the glide never looks rushed.
+const MIN_GLIDE_BEATS = 0.25;
+// With tempo on, a pattern note clears after this share of its length, leaving the rest for the glide to the next beat.
+const TEMPO_HOLD_SHARE = 0.5;
 // The page content is 960 wide, less the staff's side padding.
 const STAFF_WIDTH = 944;
 
 export function practiceScreen(pieceId?: string): Screen {
   const settings = getSettings();
   const pieces = allPieces();
-  let piece = pieces.find((candidate) => candidate.id === pieceId) ?? pieces[0];
+  let basePiece = pieces.find((candidate) => candidate.id === pieceId) ?? pieces[0];
+  let piece = withPattern(basePiece, settings.pattern);
   let mutedUntil = 0;
   let holdProgress = 0;
   let startIndex = 0;
+  let lastBeat: number | null = null;
+  let pendingHit: { cents: number; at: number; arrivesAt: number } | null = null;
 
-  const judge = createJudge(settings);
+  const judge = createJudge({
+    get toleranceCents() {
+      return settings.toleranceCents;
+    },
+    get holdMs() {
+      return holdMs();
+    },
+  });
   const needle = createNeedle();
-  const staff = createStaff(STAFF_WIDTH);
-  const highway = createHighway(startFrom);
+  const staff = createStaff(STAFF_WIDTH, !settings.staffOpen);
+  const highway = createHighway(startFrom, staff.follow);
+  const staffToggle = h("button", {
+    className: "staff-toggle",
+    textContent: "▾",
+    onclick() {
+      settings.staffOpen = !settings.staffOpen;
+      saveSettings();
+      staff.setCollapsed(!settings.staffOpen);
+      labelStaffToggle();
+      renderNotes();
+    },
+  });
+  const staffPanel = h("div", { className: "staff-panel" }, staff.element, staffToggle);
   const hertz = h("span");
   const progress = h("p");
   const stats = h("div", { className: "stats" });
 
   const currentIndex = () => controls.session?.index ?? startIndex;
 
+  function labelStaffToggle() {
+    const label = settings.staffOpen ? t.collapseSheet : t.showFullSheet;
+    staffToggle.ariaExpanded = String(settings.staffOpen);
+    staffToggle.ariaLabel = label;
+    staffToggle.title = label;
+  }
+  labelStaffToggle();
+
+  const beatMs = () => 60000 / settings.bpm;
+
+  // A pattern note is held for its own length, not the usual short hold.
+  function holdMs() {
+    const index = currentIndex();
+    const beats = piece.notes[index]?.beats;
+    if (!beats) return settings.holdMs;
+
+    const noteMs = beats * beatMs();
+    return settings.tempoOn && index < piece.notes.length - 1 ? noteMs * TEMPO_HOLD_SHARE : noteMs;
+  }
+
+  function loadPiece() {
+    piece = withPattern(basePiece, settings.pattern);
+    stats.replaceChildren();
+    startIndex = 0;
+    highway.jumpTo(0);
+    renderNotes();
+  }
+
   function renderNotes() {
     const index = currentIndex();
     const note = piece.notes[index];
-    staff.element.hidden = !settings.toggles.staff;
-    staff.draw(piece.notes.map(({ pitch }) => pitch), index);
+    staffPanel.hidden = !settings.toggles.staff;
+    staff.draw(piece.notes, index);
     progress.textContent = note
       ? `${t.noteOf(index + 1, piece.notes.length)}${note.bar ? t.bar(note.bar) : ""}`
       : t.allDone(piece.notes.length);
     highway.draw(piece.notes, index, holdProgress);
+  }
+
+  function runSummary(passes: number, seconds: string) {
+    if (piece.pattern) return t.patternDone(piece.pattern + 1, seconds);
+    return startIndex === 0 ? t.passDone(passes, seconds) : t.partialDone(startIndex + 1, seconds);
   }
 
   function showStats(session: Session) {
@@ -53,7 +113,7 @@ export function practiceScreen(pieceId?: string): Screen {
     const seconds = localNumber(session.lastRunSeconds, 0);
     const cents = Math.round(entry.averageCents ?? 0);
     stats.replaceChildren(
-      h("p", {}, startIndex === 0 ? t.passDone(entry.passes, seconds) : t.partialDone(startIndex + 1, seconds)),
+      h("p", {}, runSummary(entry.passes, seconds)),
       h("p", {}, t.summary(t.hitSkipped(entry.notesHit, entry.notesSkipped), cents)),
       h("p", {}, t.slowest(slowest || t.slowestNone)),
       h("button", { textContent: t.playAgain, onclick: () => startFrom(startIndex) }),
@@ -61,6 +121,8 @@ export function practiceScreen(pieceId?: string): Screen {
   }
 
   function startFrom(index: number) {
+    cancelGlide();
+    lastBeat = null;
     startIndex = index;
     const session = controls.session;
     if (session) {
@@ -72,24 +134,58 @@ export function practiceScreen(pieceId?: string): Screen {
     renderNotes();
   }
 
-  function moveOn(session: Session, previousMidi: number) {
+  // With tempo on, a hit waits for the next beat while the timeline glides there.
+  // A hit lands one hold time after the bow starts, so the first note's start sets the beat, not its hit.
+  function glideToNextNote(session: Session, cents: number, now: number) {
+    const noteMs = (session.current.beats ?? 1) * beatMs();
+    const gridMs = Math.min(noteMs, beatMs());
+    const due = (lastBeat ?? now - holdMs()) + noteMs;
+    lastBeat = due + Math.max(0, Math.ceil((now + MIN_GLIDE_BEATS * gridMs - due) / gridMs)) * gridMs;
+    pendingHit = { cents, at: now, arrivesAt: lastBeat };
+    judge.setTarget(session.currentMidi, session.currentMidi);
+    highway.glideTo(session.index + 1, lastBeat - now);
+  }
+
+  function arriveOnBeat(session: Session) {
+    const { cents, at, arrivesAt } = pendingHit!;
+    pendingHit = null;
+    const previousMidi = session.currentMidi;
+    const released = judge.released;
+    session.hit(cents, at, arrivesAt);
+    moveOn(session, released ? undefined : previousMidi);
+  }
+
+  function cancelGlide() {
+    if (!pendingHit) return;
+
+    pendingHit = null;
+    highway.jumpTo(currentIndex());
+  }
+
+  function moveOn(session: Session, previousMidi?: number) {
     holdProgress = 0;
     if (session.finished) showStats(session);
-    else judge.setTarget(session.currentMidi, previousMidi);
+    // Fast bow changes are too short to detect, so inside a pattern the beat and hold time separate repeated notes.
+    else judge.setTarget(session.currentMidi, piece.pattern ? undefined : previousMidi);
     renderNotes();
   }
 
   function onReading(frequency: number | null, now: number) {
     const session = controls.session!;
     if (!session.finished) {
+      if (pendingHit && now >= pendingHit.arrivesAt) arriveOnBeat(session);
       const verdict = judge.update(now < mutedUntil ? null : frequency, now);
-      holdProgress = verdict.progress;
+      holdProgress = pendingHit ? 1 : verdict.progress;
       needle.show(verdict.cents);
       hertz.textContent = frequency === null ? "" : `${localNumber(frequency, 1)} Hz`;
-      if (verdict.hit) {
-        const previousMidi = session.currentMidi;
-        session.hit(verdict.averageCents, now);
-        moveOn(session, previousMidi);
+      if (verdict.hit && !pendingHit) {
+        if (settings.tempoOn && session.index < piece.notes.length - 1) {
+          glideToNextNote(session, verdict.averageCents, now);
+        } else {
+          const previousMidi = session.currentMidi;
+          session.hit(verdict.averageCents, now);
+          moveOn(session, previousMidi);
+        }
       }
     }
     highway.draw(piece.notes, session.index, holdProgress);
@@ -104,6 +200,7 @@ export function practiceScreen(pieceId?: string): Screen {
       startFrom(startIndex);
     },
     onStop() {
+      cancelGlide();
       skipButton.disabled = true;
       holdProgress = 0;
       needle.show(null);
@@ -117,15 +214,12 @@ export function practiceScreen(pieceId?: string): Screen {
     {
       onchange: async () => {
         await controls.stop();
-        piece = pieces.find((candidate) => candidate.id === pieceSelect.value)!;
-        stats.replaceChildren();
-        startIndex = 0;
-        highway.jumpTo(0);
-        renderNotes();
+        basePiece = pieces.find((candidate) => candidate.id === pieceSelect.value)!;
+        loadPiece();
       },
     },
     ...pieces.map((candidate) =>
-      h("option", { value: candidate.id, selected: candidate === piece, textContent: localTitle(candidate.id, candidate.title) }),
+      h("option", { value: candidate.id, selected: candidate === basePiece, textContent: localTitle(candidate.id, candidate.title) }),
     ),
   );
 
@@ -149,11 +243,67 @@ export function practiceScreen(pieceId?: string): Screen {
       const session = controls.session!;
       if (session.finished) return;
 
+      cancelGlide();
       const previousMidi = session.currentMidi;
       session.skip(performance.now());
       moveOn(session, previousMidi);
     },
   });
+
+  const bpmValue = h("output", { textContent: `${settings.bpm} BPM` });
+  const bpmControl = h(
+    "label",
+    { className: "bpm" },
+    h("input", {
+      type: "range",
+      min: "30",
+      max: "120",
+      step: "5",
+      value: String(settings.bpm),
+      oninput(event) {
+        settings.bpm = Number((event.target as HTMLInputElement).value);
+        bpmValue.textContent = `${settings.bpm} BPM`;
+        saveSettings();
+      },
+    }),
+    bpmValue,
+  );
+  const tempoSwitch = h(
+    "label",
+    {},
+    h("input", {
+      type: "checkbox",
+      role: "switch",
+      checked: settings.tempoOn,
+      onchange(event) {
+        settings.tempoOn = (event.target as HTMLInputElement).checked;
+        showBpm();
+        saveSettings();
+      },
+    }),
+    ` ${t.tempo}`,
+  );
+  // Patterns need a beat length even with tempo off.
+  const showBpm = () => {
+    bpmControl.hidden = !settings.tempoOn && settings.pattern === 0;
+  };
+  showBpm();
+
+  const patternButtons = PATTERNS.map((_, pattern) =>
+    h("button", {
+      textContent: String(pattern + 1),
+      title: `${t.pattern} ${pattern + 1}`,
+      ariaPressed: String(pattern === settings.pattern),
+      async onclick() {
+        await controls.stop();
+        settings.pattern = pattern;
+        saveSettings();
+        patternButtons.forEach((button, index) => (button.ariaPressed = String(index === pattern)));
+        showBpm();
+        loadPiece();
+      },
+    }),
+  );
 
   renderNotes();
 
@@ -161,13 +311,14 @@ export function practiceScreen(pieceId?: string): Screen {
     element: h(
       "section",
       { className: "practice" },
-      createToggles(renderNotes),
-      h("div", { className: "row" }, pieceSelect, controls.element, referenceButton, skipButton),
+      createToggles(renderNotes, ["grid"]),
+      h("div", { className: "row" }, pieceSelect, controls.element, referenceButton, skipButton, tempoSwitch, bpmControl),
       progress,
       h("div", { className: "row tuning" }, needle.element, hertz),
       highway.element,
       stats,
-      staff.element,
+      staffPanel,
+      h("div", { className: "row patterns" }, t.pattern, h("div", { role: "group", ariaLabel: t.pattern }, ...patternButtons)),
     ),
     leave: controls.leave,
   };

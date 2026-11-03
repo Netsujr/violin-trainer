@@ -84,7 +84,8 @@ header .language button {
 }
 
 nav button:not([aria-current]),
-.language button[aria-pressed="false"] {
+.language button[aria-pressed="false"],
+.patterns button[aria-pressed="false"] {
   --pico-background-color: var(--pico-card-background-color);
   --pico-border-color: var(--pico-muted-border-color);
   --pico-color: var(--pico-muted-color);
@@ -299,15 +300,83 @@ section > ul > li {
 }
 
 /* Practice */
+.patterns [role="group"] {
+  width: auto;
+  margin: 0;
+}
+
+.patterns button {
+  --pico-form-element-spacing-horizontal: 1rem;
+}
+
+.bpm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bpm input {
+  width: 6rem;
+  margin: 0;
+}
+
 .practice > p {
   margin: 1rem 0 0;
   font-size: 1.25rem;
   font-weight: 600;
 }
 
-.practice > .staff {
-  width: 100%;
+.staff-panel {
+  position: relative;
   margin-block: 1rem;
+}
+
+.staff-panel .staff {
+  width: 100%;
+}
+
+.staff.collapsed {
+  padding-inline: 0;
+  overflow: hidden;
+}
+
+/* The collapsed line's playhead, under the timeline's hit line: 130 of its 960 width. */
+.staff-panel:has(.collapsed)::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: calc(130 / 960 * 100%);
+  width: 2px;
+  background: #b03020;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.staff-toggle {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0 0.625rem;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  --pico-background-color: #4a4036;
+  --pico-border-color: #4a4036;
+  --pico-color: #f3ead9;
+}
+
+.staff-panel .staff-toggle:is(:hover, :active, :focus) {
+  --pico-background-color: #5a4e42;
+  --pico-border-color: #5a4e42;
+  --pico-color: #f3ead9;
+}
+
+.staff-panel .staff-toggle:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+.staff-toggle[aria-expanded="true"] {
+  transform: rotate(180deg);
 }
 
 /* Library */

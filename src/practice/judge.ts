@@ -33,6 +33,11 @@ export function createJudge(options: { toleranceCents: number; holdMs: number })
       resetHold();
     },
 
+    // After setTarget(midi, midi), this turns true once that note has stopped sounding.
+    get released() {
+      return !needsRelease;
+    },
+
     update(frequency: number | null, now: number): Verdict {
       const cents = frequency === null ? null : centsToTarget(frequency, target);
       const inTune = cents !== null && Math.abs(cents) <= options.toleranceCents;

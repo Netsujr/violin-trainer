@@ -8,6 +8,7 @@ export type PieceNote = {
   string?: StringName;
   finger?: string;
   bar?: number;
+  beats?: number;
 };
 
 export type Piece = {
@@ -16,6 +17,7 @@ export type Piece = {
   subtitle?: string;
   source: string;
   notes: PieceNote[];
+  pattern?: number;
 };
 
 const ACCIDENTAL: Record<string, string> = { "": "", "#": "♯", b: "♭" };

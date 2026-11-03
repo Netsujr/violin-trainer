@@ -9,8 +9,9 @@ const WIDTH = 960;
 const LANE_HEIGHT = 84;
 const HEIGHT = LANE_HEIGHT * LANES.length;
 const HIT_X = 130;
-const SPACING = 120;
-const TILE_WIDTH = 92;
+const BEAT_WIDTH = 120;
+const BAR_BEATS = 4;
+const TILE_GAP = 8;
 const TILE_HEIGHT = 74;
 const OUTLINE_GAP = 3;
 const OUTLINE_CORNER = 11;
@@ -24,8 +25,12 @@ const HOLD_COLOR = "#4cd07d";
 const LANE_COLORS = ["#211c16", "#1b1712"];
 const LANE_LABEL_COLOR = "#a39a8b";
 const HIT_LINE_COLOR = "#e8e2d6";
+const BEAT_LINE_COLOR = "#3a3228";
+const BAR_LINE_COLOR = "#5a4e42";
 
-export function createHighway(onPick: (noteIndex: number) => void) {
+const tileWidth = (note: PieceNote) => (note.beats ?? 1) * BEAT_WIDTH - TILE_GAP;
+
+export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat: number) => void) {
   const canvas = h("canvas", { width: WIDTH * devicePixelRatio, height: HEIGHT * devicePixelRatio });
   const context = canvas.getContext("2d")!;
   context.scale(devicePixelRatio, devicePixelRatio);
@@ -38,7 +43,10 @@ export function createHighway(onPick: (noteIndex: number) => void) {
       tabIndex: 0,
       role: "region",
       ariaLabel: t.timelineLabel,
-      onscroll: paint,
+      onscroll() {
+        paint();
+        onMove(position());
+      },
       onclick(event) {
         const noteIndex = noteAt(event);
         if (noteIndex !== null) onPick(noteIndex);
@@ -47,36 +55,56 @@ export function createHighway(onPick: (noteIndex: number) => void) {
         scroller.style.cursor = noteAt(event) === null ? "" : "pointer";
       },
       onkeydown(event) {
-        if (event.key === "Enter") onPick(Math.min(Math.round(position()), notes.length - 1));
+        // A little past the line, so a view that rounded just short of a note still picks it.
+        if (event.key === "Enter") onPick(Math.min(noteAtBeat(position() + 0.02), notes.length - 1));
       },
     },
     track,
   );
   let notes: PieceNote[] = [];
+  // The beat each note starts on, then the total, so index notes.length is the end of the piece.
+  let starts = [0];
   let currentIndex = 0;
   let holdProgress = 0;
+  let glideFrame = 0;
 
-  const pixelsPerNote = () => (SPACING * (scroller.clientWidth || WIDTH)) / WIDTH;
-  const position = () => scroller.scrollLeft / pixelsPerNote();
-  const tileX = (noteIndex: number) => HIT_X + (noteIndex - position()) * SPACING;
+  const pixelsPerBeat = () => (BEAT_WIDTH * (scroller.clientWidth || WIDTH)) / WIDTH;
+  const position = () => scroller.scrollLeft / pixelsPerBeat();
+  const scrollLeftOf = (index: number) => starts[index] * pixelsPerBeat();
+  const tileX = (noteIndex: number) => HIT_X + (starts[noteIndex] - position()) * BEAT_WIDTH + TILE_GAP / 2;
   const laneCenter = (note: PieceNote) => (LANES.indexOf(note.string!) + 0.5) * LANE_HEIGHT;
+  const noteAtBeat = (beat: number) => starts.findLastIndex((start) => start <= beat);
 
   function noteAt(event: MouseEvent) {
     const box = canvas.getBoundingClientRect();
     const x = ((event.clientX - box.left) * WIDTH) / box.width;
     const y = ((event.clientY - box.top) * HEIGHT) / box.height;
-    const noteIndex = Math.round(position() + (x - HIT_X) / SPACING);
+    const noteIndex = noteAtBeat(position() + (x - HIT_X) / BEAT_WIDTH);
     const note = notes[noteIndex];
     if (!note) return null;
 
-    const overTile = Math.abs(tileX(noteIndex) - x) <= TILE_WIDTH / 2 && Math.abs(laneCenter(note) - y) <= TILE_HEIGHT / 2;
-    return overTile ? noteIndex : null;
+    return Math.abs(laneCenter(note) - y) <= TILE_HEIGHT / 2 ? noteIndex : null;
+  }
+
+  function drawGrid() {
+    if (!getSettings().toggles.grid) return;
+
+    const at = position();
+    const first = Math.max(0, Math.ceil(at - HIT_X / BEAT_WIDTH));
+    const last = Math.min(starts.at(-1)!, Math.floor(at + (WIDTH - HIT_X) / BEAT_WIDTH));
+    for (let beat = first; beat <= last; beat++) {
+      context.fillStyle = notes[0]?.beats && beat % BAR_BEATS === 0 ? BAR_LINE_COLOR : BEAT_LINE_COLOR;
+      context.fillRect(HIT_X + (beat - at) * BEAT_WIDTH, 0, 1, HEIGHT);
+    }
   }
 
   function drawLanes() {
-    LANES.forEach((lane, index) => {
+    LANES.forEach((_, index) => {
       context.fillStyle = LANE_COLORS[index % 2];
       context.fillRect(0, index * LANE_HEIGHT, WIDTH, LANE_HEIGHT);
+    });
+    drawGrid();
+    LANES.forEach((lane, index) => {
       context.fillStyle = LANE_LABEL_COLOR;
       context.font = "bold 18px system-ui";
       context.textAlign = "left";
@@ -89,39 +117,42 @@ export function createHighway(onPick: (noteIndex: number) => void) {
   function drawTile(note: PieceNote, x: number) {
     const { toggles } = getSettings();
     const y = laneCenter(note);
+    const width = tileWidth(note);
     context.fillStyle = TILE_COLOR;
     context.beginPath();
-    context.roundRect(x - TILE_WIDTH / 2, y - TILE_HEIGHT / 2, TILE_WIDTH, TILE_HEIGHT, 8);
+    context.roundRect(x, y - TILE_HEIGHT / 2, width, TILE_HEIGHT, 8);
     context.fill();
     context.textAlign = "center";
 
+    // Labels stay at the front of a long tile, the end that reaches the hit line first.
+    const textX = x + Math.min(width, BEAT_WIDTH - TILE_GAP) / 2;
     const { solfege, letter } = noteLabels(note.pitch);
     if (toggles.fingers) {
       context.fillStyle = note.finger?.startsWith("L") ? LOW_FINGER_COLOR : "#111";
       context.font = "bold 22px system-ui";
-      context.fillText(note.finger?.replace("L", "") ?? "?", x, y - 12);
+      context.fillText(note.finger?.replace("L", "") ?? "?", textX, y - 12);
     }
     if (toggles.noteNames) {
       context.fillStyle = NAME_COLOR;
       context.font = "bold 16px system-ui";
-      context.fillText(solfege, x, y + 10);
+      context.fillText(solfege, textX, y + 10);
     }
     if (toggles.letterNames) {
       context.fillStyle = LETTER_COLOR;
       context.font = "12px system-ui";
-      context.fillText(letter, x, y + 27);
+      context.fillText(letter, textX, y + 27);
     }
   }
 
   function outlineTile(note: PieceNote, x: number, color: string, portion = 1) {
-    const width = TILE_WIDTH + OUTLINE_GAP * 2;
+    const width = tileWidth(note) + OUTLINE_GAP * 2;
     const height = TILE_HEIGHT + OUTLINE_GAP * 2;
     const perimeter = 2 * (width + height);
     context.strokeStyle = color;
     context.lineWidth = 4;
     context.setLineDash([portion * perimeter, perimeter]);
     context.beginPath();
-    context.roundRect(x - width / 2, laneCenter(note) - height / 2, width, height, OUTLINE_CORNER);
+    context.roundRect(x - OUTLINE_GAP, laneCenter(note) - height / 2, width, height, OUTLINE_CORNER);
     context.stroke();
     context.setLineDash([]);
   }
@@ -131,7 +162,7 @@ export function createHighway(onPick: (noteIndex: number) => void) {
     drawLanes();
     notes.forEach((note, noteIndex) => {
       const x = tileX(noteIndex);
-      if (x < -TILE_WIDTH || x > WIDTH + TILE_WIDTH) return;
+      if (x + tileWidth(note) < 0 || x > WIDTH) return;
 
       drawTile(note, x);
       if (noteIndex !== currentIndex) return;
@@ -144,18 +175,35 @@ export function createHighway(onPick: (noteIndex: number) => void) {
   return {
     element: h("div", { className: "highway" }, canvas, scroller),
     draw(pieceNotes: PieceNote[], index: number, progress: number) {
-      notes = pieceNotes;
+      if (pieceNotes !== notes) {
+        notes = pieceNotes;
+        starts = [0];
+        for (const note of notes) starts.push(starts.at(-1)! + (note.beats ?? 1));
+        track.style.width = `${100 + (starts.at(-1)! * BEAT_WIDTH * 100) / WIDTH}%`;
+      }
       holdProgress = progress;
-      track.style.width = `${100 + (notes.length * SPACING * 100) / WIDTH}%`;
       if (index !== currentIndex) {
         currentIndex = index;
-        scroller.scrollTo({ left: index * pixelsPerNote(), behavior: "smooth" });
+        scroller.scrollTo({ left: scrollLeftOf(index), behavior: "smooth" });
       }
       paint();
     },
+    glideTo(index: number, ms: number) {
+      const from = scroller.scrollLeft;
+      const to = scrollLeftOf(index);
+      const startedAt = performance.now();
+      const step = () => {
+        const progress = Math.min(1, (performance.now() - startedAt) / ms);
+        scroller.scrollLeft = from + (to - from) * progress * progress * (3 - 2 * progress);
+        if (progress < 1) glideFrame = requestAnimationFrame(step);
+      };
+      cancelAnimationFrame(glideFrame);
+      glideFrame = requestAnimationFrame(step);
+    },
     jumpTo(index: number) {
+      cancelAnimationFrame(glideFrame);
       currentIndex = index;
-      scroller.scrollLeft = index * pixelsPerNote();
+      scroller.scrollLeft = scrollLeftOf(index);
     },
   };
 }

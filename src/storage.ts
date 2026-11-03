@@ -10,7 +10,11 @@ export type Settings = {
   toleranceCents: number;
   holdMs: number;
   minRms: number;
-  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean };
+  tempoOn: boolean;
+  bpm: number;
+  pattern: number;
+  staffOpen: boolean;
+  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean };
   targetDays: Record<string, number>;
 };
 
@@ -21,7 +25,11 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   toleranceCents: 40,
   holdMs: 200,
   minRms: 0.01,
-  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true },
+  tempoOn: false,
+  bpm: 60,
+  pattern: 0,
+  staffOpen: false,
+  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true },
   targetDays: {},
 };
 
@@ -34,7 +42,16 @@ const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.st
 let settings: Settings | undefined;
 
 export function getSettings() {
-  settings ??= { language: navigator.language.startsWith("pt") ? "pt" : "en", ...DEFAULT_SETTINGS, ...read("settings", {}) };
+  if (!settings) {
+    const stored = read<Partial<Settings>>("settings", {});
+    settings = {
+      language: navigator.language.startsWith("pt") ? "pt" : "en",
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      // Merged separately, so a switch added later still gets its default on settings saved before it existed.
+      toggles: { ...DEFAULT_SETTINGS.toggles, ...stored.toggles },
+    };
+  }
   return settings;
 }
 

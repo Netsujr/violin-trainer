@@ -32,9 +32,10 @@ export class Session {
     return midiOf(this.current.pitch);
   }
 
-  hit(cents: number, now: number) {
+  // With tempo on, the next note only starts on the beat, some time after the hit itself.
+  hit(cents: number, now: number, nextStartsAt = now) {
     this.hits.push({ pitch: this.current.pitch, ms: now - this.noteStart, cents, at: now });
-    this.advance(now);
+    this.advance(nextStartsAt);
   }
 
   skip(now: number) {
@@ -42,11 +43,11 @@ export class Session {
     this.advance(now);
   }
 
-  // A jump is neither a hit nor a skip. A run that didn't start at note 1 isn't a whole pass, so it isn't timed as one.
+  // A jump is neither a hit nor a skip. Only a run from note 1 with no rhythm pattern counts as a timed pass, so pass times stay comparable.
   jumpTo(index: number, now: number) {
     this.index = index;
     this.noteStart = this.passStart = now;
-    this.wholePass = index === 0;
+    this.wholePass = index === 0 && !this.piece.pattern;
   }
 
   private advance(now: number) {
