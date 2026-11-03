@@ -9,18 +9,18 @@ import type { Session } from "../practice/session";
 import { allPieces, getSettings, saveSettings } from "../storage";
 import { h, type Screen } from "./dom";
 import { createHighway } from "./highway";
+import { contentWidth, timelineScale } from "./layout";
 import { createNeedle } from "./listen";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
-import { createToggles } from "./toggles";
+import { createIconToggle } from "./toggles";
 
 const REFERENCE_ECHO_MS = 150;
 // A hit closer to the beat than this waits for the following beat, so the glide never looks rushed.
 const MIN_GLIDE_BEATS = 0.25;
 // With tempo on, a pattern note clears after this share of its length, leaving the rest for the glide to the next beat.
 const TEMPO_HOLD_SHARE = 0.5;
-// The page content is 960 wide, less the staff's side padding.
-const STAFF_WIDTH = 944;
+const STAFF_SIDE_PADDING = 16;
 
 export function practiceScreen(pieceId?: string): Screen {
   const settings = getSettings();
@@ -43,7 +43,8 @@ export function practiceScreen(pieceId?: string): Screen {
   });
   const metronome = createMetronome();
   const needle = createNeedle();
-  const staff = createStaff(STAFF_WIDTH, !settings.staffOpen);
+  const staffWidth = () => (contentWidth() - STAFF_SIDE_PADDING) / timelineScale();
+  const staff = createStaff(staffWidth(), !settings.staffOpen, timelineScale());
   const highway = createHighway(startFrom, staff.follow);
   const staffToggle = h("button", {
     className: "staff-toggle",
@@ -56,7 +57,38 @@ export function practiceScreen(pieceId?: string): Screen {
       renderNotes();
     },
   });
-  const staffPanel = h("div", { className: "staff-panel" }, staff.element, staffToggle);
+  const staffPanel = h("div", { className: "staff-panel" }, staff.element);
+  const staffBar = h(
+    "div",
+    { className: "section-bar" },
+    createIconToggle("staffFingers", renderNotes),
+    createIconToggle("staffNames", renderNotes),
+    staffToggle,
+  );
+  const timelineBar = h(
+    "div",
+    { className: "section-bar" },
+    createIconToggle("fingers", renderNotes),
+    createIconToggle("noteNames", renderNotes),
+    createIconToggle("letterNames", renderNotes),
+    createIconToggle("grid", renderNotes),
+  );
+  const showScale = () => staffPanel.style.setProperty("--timeline-scale", String(timelineScale()));
+  showScale();
+
+  // Only a real change of layout, not a phone's address bar sliding away.
+  let fitted = `${contentWidth()}:${timelineScale()}`;
+  function fitToScreen() {
+    const size = `${contentWidth()}:${timelineScale()}`;
+    if (size === fitted) return;
+
+    fitted = size;
+    showScale();
+    highway.resize();
+    staff.resize(staffWidth(), timelineScale());
+    renderNotes();
+  }
+  addEventListener("resize", fitToScreen);
   const hertz = h("span");
   const progress = h("p");
   const stats = h("div", { className: "stats" });
@@ -94,8 +126,7 @@ export function practiceScreen(pieceId?: string): Screen {
   function renderNotes() {
     const index = currentIndex();
     const note = piece.notes[index];
-    staffPanel.hidden = !settings.toggles.staff;
-    staff.draw(piece.notes, index);
+    staff.draw(piece.notes, index, { names: settings.toggles.staffNames, fingers: settings.toggles.staffFingers });
     progress.textContent = note
       ? `${t.noteOf(index + 1, piece.notes.length)}${note.bar ? t.bar(note.bar) : ""}`
       : t.allDone(piece.notes.length);
@@ -303,8 +334,6 @@ export function practiceScreen(pieceId?: string): Screen {
     }),
     ` ${t.metronome}`,
   );
-  const toggles = createToggles(renderNotes, ["grid"]);
-  toggles.append(tempoSwitch, metronomeSwitch);
   const optionsPanel = h(
     "details",
     {
@@ -316,7 +345,7 @@ export function practiceScreen(pieceId?: string): Screen {
       },
     },
     h("summary", {}, t.options),
-    toggles,
+    h("div", { className: "row toggles" }, tempoSwitch, metronomeSwitch),
     h("div", { className: "row" }, pieceSelect, controls.recordLabel, bpmControl),
   );
 
@@ -345,11 +374,14 @@ export function practiceScreen(pieceId?: string): Screen {
       progress,
       h("div", { className: "row actions" }, controls.startButton, referenceButton, skipButton, controls.message),
       h("div", { className: "row tuning" }, needle.element, hertz),
-      highway.element,
+      h("div", { className: "timeline-section" }, timelineBar, highway.element),
       stats,
-      staffPanel,
+      h("div", { className: "staff-section" }, staffBar, staffPanel),
       h("div", { className: "row patterns" }, t.pattern, h("div", { role: "group", ariaLabel: t.pattern }, ...patternButtons)),
     ),
-    leave: controls.leave,
+    leave() {
+      removeEventListener("resize", fitToScreen);
+      return controls.leave();
+    },
   };
 }

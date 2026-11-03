@@ -30,6 +30,8 @@ const en = {
     letterNames: "Letter names (A G D)",
     staff: "Staff",
     grid: "Grid",
+    staffNames: "Note names on the staff",
+    staffFingers: "Fingers on the staff",
   },
 
   start: "Start",
@@ -121,6 +123,8 @@ const pt: Strings = {
     letterNames: "Cifras (A G D)",
     staff: "Pauta",
     grid: "Grade",
+    staffNames: "Nomes das notas na pauta",
+    staffFingers: "Dedos na pauta",
   },
 
   start: "Iniciar",

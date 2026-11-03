@@ -3,9 +3,9 @@ import type { PieceNote, StringName } from "../music/notes";
 import { noteLabels } from "../music/notes";
 import { getSettings } from "../storage";
 import { h } from "./dom";
+import { contentWidth, timelineScale } from "./layout";
 
 const LANES: StringName[] = ["E", "A", "D", "G"];
-const WIDTH = 960;
 const LANE_HEIGHT = 84;
 const HEIGHT = LANE_HEIGHT * LANES.length;
 const HIT_X = 130;
@@ -31,9 +31,10 @@ const BAR_LINE_COLOR = "#5a4e42";
 const tileWidth = (note: PieceNote) => (note.beats ?? 1) * BEAT_WIDTH - TILE_GAP;
 
 export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat: number) => void) {
-  const canvas = h("canvas", { width: WIDTH * devicePixelRatio, height: HEIGHT * devicePixelRatio });
+  const canvas = h("canvas");
   const context = canvas.getContext("2d")!;
-  context.scale(devicePixelRatio, devicePixelRatio);
+  let scale = 1;
+  let viewWidth = 0;
   const track = h("div");
   // The canvas stays put. This clear layer on top scrolls natively, and the canvas repaints to match it.
   const scroller = h(
@@ -68,7 +69,18 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
   let holdProgress = 0;
   let glideFrame = 0;
 
-  const pixelsPerBeat = () => (BEAT_WIDTH * (scroller.clientWidth || WIDTH)) / WIDTH;
+  const pixelsPerBeat = () => BEAT_WIDTH * scale;
+  const fitTrack = () => (track.style.width = `calc(100% + ${starts.at(-1)! * pixelsPerBeat()}px)`);
+
+  function fitToScreen() {
+    scale = timelineScale();
+    viewWidth = contentWidth() / scale;
+    canvas.width = viewWidth * scale * devicePixelRatio;
+    canvas.height = HEIGHT * scale * devicePixelRatio;
+    context.setTransform(scale * devicePixelRatio, 0, 0, scale * devicePixelRatio, 0, 0);
+    fitTrack();
+  }
+
   const position = () => scroller.scrollLeft / pixelsPerBeat();
   const scrollLeftOf = (index: number) => starts[index] * pixelsPerBeat();
   const tileX = (noteIndex: number) => HIT_X + (starts[noteIndex] - position()) * BEAT_WIDTH + TILE_GAP / 2;
@@ -77,8 +89,8 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
 
   function noteAt(event: MouseEvent) {
     const box = canvas.getBoundingClientRect();
-    const x = ((event.clientX - box.left) * WIDTH) / box.width;
-    const y = ((event.clientY - box.top) * HEIGHT) / box.height;
+    const x = (event.clientX - box.left) / scale;
+    const y = (event.clientY - box.top) / scale;
     const noteIndex = noteAtBeat(position() + (x - HIT_X) / BEAT_WIDTH);
     const note = notes[noteIndex];
     if (!note) return null;
@@ -91,7 +103,7 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
 
     const at = position();
     const first = Math.max(0, Math.ceil(at - HIT_X / BEAT_WIDTH));
-    const last = Math.min(starts.at(-1)!, Math.floor(at + (WIDTH - HIT_X) / BEAT_WIDTH));
+    const last = Math.min(starts.at(-1)!, Math.floor(at + (viewWidth - HIT_X) / BEAT_WIDTH));
     for (let beat = first; beat <= last; beat++) {
       context.fillStyle = notes[0]?.beats && beat % BAR_BEATS === 0 ? BAR_LINE_COLOR : BEAT_LINE_COLOR;
       context.fillRect(HIT_X + (beat - at) * BEAT_WIDTH, 0, 1, HEIGHT);
@@ -101,7 +113,7 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
   function drawLanes() {
     LANES.forEach((_, index) => {
       context.fillStyle = LANE_COLORS[index % 2];
-      context.fillRect(0, index * LANE_HEIGHT, WIDTH, LANE_HEIGHT);
+      context.fillRect(0, index * LANE_HEIGHT, viewWidth, LANE_HEIGHT);
     });
     drawGrid();
     LANES.forEach((lane, index) => {
@@ -158,11 +170,11 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
   }
 
   function paint() {
-    context.clearRect(0, 0, WIDTH, HEIGHT);
+    context.clearRect(0, 0, viewWidth, HEIGHT);
     drawLanes();
     notes.forEach((note, noteIndex) => {
       const x = tileX(noteIndex);
-      if (x + tileWidth(note) < 0 || x > WIDTH) return;
+      if (x + tileWidth(note) < 0 || x > viewWidth) return;
 
       drawTile(note, x);
       if (noteIndex !== currentIndex) return;
@@ -172,6 +184,14 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
     });
   }
 
+  function jumpTo(index: number) {
+    cancelAnimationFrame(glideFrame);
+    currentIndex = index;
+    scroller.scrollLeft = scrollLeftOf(index);
+  }
+
+  fitToScreen();
+
   return {
     element: h("div", { className: "highway" }, canvas, scroller),
     draw(pieceNotes: PieceNote[], index: number, progress: number) {
@@ -179,7 +199,7 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
         notes = pieceNotes;
         starts = [0];
         for (const note of notes) starts.push(starts.at(-1)! + (note.beats ?? 1));
-        track.style.width = `${100 + (starts.at(-1)! * BEAT_WIDTH * 100) / WIDTH}%`;
+        fitTrack();
       }
       holdProgress = progress;
       if (index !== currentIndex) {
@@ -200,10 +220,11 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
       cancelAnimationFrame(glideFrame);
       glideFrame = requestAnimationFrame(step);
     },
-    jumpTo(index: number) {
-      cancelAnimationFrame(glideFrame);
-      currentIndex = index;
-      scroller.scrollLeft = scrollLeftOf(index);
+    jumpTo,
+    resize() {
+      fitToScreen();
+      jumpTo(currentIndex);
+      paint();
     },
   };
 }

@@ -100,10 +100,10 @@ header details[open] > summary {
 
 .settings-panel {
   position: absolute;
-  z-index: 1;
+  z-index: 10;
   top: calc(100% + 1.75rem);
   right: 0;
-  width: min(22rem, 90vw);
+  width: min(22rem, calc(100vw - 2rem));
   padding: 1rem;
   background: var(--pico-card-background-color);
   border: 1px solid var(--pico-muted-border-color);
@@ -267,13 +267,12 @@ section > ul > li {
 .highway {
   position: relative;
   padding-bottom: 0.875rem; /* The scrollbar sits here, below the lanes. */
-  margin-block: 1rem;
 }
 
 .highway canvas {
   display: block;
   width: 100%;
-  border-radius: var(--pico-border-radius);
+  border-radius: 0 0 var(--pico-border-radius) var(--pico-border-radius);
 }
 
 .highway-scroll {
@@ -394,13 +393,60 @@ section > ul > li {
   font-weight: 600;
 }
 
+.timeline-section,
+.staff-section {
+  margin-block: 1rem;
+}
+
+/* A small bar on top of a section, so its controls never cover the lanes or the sheet. */
+.section-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.875rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-bottom: 0;
+  border-radius: 0.625rem 0.625rem 0 0;
+}
+
+.section-bar label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.section-bar input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
 .staff-panel {
   position: relative;
-  margin-block: 1rem;
 }
 
 .staff-panel .staff {
   width: 100%;
+  border-radius: 0 0 var(--pico-border-radius) var(--pico-border-radius);
 }
 
 .staff.collapsed {
@@ -408,12 +454,12 @@ section > ul > li {
   overflow: hidden;
 }
 
-/* The collapsed line's playhead, under the timeline's hit line: 130 of its 960 width. */
+/* The collapsed line's playhead, under the timeline's hit line. */
 .staff-panel:has(.collapsed)::after {
   content: "";
   position: absolute;
   inset-block: 0;
-  left: calc(130 / 960 * 100%);
+  left: calc(130px * var(--timeline-scale, 1));
   width: 2px;
   background: #b03020;
   opacity: 0.45;
@@ -421,12 +467,9 @@ section > ul > li {
 }
 
 .staff-toggle {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  padding: 0 0.625rem;
-  font-size: 1.25rem;
-  line-height: 1.75rem;
+  padding: 0 0.5rem;
+  font-size: 1rem;
+  line-height: 1.375rem;
   --pico-background-color: #4a4036;
   --pico-border-color: #4a4036;
   --pico-color: #f3ead9;
@@ -493,4 +536,251 @@ a[download] {
 .marker {
   padding: 0.125rem 0.5rem;
   font-size: 0.875rem;
+}
+
+/* Tablets in portrait and phones: the tabs get their own row. */
+@media (max-width: 960px) {
+  .brand {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  header nav {
+    order: 1;
+    flex-basis: 100%;
+  }
+
+  header nav [role="group"] {
+    width: 100%;
+  }
+
+  header .language {
+    margin-left: 0;
+  }
+
+  .settings-panel {
+    top: calc(100% + 0.75rem);
+  }
+}
+
+/* Phones in portrait. */
+@media (max-width: 600px) {
+  nav [role="group"] button {
+    --pico-form-element-spacing-horizontal: 0.5rem;
+  }
+
+  .practice > p,
+  .practice > .actions {
+    grid-column: 1 / -1;
+  }
+
+  .practice > p {
+    margin-top: 0.5rem;
+  }
+
+  .actions {
+    margin-top: 0.25rem;
+  }
+
+  .actions button {
+    flex: 1 1 auto;
+    --pico-form-element-spacing-horizontal: 0.625rem;
+  }
+
+  /* The needle's cents are enough here, and the Hz would wrap in and out as notes change. */
+  .tuning > span {
+    display: none;
+  }
+
+  .piece > strong,
+  .piece > span {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .piece > button,
+  .piece > select {
+    flex: 1;
+  }
+
+  .add-piece {
+    max-width: none;
+  }
+}
+
+/* Phones in landscape: everything that isn't the timeline gets as little height as possible. */
+@media (max-height: 500px) {
+  #app {
+    padding-block: 0.5rem;
+  }
+
+  header {
+    flex-wrap: nowrap;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .brand {
+    display: none;
+  }
+
+  header nav {
+    order: 0;
+    flex: 1;
+    min-width: 0;
+  }
+
+  header .language {
+    margin-left: auto;
+  }
+
+  nav [role="group"] button {
+    --pico-form-element-spacing-horizontal: 0.5rem;
+    --pico-form-element-spacing-vertical: 0.25rem;
+  }
+
+  header .language button,
+  .actions button {
+    --pico-form-element-spacing-vertical: 0.25rem;
+  }
+
+  .options {
+    padding-block: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .practice > p {
+    font-size: 1rem;
+  }
+
+  .row {
+    margin-block: 0.25rem;
+  }
+
+  .timeline-section,
+  .staff-section {
+    margin-block: 0.25rem;
+  }
+
+  .section-bar {
+    min-height: 0;
+    padding-block: 0;
+  }
+
+  /* The progress, needle and buttons share one line, to give that height to the timeline. */
+  .practice {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .practice > p,
+  .practice > .tuning,
+  .practice > .actions {
+    grid-row: 2;
+  }
+
+  .practice > p {
+    grid-column: 1;
+    margin: 0;
+  }
+
+  .practice > .tuning {
+    grid-column: 2;
+  }
+
+  .practice > .actions {
+    grid-column: 3;
+    margin: 0;
+  }
+
+  .tuning > span {
+    display: none;
+  }
+
+  /* Listen: the note and needle on the left, the staff beside them. */
+  .listen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 1rem;
+    align-items: center;
+  }
+
+  .listen > * {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .listen > .staff {
+    grid-column: 2;
+    grid-row: 1 / span 5;
+    margin: 0;
+  }
+
+  .listen .row:has(> .needle) {
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  .big-note {
+    margin-block: 0.25rem;
+    font-size: 2.5rem;
+  }
+
+  .big-note.idle {
+    font-size: 1.5rem;
+    line-height: 1.667;
+  }
+}
+
+/* Fingers rather than a mouse: larger targets, and no double-tap zoom when tapping quickly. */
+@media (pointer: coarse) {
+  button,
+  label,
+  summary,
+  select {
+    touch-action: manipulation;
+  }
+
+  .toggles {
+    gap: 0.25rem 0.875rem;
+  }
+
+  .toggles input[type="checkbox"],
+  label > input[type="checkbox"] {
+    width: 1.375em;
+    height: 1.375em;
+    margin: 0;
+  }
+
+  .row > label:has(> input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+  }
+
+  details > summary {
+    padding-block: 0.5rem;
+  }
+
+  .marker {
+    min-width: 2.75rem;
+    min-height: 2.25rem;
+  }
+
+  .staff-toggle {
+    min-width: 2.5rem;
+    min-height: 2.25rem;
+  }
+
+  .section-bar label {
+    min-width: 2.75rem;
+    min-height: 2.25rem;
+  }
+
+  .bpm input {
+    height: 2.25rem;
+  }
 }

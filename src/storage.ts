@@ -4,6 +4,7 @@ import { fillFingering } from "./music/fingering";
 import type { Language } from "./i18n";
 import type { Piece, PieceNote } from "./music/notes";
 import type { LogEntry } from "./practice/log";
+import { isSmallScreen } from "./ui/layout";
 
 export type Settings = {
   language: Language;
@@ -16,14 +17,14 @@ export type Settings = {
   pattern: number;
   staffOpen: boolean;
   optionsOpen: boolean;
-  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean };
+  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean; staffNames: boolean; staffFingers: boolean };
   targetDays: Record<string, number>;
 };
 
 export type Marker = { pitch: string; seconds: number };
 export type Recording = { blob: Blob; markers: Marker[] };
 
-const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
+const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   toleranceCents: 40,
   holdMs: 200,
   minRms: 0.01,
@@ -32,8 +33,7 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bpm: 60,
   pattern: 0,
   staffOpen: false,
-  optionsOpen: true,
-  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true },
+  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true, staffNames: true, staffFingers: true },
   targetDays: {},
 };
 
@@ -50,6 +50,8 @@ export function getSettings() {
     const stored = read<Partial<Settings>>("settings", {});
     settings = {
       language: navigator.language.startsWith("pt") ? "pt" : "en",
+      // Open, the options would push the timeline off a phone screen.
+      optionsOpen: !isSmallScreen(),
       ...DEFAULT_SETTINGS,
       ...stored,
       // Merged separately, so a switch added later still gets its default on settings saved before it existed.

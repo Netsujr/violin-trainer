@@ -1,8 +1,10 @@
 import { Note } from "tonal";
+import { noteLabels } from "../music/notes";
 import { Accidental, BarNote, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from "vexflow/bravura";
 import { h } from "./dom";
 
-export type StaffNote = { pitch: string; beats?: number };
+export type StaffNote = { pitch: string; beats?: number; finger?: string };
+export type StaffLabels = { names: boolean; fingers: boolean };
 
 const TOP = 30;
 const LINE_HEIGHT = 130;
@@ -13,10 +15,21 @@ const BAR_BEATS = 4;
 const BAR_NOTE_WIDTH = 40;
 const MAX_BARS_PER_LINE = 6;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 2: "h", 4: "w" };
-// Collapsed, the first notehead lands under the timeline's hit line, 130 of its 960 width, with room for the clef.
+// Rows relative to a stave's y: clear of the highest and lowest first-position notes, as on the printed sheet.
+const FINGER_ROW = 14;
+const NAME_ROW = 126;
+const NOTEHEAD_CENTER = 6;
+// With labels on, their rows use the space that high notes otherwise get above the staff.
+const LABELLED_TOP = 6;
+const LABELLED_BOTTOM = 8;
+const LOW_FINGER_COLOR = "#b03020";
+const FINGER_COLOR = "#111";
+const NAME_COLOR = "#6b3a1e";
+// Matches the timeline's hit line, in the same units, so the current note lines up with its tile.
+const HIT_LINE_X = 130;
+// Collapsed, the first notehead lands under the hit line, with room for the clef.
 const COLLAPSED_NOTE_START = 118;
 const COLLAPSED_MARGIN = 16;
-const HIT_LINE_SHARE = 130 / 960;
 const COLLAPSED_BEAT_WIDTH = 72;
 
 function toStaveNote({ pitch, beats = 1 }: StaffNote, showAccidental: boolean) {
@@ -75,10 +88,25 @@ function layOut(notes: StaffNote[], room: number, barred: boolean) {
 
 const beatsOf = (note: StaffNote) => note.beats ?? 1;
 
-export function createStaff(width = 300, startCollapsed = false) {
+function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: string, fontSize: number) {
+  const element = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  element.textContent = text;
+  element.setAttribute("x", String(x));
+  element.setAttribute("y", String(y));
+  element.setAttribute("fill", fill);
+  element.setAttribute("stroke", "none");
+  element.setAttribute("font-size", String(fontSize));
+  element.setAttribute("font-weight", "700");
+  element.setAttribute("font-family", "system-ui, sans-serif");
+  element.setAttribute("text-anchor", "middle");
+  svg.append(element);
+}
+
+export function createStaff(width = 300, startCollapsed = false, scale = 1) {
   const element = h("div", { className: "staff" });
   let collapsed = startCollapsed;
   let shown: string | null = null;
+  let labels: StaffLabels = { names: false, fingers: false };
   // Where each note starts, in beats and in pixels on the collapsed line.
   let noteBeats: number[] = [];
   let noteXs: number[] = [];
@@ -93,27 +121,28 @@ export function createStaff(width = 300, startCollapsed = false) {
     const totalBeats = notes.reduce((sum, note) => sum + beatsOf(note), 0);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
     const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : width;
-    const height = TOP + lines.length * LINE_HEIGHT;
+    const labelled = labels.names || labels.fingers;
+    const top = labelled ? LABELLED_TOP : TOP;
+    const height = top + lines.length * LINE_HEIGHT + (labelled ? LABELLED_BOTTOM : 0);
     const renderer = new Renderer(element, Renderer.Backends.SVG);
     renderer.resize(fullWidth, height);
     const context = renderer.getContext();
     const svg = element.querySelector("svg")!;
     svg.setAttribute("viewBox", `0 0 ${fullWidth} ${height}`);
-    if (!collapsed) {
-      // Scale with the page instead of VexFlow's fixed pixel size.
-      svg.style.width = "100%";
-      svg.style.height = "auto";
-    }
+    // Open, the sheet fills the page. Collapsed, it keeps the timeline's scale and scrolls.
+    svg.style.width = collapsed ? `${fullWidth * scale}px` : "100%";
+    svg.style.height = collapsed ? `${height * scale}px` : "auto";
 
     const allNotes: StaveNote[] = [];
     lines.forEach((line, lineIndex) => {
       const staveX = collapsed ? COLLAPSED_MARGIN : 0;
-      const stave = new Stave(staveX, TOP + lineIndex * LINE_HEIGHT, fullWidth - staveX - 1).addClef("treble");
+      const stave = new Stave(staveX, top + lineIndex * LINE_HEIGHT, fullWidth - staveX - 1).addClef("treble");
       if (collapsed) stave.setNoteStartX(COLLAPSED_NOTE_START);
       stave.setContext(context).draw();
       const lineNotes = line.flat();
       if (lineNotes.length === 0) return;
 
+      const firstNote = allNotes.length;
       const beams: Beam[] = [];
       const tickables = line.flatMap((bar, barIndex) => {
         // In a bar, an accidental is only written the first time.
@@ -135,6 +164,15 @@ export function createStaff(width = 300, startCollapsed = false) {
       new Formatter().joinVoices([voice]).format([voice], formatWidth);
       voice.draw(context, stave);
       beams.forEach((beam) => beam.setContext(context).draw());
+      const staveY = top + lineIndex * LINE_HEIGHT;
+      lineNotes.forEach((note, index) => {
+        const x = allNotes[firstNote + index].getAbsoluteX() + NOTEHEAD_CENTER;
+        if (labels.fingers && note.finger) {
+          const color = note.finger.startsWith("L") ? LOW_FINGER_COLOR : FINGER_COLOR;
+          svgText(svg, note.finger.replace("L", ""), x, staveY + FINGER_ROW, color, 13);
+        }
+        if (labels.names) svgText(svg, noteLabels(note.pitch).solfege, x, staveY + NAME_ROW, NAME_COLOR, 11);
+      });
     });
 
     noteXs = allNotes.map((note) => note.getAbsoluteX());
@@ -153,13 +191,14 @@ export function createStaff(width = 300, startCollapsed = false) {
     const nextX = noteXs[index + 1] ?? noteXs[index];
     const nextBeat = noteBeats[index + 1] ?? noteBeats[index] + 1;
     const between = Math.min(1, (followedBeat - noteBeats[index]) / (nextBeat - noteBeats[index]));
-    element.scrollLeft = noteXs[index] + between * (nextX - noteXs[index]) - element.clientWidth * HIT_LINE_SHARE;
+    element.scrollLeft = (noteXs[index] + between * (nextX - noteXs[index]) - HIT_LINE_X) * scale;
   }
 
   return {
     element,
-    draw(notes: StaffNote[], current = 0) {
-      const key = notes.map((note) => `${note.pitch}:${note.beats}`).join();
+    draw(notes: StaffNote[], current = 0, newLabels: StaffLabels = labels) {
+      labels = newLabels;
+      const key = [labels.names, labels.fingers, ...notes.map((note) => `${note.pitch}:${note.beats}:${note.finger}`)].join();
       if (key !== shown) {
         shown = key;
         render(notes);
@@ -171,6 +210,11 @@ export function createStaff(width = 300, startCollapsed = false) {
     },
     setCollapsed(value: boolean) {
       collapsed = value;
+      shown = null;
+    },
+    resize(newWidth: number, newScale: number) {
+      width = newWidth;
+      scale = newScale;
       shown = null;
     },
     // Keeps the collapsed line in step with the timeline, beat for beat.
