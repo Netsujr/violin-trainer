@@ -1,0 +1,44 @@
+[
+  {
+    "id": "d-major-1oct",
+    "title": "D major",
+    "subtitle": "One octave · D and A strings",
+    "source": "built-in",
+    "notes": [{ "pitch": "D4" }, { "pitch": "E4" }, { "pitch": "F#4" }, { "pitch": "G4" }, { "pitch": "A4" }, { "pitch": "B4" }, { "pitch": "C#5" }, { "pitch": "D5" }]
+  },
+  {
+    "id": "a-major-1oct",
+    "title": "A major",
+    "subtitle": "One octave · A and E strings",
+    "source": "built-in",
+    "notes": [{ "pitch": "A4" }, { "pitch": "B4" }, { "pitch": "C#5" }, { "pitch": "D5" }, { "pitch": "E5" }, { "pitch": "F#5" }, { "pitch": "G#5" }, { "pitch": "A5" }]
+  },
+  {
+    "id": "g-major-2oct",
+    "title": "G major",
+    "subtitle": "Two octaves · all four strings",
+    "source": "built-in",
+    "notes": [{ "pitch": "G3" }, { "pitch": "A3" }, { "pitch": "B3" }, { "pitch": "C4" }, { "pitch": "D4" }, { "pitch": "E4" }, { "pitch": "F#4" }, { "pitch": "G4" }, { "pitch": "A4" }, { "pitch": "B4" }, { "pitch": "C5" }, { "pitch": "D5" }, { "pitch": "E5" }, { "pitch": "F#5" }, { "pitch": "G5" }]
+  },
+  {
+    "id": "c-major-1oct",
+    "title": "C major",
+    "subtitle": "One octave · G, D and A strings",
+    "source": "built-in",
+    "notes": [{ "pitch": "C4" }, { "pitch": "D4" }, { "pitch": "E4" }, { "pitch": "F4" }, { "pitch": "G4" }, { "pitch": "A4" }, { "pitch": "B4" }, { "pitch": "C5" }]
+  },
+  {
+    "id": "a-minor-1oct",
+    "title": "A minor (natural)",
+    "subtitle": "One octave · A and E strings",
+    "source": "built-in",
+    "notes": [{ "pitch": "A4" }, { "pitch": "B4" }, { "pitch": "C5" }, { "pitch": "D5" }, { "pitch": "E5" }, { "pitch": "F5" }, { "pitch": "G5" }, { "pitch": "A5" }]
+  },
+  {
+    "id": "d-minor-1oct",
+    "title": "D minor (natural)",
+    "subtitle": "One octave · D and A strings",
+    "source": "built-in",
+    "notes": [{ "pitch": "D4" }, { "pitch": "E4" }, { "pitch": "F4" }, { "pitch": "G4" }, { "pitch": "A4" }, { "pitch": "Bb4" }, { "pitch": "C5" }, { "pitch": "D5" }]
+  }
+]

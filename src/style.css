@@ -1,0 +1,104 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #15151a;
+  color: #e8e2d6;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+}
+
+main {
+  margin-top: 16px;
+}
+
+button {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+button.active {
+  background: #e8e2d6;
+  color: #15151a;
+}
+
+a {
+  color: inherit;
+}
+
+canvas {
+  max-width: 100%;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-block: 8px;
+}
+
+.big-note {
+  font-size: 64px;
+  font-weight: 700;
+  min-height: 80px;
+}
+
+.needle {
+  position: relative;
+  width: 300px;
+  height: 20px;
+  background: #2b2b33;
+  background-image: linear-gradient(#e8e2d6, #e8e2d6);
+  background-size: 2px 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.needle i {
+  position: absolute;
+  width: 4px;
+  height: 100%;
+  margin-left: -2px;
+  background: #e0a030;
+}
+
+.needle.in-tune i {
+  background: #4cd07d;
+}
+
+.staff {
+  width: fit-content;
+  background: #f3ead9;
+  margin-block: 8px;
+}
+
+.warning {
+  color: #f08070;
+}
+
+.setting {
+  display: block;
+  margin-block: 8px;
+}
+
+.add-piece {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 600px;
+}
+
+.day {
+  width: 40px;
+}
+
+.piece > strong {
+  min-width: 160px;
+}
+
+.marker {
+  padding: 2px 6px;
+}

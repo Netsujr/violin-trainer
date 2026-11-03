@@ -1,0 +1,23 @@
+{
+  "name": "violin-trainer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
+  },
+  "dependencies": {
+    "idb-keyval": "^6.3.0",
+    "pitchy": "^4.1.0",
+    "tonal": "^6.5.1",
+    "vexflow": "^5.0.0"
+  }
+}

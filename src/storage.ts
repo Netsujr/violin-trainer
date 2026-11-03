@@ -1,0 +1,68 @@
+import { del, get, set } from "idb-keyval";
+import scales from "./content/scales.json";
+import { fillFingering } from "./music/fingering";
+import type { Piece, PieceNote } from "./music/notes";
+import type { LogEntry } from "./practice/log";
+
+export type Settings = {
+  toleranceCents: number;
+  holdMs: number;
+  minRms: number;
+  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean };
+  targetDays: Record<string, number>;
+};
+
+export type Marker = { pitch: string; seconds: number };
+export type Recording = { blob: Blob; markers: Marker[] };
+
+const DEFAULT_SETTINGS: Settings = {
+  toleranceCents: 40,
+  holdMs: 200,
+  minRms: 0.01,
+  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true },
+  targetDays: {},
+};
+
+const read = <T>(key: string, fallback: T): T => {
+  const stored = localStorage.getItem(key);
+  return stored === null ? fallback : JSON.parse(stored);
+};
+const write = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
+
+let settings: Settings | undefined;
+
+export function getSettings() {
+  settings ??= { ...DEFAULT_SETTINGS, ...read("settings", {}) };
+  return settings;
+}
+
+export const saveSettings = () => write("settings", getSettings());
+
+const withWayDown = (notes: PieceNote[]) => [...notes, ...notes.slice(0, -1).reverse()];
+
+const fingered = (piece: Piece): Piece => ({ ...piece, notes: piece.notes.map(fillFingering) });
+
+export const builtInPieces = () =>
+  (scales as Piece[]).map((scale) => fingered({ ...scale, notes: withWayDown(scale.notes) }));
+
+const committedPieces = () =>
+  Object.values(import.meta.glob<Piece>("./content/pieces/*.json", { eager: true, import: "default" })).map(fingered);
+
+const savedPieces = () => read<Piece[]>("pieces", []);
+
+export const allPieces = () => [...builtInPieces(), ...committedPieces(), ...savedPieces()];
+
+export const savePiece = (piece: Piece) => write("pieces", [...savedPieces(), piece]);
+
+export const deletePiece = (id: string) =>
+  write("pieces", savedPieces().filter((piece) => piece.id !== id));
+
+export const loadLog = () => read<LogEntry[]>("log", []);
+
+export const appendLog = (entry: LogEntry) => write("log", [...loadLog(), entry]);
+
+export const saveRecording = (id: string, recording: Recording) => set(id, recording);
+
+export const getRecording = (id: string) => get<Recording>(id);
+
+export const deleteRecording = (id: string) => del(id);
