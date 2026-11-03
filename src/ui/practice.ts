@@ -18,8 +18,11 @@ import { createIconToggle } from "./toggles";
 const REFERENCE_ECHO_MS = 150;
 // A hit closer to the beat than this waits for the following beat, so the glide never looks rushed.
 const MIN_GLIDE_BEATS = 0.1;
-// With tempo on, a pattern note clears after this share of its length, leaving the rest for the glide to the next beat.
+// With tempo on, a pattern note clears after about half its length, leaving the rest for the glide to the next beat.
+// The mic's delay in hearing a note comes off that, or a short note would leave no room to come in slightly late.
 const TEMPO_HOLD_SHARE = 0.5;
+const MIC_DELAY_MS = 70;
+const SHORTEST_TEMPO_HOLD_MS = 80;
 // Otherwise it clears just short of its full length, because the mic takes a moment to hear a note start.
 const FULL_HOLD_SHARE = 0.9;
 const STAFF_SIDE_PADDING = 16;
@@ -114,7 +117,10 @@ export function practiceScreen(pieceId?: string): Screen {
     if (!beats) return settings.holdMs;
 
     const noteMs = beats * beatMs();
-    return noteMs * (settings.tempoOn && index < piece.notes.length - 1 ? TEMPO_HOLD_SHARE : FULL_HOLD_SHARE);
+    if (settings.tempoOn && index < piece.notes.length - 1) {
+      return Math.max(SHORTEST_TEMPO_HOLD_MS, noteMs * TEMPO_HOLD_SHARE - MIC_DELAY_MS);
+    }
+    return noteMs * FULL_HOLD_SHARE;
   }
 
   function loadPiece() {

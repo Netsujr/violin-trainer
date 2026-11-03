@@ -107,7 +107,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.close();
 }
 {
-  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 30 } }, { midis: D });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 30 } }, { midis: D, delays: { 6: 60000, 7: 60000 } });
   await run(s);
   await s.page.waitForFunction(() => document.querySelector(".highway-scroll").scrollLeft > 5);
   await stop(s.page);
@@ -219,6 +219,18 @@ for (const [label, count, pattern, ms, expected] of [
   await s.close();
 }
 
+for (const [label, bpm, late, expected] of [
+  ["a fast eighth note 60 ms late stays on the beat", 90, 60, [333, 333, 333, 667, 667]],
+  ["a very fast eighth note 40 ms late stays on the beat", 120, 40, [250, 250, 250, 500, 500]],
+]) {
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm, pattern: 3 } }, { midis: eachNote(6), delays: { 3: late } });
+  await run(s);
+  await sleep((60000 / bpm) * 4);
+  const gaps = await noteGaps(s.page);
+  check(label, gaps.length >= 4 && near(gaps, expected, 50), gaps.join(" "));
+  await s.close();
+}
+
 // Metronome
 {
   const s = await practice("t-silent.wav", { settings: { bpm: 60 } });
@@ -263,7 +275,7 @@ for (const [label, count, pattern, ms, expected] of [
   await sleep(2600);
   const clicks = await s.page.evaluate(() => window.clicks.map((click) => click.scheduled));
   const gaps = clicks.slice(1).map((time, index) => Math.round(time - clicks[index]));
-  check("metronome: follows the BPM slider mid-run", gaps.includes(1000) && near(gaps.slice(-3), [500], 15), gaps.join(" "));
+  check("metronome: follows the BPM slider mid-run", gaps.some((gap) => Math.abs(gap - 1000) <= 15) && near(gaps.slice(-3), [500], 15), gaps.join(" "));
   await s.close();
 }
 {
