@@ -49,6 +49,45 @@ export const noteGaps = async (page) => {
   const times = await page.evaluate(() => window.noteTimes);
   return times.slice(1).map((time, index) => Math.round(time - times[index]));
 };
+// A synthetic violinist standing in for the microphone. It watches the current note and plays it, as a
+// person would, so a timing check doesn't depend on when the mic starts relative to a fixed audio file.
+// delayMs is how long it takes to come in on each new note, and delays overrides that for a note number.
+export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
+  page.evaluate(({ midis, delayMs, delays }) => {
+    const context = new AudioContext();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sawtooth";
+    gain.gain.value = 0;
+    oscillator.connect(gain);
+    oscillator.start();
+    // A fresh stream each time, because stopping a session ends the one it was using.
+    navigator.mediaDevices.getUserMedia = async () => {
+      const output = context.createMediaStreamDestination();
+      gain.connect(output);
+      return output.stream;
+    };
+    let current = 0;
+    const tick = () => {
+      const note = Number(document.querySelector("section > p")?.textContent.match(/^Note (\d+) of/)?.[1] ?? 0);
+      if (note !== current) {
+        current = note;
+        const wait = delays[note] ?? delayMs;
+        const play = () => {
+          if (current !== note) return;
+          oscillator.frequency.value = 440 * 2 ** ((midis[note - 1] - 69) / 12);
+          gain.gain.value = 0.3;
+        };
+        if (note === 0) gain.gain.value = 0;
+        else if (wait > 0) {
+          gain.gain.value = 0;
+          setTimeout(play, wait);
+        } else play();
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  }, { midis, delayMs, delays });
 export const near = (values, expected, tolerance = 60) => values.length > 0 && values.every((value, index) => Math.abs(value - (expected[index % expected.length])) <= tolerance);
 export const progress = (page) => page.locator("section > p").first().innerText();
 export const nav = (page, name) => page.click(`nav button:text-is("${name}")`);

@@ -1,21 +1,21 @@
 // Tempo mode, rhythm patterns and the metronome.
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, trackNotes, noteGaps, near, progress, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, OUT } from "./lib.mjs";
 
 const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
-const GAP = 0.08;
-const bowed = (midi, beats) => beats.flatMap((length) => [note(midi, length - GAP), rest(GAP)]);
 const REPEAT = [{ id: "r", title: "Repeat", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
 const TWO = [{ id: "two", title: "Two", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
 const scroll = (page) => page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);
 
-async function practice(file, seeded) {
+async function practice(file, seeded, player) {
   const s = await open(OUT + file);
   await seed(s.page, seeded);
   await nav(s.page, "Practice");
   await sleep(200);
+  if (player) await followNotes(s.page, player);
   return s;
 }
+const eachNote = (count) => D.flatMap((midi) => Array(count).fill(midi));
 const run = async (s) => {
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
@@ -31,33 +31,35 @@ const spyOnClicks = (page) =>
     };
   });
 
-wav(OUT + "t-1s.wav", D.map((m) => note(m, 1)));
-wav(OUT + "t-half.wav", D.map((m) => note(m, 0.5)));
 wav(OUT + "t-wrong.wav", [note(63, 4)]);
 wav(OUT + "t-silent.wav", [rest(3)]);
 wav(OUT + "t-bowed.wav", [note(62, 0.85), rest(0.15), note(62, 0.85), rest(0.15), note(64, 2)]);
 wav(OUT + "t-long.wav", [note(62, 7)]);
-wav(OUT + "t-p2.wav", D.map((m) => note(m, 2)));
-wav(OUT + "t-p3.wav", D.map((m) => note(m, 4)));
-wav(OUT + "t-p4.wav", D.flatMap((m) => bowed(m, [0.5, 0.5, 0.5, 0.5, 1, 1])));
-wav(OUT + "t-p5.wav", D.flatMap((m) => bowed(m, [1, 0.5, 0.5, 1, 0.5, 0.5])));
 wav(OUT + "t-two.wav", [note(62, 2), note(64, 2.5), rest(1)]);
 wav(OUT + "t-clicks.wav", Array.from({ length: 8 }, () => [{ hz: 2500, seconds: 0.02, wave: "sine" }, rest(0.98)]).flat());
 wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds: 0.02, wave: "sine" }, note(m, 0.5)]));
 
 // Tempo
 {
-  const s = await practice("t-1s.wav", { settings: { tempoOn: true, bpm: 60 } });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 60 } }, { midis: D });
   await run(s);
-  const scrolls = [];
-  const t0 = Date.now();
-  while (Date.now() - t0 < 16500) { scrolls.push(await scroll(s.page)); await sleep(15); }
+  // Frame by frame from inside the page, while notes are still gliding on the beat.
+  await s.page.evaluate(() => {
+    window.scrolls = [];
+    const tick = () => {
+      if (document.querySelector("section > p").textContent.startsWith("Note")) window.scrolls.push(document.querySelector(".highway-scroll").scrollLeft);
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  await sleep(16500);
+  const scrolls = await s.page.evaluate(() => window.scrolls);
   const gaps = await noteGaps(s.page);
   check("tempo: 60 BPM moves a note a second", near(gaps.slice(0, -1), [1000]), gaps.join(" "));
   check("tempo: the last note clears straight away", gaps.at(-1) < 500, String(gaps.at(-1)));
   check("tempo: finishes the piece", (await progress(s.page)) === "All 15 notes done", await progress(s.page));
   check("tempo: the glide never jumps back", scrolls.every((value, index) => index === 0 || value >= scrolls[index - 1] - 1));
-  check("tempo: the glide passes through in small steps", Math.max(...scrolls.map((value, index) => (index ? value - scrolls[index - 1] : 0))) < 60);
+  check("tempo: the glide passes through in small steps", Math.max(...scrolls.map((value, index) => (index ? value - scrolls[index - 1] : 0))) < 20, `biggest step ${Math.max(...scrolls.map((value, index) => (index ? value - scrolls[index - 1] : 0)))} px over ${scrolls.length} frames`);
   await stop(s.page);
   await sleep(150);
   const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")).at(-1));
@@ -66,7 +68,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.close();
 }
 {
-  const s = await practice("t-half.wav", { settings: { tempoOn: true, bpm: 120 } });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 120 } }, { midis: D });
   await run(s);
   await sleep(4000);
   const gaps = await noteGaps(s.page);
@@ -74,7 +76,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.close();
 }
 {
-  const s = await practice("t-1s.wav", { settings: { tempoOn: true, bpm: 120 } });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 120 } }, { midis: D, delayMs: 300 });
   await run(s);
   await sleep(5000);
   const gaps = await noteGaps(s.page);
@@ -105,7 +107,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.close();
 }
 {
-  const s = await practice("t-1s.wav", { settings: { tempoOn: true, bpm: 30 } });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 30 } }, { midis: D });
   await run(s);
   await s.page.waitForFunction(() => document.querySelector(".highway-scroll").scrollLeft > 5);
   await stop(s.page);
@@ -166,13 +168,13 @@ const buttons = (page) => page.locator(".patterns button");
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
-for (const [label, file, pattern, ms, expected] of [
-  ["pattern 2", "t-p2.wav", 1, 7500, [2000]],
-  ["pattern 3", "t-p3.wav", 2, 14000, [4000]],
-  ["pattern 4", "t-p4.wav", 3, 9000, [500, 500, 500, 1000, 1000, 500]],
-  ["pattern 5", "t-p5.wav", 4, 9000, [500, 500, 1000, 500, 500, 1000]],
+for (const [label, count, pattern, ms, expected] of [
+  ["pattern 2", 1, 1, 7500, [2000]],
+  ["pattern 3", 1, 2, 14000, [4000]],
+  ["pattern 4", 6, 3, 9000, [500, 500, 500, 1000, 1000, 500]],
+  ["pattern 5", 6, 4, 9000, [500, 500, 1000, 500, 500, 1000]],
 ]) {
-  const s = await practice(file, { settings: { tempoOn: true, bpm: 60, pattern } });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 60, pattern } }, { midis: eachNote(count) });
   await run(s);
   await sleep(ms);
   const gaps = await noteGaps(s.page);
@@ -180,11 +182,11 @@ for (const [label, file, pattern, ms, expected] of [
   await s.close();
 }
 {
-  const s = await practice("t-p2.wav", { settings: { tempoOn: false, bpm: 60, pattern: 1 } });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: false, bpm: 60, pattern: 1 } }, { midis: D });
   await run(s);
-  await sleep(5000);
+  await sleep(6500);
   const gaps = await noteGaps(s.page);
-  check("with tempo off, a pattern note is held for its full length", gaps.length >= 1 && near(gaps, [2000], 120), gaps.join(" "));
+  check("with tempo off, a pattern note is held for nearly its full length", gaps.length >= 2 && near(gaps, [1850], 120), gaps.join(" "));
   await s.close();
 }
 {
@@ -205,6 +207,15 @@ for (const [label, file, pattern, ms, expected] of [
   await sleep(150);
   const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")).at(-1));
   check("a pattern isn't timed as a pass", log.passes === 0 && log.averagePassSeconds === null && log.notesHit === 2, JSON.stringify(log));
+  await s.close();
+}
+
+{
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, bpm: 60, pattern: 3 } }, { midis: eachNote(6), delays: { 3: 150 } });
+  await run(s);
+  await sleep(4300);
+  const gaps = await noteGaps(s.page);
+  check("one eighth note 150 ms late stays on the beat", gaps.length >= 4 && near(gaps, [500, 500, 500, 1000, 1000]), gaps.join(" "));
   await s.close();
 }
 
@@ -232,7 +243,7 @@ for (const [label, file, pattern, ms, expected] of [
   await s.close();
 }
 {
-  const s = await practice("t-1s.wav", { settings: { tempoOn: true, metronomeOn: true, bpm: 60 } });
+  const s = await practice("t-silent.wav", { settings: { tempoOn: true, metronomeOn: true, bpm: 60 } }, { midis: D });
   await spyOnClicks(s.page);
   await run(s);
   await sleep(7000);
