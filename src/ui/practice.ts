@@ -12,7 +12,8 @@ import { createStaff } from "./staff";
 import { createToggles } from "./toggles";
 
 const REFERENCE_ECHO_MS = 150;
-const STAFF_NOTES = 3;
+// The page content is 960 wide, less the staff's side padding.
+const STAFF_WIDTH = 944;
 
 export function practiceScreen(pieceId?: string): Screen {
   const settings = getSettings();
@@ -20,22 +21,23 @@ export function practiceScreen(pieceId?: string): Screen {
   let piece = pieces.find((candidate) => candidate.id === pieceId) ?? pieces[0];
   let mutedUntil = 0;
   let holdProgress = 0;
+  let startIndex = 0;
 
   const judge = createJudge(settings);
   const needle = createNeedle();
-  const staff = createStaff();
-  const highway = createHighway();
+  const staff = createStaff(STAFF_WIDTH);
+  const highway = createHighway(startFrom);
   const hertz = h("span");
   const progress = h("p");
   const stats = h("div", { className: "stats" });
 
-  const currentIndex = () => controls.session?.index ?? 0;
+  const currentIndex = () => controls.session?.index ?? startIndex;
 
   function renderNotes() {
     const index = currentIndex();
     const note = piece.notes[index];
     staff.element.hidden = !settings.toggles.staff;
-    staff.draw(piece.notes.slice(index, index + STAFF_NOTES).map((upcoming) => upcoming.pitch));
+    staff.draw(piece.notes.map(({ pitch }) => pitch), index);
     progress.textContent = note
       ? `Note ${index + 1} of ${piece.notes.length}${note.bar ? ` · bar ${note.bar}` : ""}`
       : `All ${piece.notes.length} notes done`;
@@ -48,17 +50,22 @@ export function practiceScreen(pieceId?: string): Screen {
       .map((note) => `${noteLabels(note.pitch).solfege} (${note.seconds.toFixed(1)} s)`)
       .join(", ");
     stats.replaceChildren(
-      h("p", {}, `Pass ${entry.passes} done in ${session.passSeconds.at(-1)!.toFixed(0)} s.`),
+      h("p", {}, `${startIndex === 0 ? `Pass ${entry.passes}` : `Note ${startIndex + 1} to the end`} done in ${session.lastRunSeconds.toFixed(0)} s.`),
       h("p", {}, `This session: ${entry.notesHit} hit, ${entry.notesSkipped} skipped, ${(entry.averageCents ?? 0).toFixed(0)} cents off on average.`),
       h("p", {}, `Slowest: ${slowest || "none"}`),
-      h("button", { textContent: "Play again", onclick: () => playAgain(session) }),
+      h("button", { textContent: "Play again", onclick: () => startFrom(startIndex) }),
     );
   }
 
-  function playAgain(session: Session) {
-    session.restart(performance.now());
+  function startFrom(index: number) {
+    startIndex = index;
+    const session = controls.session;
+    if (session) {
+      session.jumpTo(index, performance.now());
+      judge.setTarget(session.currentMidi);
+    }
+    holdProgress = 0;
     stats.replaceChildren();
-    judge.setTarget(session.currentMidi);
     renderNotes();
   }
 
@@ -90,9 +97,8 @@ export function practiceScreen(pieceId?: string): Screen {
     onReading,
     onStart() {
       skipButton.disabled = false;
-      stats.replaceChildren();
-      judge.setTarget(controls.session!.currentMidi);
-      renderNotes();
+      highway.jumpTo(startIndex);
+      startFrom(startIndex);
     },
     onStop() {
       skipButton.disabled = true;
@@ -110,6 +116,7 @@ export function practiceScreen(pieceId?: string): Screen {
         await controls.stop();
         piece = pieces.find((candidate) => candidate.id === pieceSelect.value)!;
         stats.replaceChildren();
+        startIndex = 0;
         highway.jumpTo(0);
         renderNotes();
       },
@@ -155,9 +162,9 @@ export function practiceScreen(pieceId?: string): Screen {
       h("div", { className: "row" }, pieceSelect, controls.element, referenceButton, skipButton),
       progress,
       h("div", { className: "row tuning" }, needle.element, hertz),
-      staff.element,
       highway.element,
       stats,
+      staff.element,
     ),
     leave: controls.leave,
   };

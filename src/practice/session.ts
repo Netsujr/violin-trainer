@@ -10,8 +10,10 @@ export class Session {
   hits: NoteHit[] = [];
   skipped = 0;
   passSeconds: number[] = [];
+  lastRunSeconds = 0;
   private noteStart: number;
   private passStart: number;
+  private wholePass = true;
 
   constructor(piece: Piece, now: number) {
     this.piece = piece;
@@ -40,14 +42,19 @@ export class Session {
     this.advance(now);
   }
 
-  restart(now: number) {
-    this.index = 0;
+  // A jump is neither a hit nor a skip. A run that didn't start at note 1 isn't a whole pass, so it isn't timed as one.
+  jumpTo(index: number, now: number) {
+    this.index = index;
     this.noteStart = this.passStart = now;
+    this.wholePass = index === 0;
   }
 
   private advance(now: number) {
     this.index++;
     this.noteStart = now;
-    if (this.finished) this.passSeconds.push((now - this.passStart) / 1000);
+    if (!this.finished) return;
+
+    this.lastRunSeconds = (now - this.passStart) / 1000;
+    if (this.wholePass) this.passSeconds.push(this.lastRunSeconds);
   }
 }

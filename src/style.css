@@ -198,11 +198,42 @@ section > ul > li {
   display: block;
 }
 
-canvas {
+.staff .current text {
+  fill: #b03020;
+}
+
+.staff .current path {
+  stroke: #b03020;
+}
+
+.highway {
+  position: relative;
+  padding-bottom: 0.875rem; /* The scrollbar sits here, below the lanes. */
+  margin-block: 1rem;
+}
+
+.highway canvas {
   display: block;
   width: 100%;
-  margin-block: 1rem;
   border-radius: var(--pico-border-radius);
+}
+
+.highway-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pico-secondary-background) transparent;
+}
+
+.highway-scroll:focus-visible {
+  outline: 2px solid var(--pico-primary-background);
+  outline-offset: 1px;
+}
+
+.highway-scroll > div {
+  height: 1px;
 }
 
 /* Listen */
@@ -238,39 +269,16 @@ canvas {
   color: var(--pico-muted-color);
 }
 
-/* Practice: the staff sits beside the progress and needle, to keep the highway on screen. */
-.practice {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 1.5rem;
-}
-
-.practice > * {
-  grid-column: 1 / -1;
-}
-
+/* Practice */
 .practice > p {
-  grid-column: 1;
-  align-self: end;
-  margin: 0;
+  margin: 1rem 0 0;
   font-size: 1.25rem;
   font-weight: 600;
 }
 
-.practice > .tuning {
-  grid-column: 1;
-  align-self: start;
-}
-
 .practice > .staff {
-  grid-column: 2;
-  grid-row: 3 / span 2;
-}
-
-@media (max-width: 720px) {
-  .practice {
-    display: block;
-  }
+  width: 100%;
+  margin-block: 1rem;
 }
 
 /* Library */

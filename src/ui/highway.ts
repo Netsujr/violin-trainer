@@ -11,23 +11,66 @@ const HIT_X = 130;
 const SPACING = 120;
 const TILE_WIDTH = 92;
 const TILE_HEIGHT = 74;
-const RING_GAP = 3;
-const RING_CORNER = 11;
-const SLIDE_RATE = 0.18;
+const OUTLINE_GAP = 3;
+const OUTLINE_CORNER = 11;
 const LOW_FINGER_COLOR = "#b03020";
 const NAME_COLOR = "#6b3a1e";
 const LETTER_COLOR = "#666";
 const TILE_COLOR = "#f3ead9";
+const CURRENT_COLOR = "#ff9500";
+const HOLD_COLOR = "#4cd07d";
 // Matches the palette in style.css.
 const LANE_COLORS = ["#211c16", "#1b1712"];
 const LANE_LABEL_COLOR = "#a39a8b";
 const HIT_LINE_COLOR = "#e8e2d6";
 
-export function createHighway() {
+export function createHighway(onPick: (noteIndex: number) => void) {
   const canvas = h("canvas", { width: WIDTH * devicePixelRatio, height: HEIGHT * devicePixelRatio });
   const context = canvas.getContext("2d")!;
   context.scale(devicePixelRatio, devicePixelRatio);
-  let position = 0;
+  const track = h("div");
+  // The canvas stays put. This clear layer on top scrolls natively, and the canvas repaints to match it.
+  const scroller = h(
+    "div",
+    {
+      className: "highway-scroll",
+      tabIndex: 0,
+      role: "region",
+      ariaLabel: "Note timeline. Scroll to a note and press Enter to start from it.",
+      onscroll: paint,
+      onclick(event) {
+        const noteIndex = noteAt(event);
+        if (noteIndex !== null) onPick(noteIndex);
+      },
+      onpointermove(event) {
+        scroller.style.cursor = noteAt(event) === null ? "" : "pointer";
+      },
+      onkeydown(event) {
+        if (event.key === "Enter") onPick(Math.min(Math.round(position()), notes.length - 1));
+      },
+    },
+    track,
+  );
+  let notes: PieceNote[] = [];
+  let currentIndex = 0;
+  let holdProgress = 0;
+
+  const pixelsPerNote = () => (SPACING * (scroller.clientWidth || WIDTH)) / WIDTH;
+  const position = () => scroller.scrollLeft / pixelsPerNote();
+  const tileX = (noteIndex: number) => HIT_X + (noteIndex - position()) * SPACING;
+  const laneCenter = (note: PieceNote) => (LANES.indexOf(note.string!) + 0.5) * LANE_HEIGHT;
+
+  function noteAt(event: MouseEvent) {
+    const box = canvas.getBoundingClientRect();
+    const x = ((event.clientX - box.left) * WIDTH) / box.width;
+    const y = ((event.clientY - box.top) * HEIGHT) / box.height;
+    const noteIndex = Math.round(position() + (x - HIT_X) / SPACING);
+    const note = notes[noteIndex];
+    if (!note) return null;
+
+    const overTile = Math.abs(tileX(noteIndex) - x) <= TILE_WIDTH / 2 && Math.abs(laneCenter(note) - y) <= TILE_HEIGHT / 2;
+    return overTile ? noteIndex : null;
+  }
 
   function drawLanes() {
     LANES.forEach((lane, index) => {
@@ -41,8 +84,6 @@ export function createHighway() {
     context.fillStyle = HIT_LINE_COLOR;
     context.fillRect(HIT_X - 1, 0, 2, HEIGHT);
   }
-
-  const laneCenter = (note: PieceNote) => (LANES.indexOf(note.string!) + 0.5) * LANE_HEIGHT;
 
   function drawTile(note: PieceNote, x: number) {
     const { toggles } = getSettings();
@@ -71,35 +112,49 @@ export function createHighway() {
     }
   }
 
-  function drawHoldRing(note: PieceNote, x: number, progress: number) {
-    const width = TILE_WIDTH + RING_GAP * 2;
-    const height = TILE_HEIGHT + RING_GAP * 2;
+  function outlineTile(note: PieceNote, x: number, color: string, portion = 1) {
+    const width = TILE_WIDTH + OUTLINE_GAP * 2;
+    const height = TILE_HEIGHT + OUTLINE_GAP * 2;
     const perimeter = 2 * (width + height);
-    context.strokeStyle = "#4cd07d";
+    context.strokeStyle = color;
     context.lineWidth = 4;
-    context.setLineDash([progress * perimeter, perimeter]);
+    context.setLineDash([portion * perimeter, perimeter]);
     context.beginPath();
-    context.roundRect(x - width / 2, laneCenter(note) - height / 2, width, height, RING_CORNER);
+    context.roundRect(x - width / 2, laneCenter(note) - height / 2, width, height, OUTLINE_CORNER);
     context.stroke();
     context.setLineDash([]);
   }
 
-  return {
-    element: canvas,
-    draw(notes: PieceNote[], index: number, holdProgress: number) {
-      position += (index - position) * SLIDE_RATE;
-      context.clearRect(0, 0, WIDTH, HEIGHT);
-      drawLanes();
-      notes.forEach((note, noteIndex) => {
-        const x = HIT_X + (noteIndex - position) * SPACING;
-        if (x < -TILE_WIDTH || x > WIDTH + TILE_WIDTH) return;
+  function paint() {
+    context.clearRect(0, 0, WIDTH, HEIGHT);
+    drawLanes();
+    notes.forEach((note, noteIndex) => {
+      const x = tileX(noteIndex);
+      if (x < -TILE_WIDTH || x > WIDTH + TILE_WIDTH) return;
 
-        drawTile(note, x);
-        if (noteIndex === index && holdProgress > 0) drawHoldRing(note, x, holdProgress);
-      });
+      drawTile(note, x);
+      if (noteIndex !== currentIndex) return;
+
+      outlineTile(note, x, CURRENT_COLOR);
+      if (holdProgress > 0) outlineTile(note, x, HOLD_COLOR, holdProgress);
+    });
+  }
+
+  return {
+    element: h("div", { className: "highway" }, canvas, scroller),
+    draw(pieceNotes: PieceNote[], index: number, progress: number) {
+      notes = pieceNotes;
+      holdProgress = progress;
+      track.style.width = `${100 + (notes.length * SPACING * 100) / WIDTH}%`;
+      if (index !== currentIndex) {
+        currentIndex = index;
+        scroller.scrollTo({ left: index * pixelsPerNote(), behavior: "smooth" });
+      }
+      paint();
     },
     jumpTo(index: number) {
-      position = index;
+      currentIndex = index;
+      scroller.scrollLeft = index * pixelsPerNote();
     },
   };
 }

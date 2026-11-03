@@ -20,6 +20,30 @@ const entry = (startedAt: string, minutes: number, pieceId = "p", notesHit = 1):
 });
 
 describe("session and log entry", () => {
+  it("jumps without counting a hit or a skip, and times a partial run but not as a pass", () => {
+    const session = new Session(piece, 0);
+    session.hit(10, 1000);
+    session.jumpTo(2, 5000);
+    expect(session.current.pitch).toBe("F#4");
+    session.hit(10, 6000);
+    session.hit(10, 8000);
+    expect(session.finished).toBe(true);
+    expect(session.lastRunSeconds).toBe(3);
+    expect(session.passSeconds).toEqual([]);
+    expect(session.skipped).toBe(0);
+    expect(session.hits.map((hit) => hit.ms)).toEqual([1000, 1000, 2000]);
+    expect(buildEntry(session, 8000).passes).toBe(0);
+    expect(buildEntry(session, 8000).averagePassSeconds).toBeNull();
+  });
+
+  it("counts a whole pass again after jumping back to note 1", () => {
+    const session = new Session(piece, 0);
+    session.jumpTo(2, 1000);
+    session.jumpTo(0, 2000);
+    for (const now of [3000, 4000, 5000, 6000]) session.hit(10, now);
+    expect(session.passSeconds).toEqual([4]);
+  });
+
   it("summarises a session", () => {
     const session = new Session(piece, 0);
     session.hit(10, 1000);
@@ -49,7 +73,7 @@ describe("session and log entry", () => {
   it("counts each finished pass", () => {
     const session = new Session(piece, 0);
     for (const now of [1, 2, 3, 4]) session.hit(0, now * 1000);
-    session.restart(5000);
+    session.jumpTo(0, 5000);
     expect(session.index).toBe(0);
     for (const now of [6, 7, 8, 9]) session.hit(0, now * 1000);
     expect(buildEntry(session, 10000).passes).toBe(2);
