@@ -8,7 +8,7 @@ const CLICK_MS = 20;
 const CLICK_VOLUME = 0.5;
 const SCHEDULE_AHEAD_MS = 100;
 // Long enough for a new audio context to start, so the first click isn't late.
-const FIRST_CLICK_DELAY_MS = 500;
+export const FIRST_CLICK_DELAY_MS = 500;
 
 const outputLatencyMs = () => (sharedAudioContext().outputLatency || 0) * 1000;
 

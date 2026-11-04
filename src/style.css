@@ -540,6 +540,12 @@ section > ul > li {
   height: 1.25rem;
 }
 
+/* Set directly, because Pico's hover and focus styles replace its variables. */
+.icon-button[aria-pressed="true"] {
+  color: #4cd07d;
+  border-color: #4cd07d;
+}
+
 .day-picker {
   position: relative;
   display: inline-flex;
@@ -877,6 +883,16 @@ a[download] {
     align-items: center;
     min-height: 2.25rem;
   }
+}
+
+.toggles label:has(input:disabled) {
+  opacity: 0.5;
+}
+
+.stats .score {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--pico-primary);
 }
 
 /* Fullscreen: only the run controls, the timeline and the moving staff. Last, to win over the sizes above. */

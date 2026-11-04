@@ -14,7 +14,11 @@ export type LogEntry = {
   averagePassSeconds: number | null;
   slowest: { pitch: string; seconds: number }[];
   recordingId?: string;
+  // Only when the lanes kept moving, where skipped notes are the missed ones.
+  score?: number;
 };
+
+export const scorePercent = (hit: number, total: number) => (total === 0 ? 0 : Math.round((hit / total) * 100));
 
 const average = (values: number[]) =>
   values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -31,11 +35,14 @@ export function buildEntry(session: Session, now: number, recordingId?: string):
     notesSkipped: session.skipped,
     averageCents: average(session.hits.map((hit) => hit.cents)),
     averagePassSeconds: average(session.passSeconds),
-    slowest: [...session.hits]
-      .sort((a, b) => b.ms - a.ms)
-      .slice(0, 3)
-      .map((hit) => ({ pitch: hit.pitch, seconds: hit.ms / 1000 })),
+    slowest: session.following
+      ? []
+      : [...session.hits]
+          .sort((a, b) => b.ms - a.ms)
+          .slice(0, 3)
+          .map((hit) => ({ pitch: hit.pitch, seconds: hit.ms / 1000 })),
     recordingId,
+    ...(session.following && { score: scorePercent(session.hits.length, session.hits.length + session.skipped) }),
   };
 }
 

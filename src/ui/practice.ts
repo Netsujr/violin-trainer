@@ -1,10 +1,11 @@
-import { createMetronome } from "../audio/metronome";
+import { createMetronome, FIRST_CLICK_DELAY_MS } from "../audio/metronome";
 import { playReference, REFERENCE_MS } from "../audio/reference";
 import { localNumber, localTitle, t } from "../i18n";
 import { midiOf, noteLabels } from "../music/notes";
 import { PATTERNS, withPattern } from "../music/patterns";
-import { createJudge } from "../practice/judge";
-import { buildEntry } from "../practice/log";
+import { createFollow } from "../practice/follow";
+import { centsToTarget, createJudge } from "../practice/judge";
+import { buildEntry, scorePercent } from "../practice/log";
 import type { Session } from "../practice/session";
 import { allPieces, getSettings, saveSettings } from "../storage";
 import { h, type Screen } from "./dom";
@@ -13,7 +14,7 @@ import { contentWidth, setFullscreenLayout, timelineScale } from "./layout";
 import { createNeedle } from "./listen";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
-import { COMPRESS_ICON, createIconToggle, EXPAND_ICON } from "./toggles";
+import { COMPRESS_ICON, createIconToggle, DONT_WAIT_ICON, EXPAND_ICON } from "./toggles";
 
 const REFERENCE_ECHO_MS = 150;
 // A hit closer to the beat than this waits for the following beat, so the glide never looks rushed.
@@ -26,6 +27,7 @@ const SHORTEST_TEMPO_HOLD_MS = 80;
 // Otherwise it clears just short of its full length, because the mic takes a moment to hear a note start.
 const FULL_HOLD_SHARE = 0.9;
 const STAFF_SIDE_PADDING = 16;
+const COUNT_IN_BEATS = 4;
 
 export function practiceScreen(pieceId?: string): Screen {
   const settings = getSettings();
@@ -37,6 +39,8 @@ export function practiceScreen(pieceId?: string): Screen {
   let startIndex = 0;
   let lastBeat: number | null = null;
   let pendingHit: { cents: number; at: number; arrivesAt: number } | null = null;
+  // When "Don't wait" is on: the clock the lanes move to, in beats, negative during the count-in.
+  let following: { tracker: ReturnType<typeof createFollow>; beat: number; at: number; results: Map<number, boolean>; counting: boolean } | null = null;
 
   const judge = createJudge({
     get toleranceCents() {
@@ -146,7 +150,21 @@ export function practiceScreen(pieceId?: string): Screen {
     return startIndex === 0 ? t.passDone(passes, seconds) : t.partialDone(startIndex + 1, seconds);
   }
 
+  const playAgainButton = () =>
+    h("button", { textContent: t.playAgain, onclick: () => (controls.session ? startFrom(startIndex) : controls.startButton.click()) });
+
+  function showScore(results: Map<number, boolean>) {
+    const hit = [...results.values()].filter(Boolean).length;
+    stats.replaceChildren(
+      h("p", { className: "score" }, t.score(scorePercent(hit, results.size))),
+      h("p", {}, t.hitMissed(hit, results.size - hit)),
+      playAgainButton(),
+    );
+  }
+
   function showStats(session: Session) {
+    if (following) return showScore(following.results);
+
     const entry = buildEntry(session, performance.now());
     const slowest = entry.slowest
       .map((note) => `${noteLabels(note.pitch).solfege} (${localNumber(note.seconds, 1)} s)`)
@@ -157,7 +175,7 @@ export function practiceScreen(pieceId?: string): Screen {
       h("p", {}, runSummary(entry.passes, seconds)),
       h("p", {}, t.summary(t.hitSkipped(entry.notesHit, entry.notesSkipped), cents)),
       h("p", {}, t.slowest(slowest || t.slowestNone)),
-      h("button", { textContent: t.playAgain, onclick: () => (controls.session ? startFrom(startIndex) : controls.startButton.click()) }),
+      playAgainButton(),
     );
   }
 
@@ -169,10 +187,60 @@ export function practiceScreen(pieceId?: string): Screen {
     if (session) {
       session.jumpTo(index, performance.now());
       judge.setTarget(session.currentMidi);
+      if (session.following) startFollowing(index);
     }
     holdProgress = 0;
     stats.replaceChildren();
     renderNotes();
+  }
+
+  // The first click comes after a short delay and counts in the first note, so the two share a beat.
+  function startFollowing(index: number) {
+    const tracker = createFollow(piece.notes, index, () => settings.toleranceCents);
+    const beat = tracker.startBeat - COUNT_IN_BEATS - FIRST_CLICK_DELAY_MS / beatMs();
+    following = { tracker, beat, at: performance.now(), results: new Map(), counting: true };
+    metronome.reset();
+    highway.showResults(following.results);
+    highway.jumpTo(index);
+  }
+
+  function stopFollowing() {
+    following = null;
+    highway.showResults(null);
+  }
+
+  function followReading(session: Session, frequency: number | null, now: number) {
+    const state = following!;
+    const stepBeats = (now - state.at) / beatMs();
+    state.at = now;
+    state.beat += stepBeats;
+    const heard = now < mutedUntil ? null : frequency;
+    // What the mic hears now was played a moment ago.
+    const micBeat = state.beat - MIC_DELAY_MS / beatMs();
+    for (const { index, hit, cents } of state.tracker.update(heard, micBeat, stepBeats)) {
+      state.results.set(index, hit);
+      if (hit) {
+        const startedAt = now - MIC_DELAY_MS - (micBeat - state.tracker.starts[index]) * beatMs();
+        // A recording's marker sits one hold time before this, which puts it where the note starts.
+        session.hit(cents, startedAt + settings.holdMs, now);
+      } else session.skip(now);
+      holdProgress = 0;
+      moveOn(session);
+    }
+    if (state.counting) {
+      const left = state.tracker.startBeat - state.beat;
+      if (left > 0) progress.textContent = t.startsIn(Math.min(COUNT_IN_BEATS, Math.ceil(left)));
+      else {
+        state.counting = false;
+        renderNotes();
+      }
+    }
+    highway.moveToBeat(Math.max(state.tracker.startBeat, Math.min(state.beat, state.tracker.starts[piece.notes.length])));
+    if (session.finished) return;
+
+    holdProgress = state.tracker.progress;
+    needle.show(frequency === null ? null : centsToTarget(frequency, session.currentMidi));
+    hertz.textContent = frequency === null ? "" : `${localNumber(frequency, 1)} Hz`;
   }
 
   // With tempo on, a hit waits for the next beat while the timeline glides there.
@@ -221,7 +289,9 @@ export function practiceScreen(pieceId?: string): Screen {
   function onReading(frequency: number | null, now: number) {
     const session = controls.session!;
     if (settings.metronomeOn) metronome.tick(now, settings.bpm);
-    if (!session.finished) {
+    if (following) {
+      if (!session.finished) followReading(session, frequency, now);
+    } else if (!session.finished) {
       if (pendingHit && now >= pendingHit.arrivesAt) arriveOnBeat(session);
       const verdict = judge.update(now < mutedUntil ? null : frequency, now);
       holdProgress = pendingHit ? 1 : verdict.progress;
@@ -245,11 +315,13 @@ export function practiceScreen(pieceId?: string): Screen {
     onReading,
     onStart() {
       metronome.reset();
-      skipButton.disabled = false;
+      controls.session!.following = settings.followOn;
+      skipButton.disabled = settings.followOn;
       highway.jumpTo(startIndex);
       startFrom(startIndex);
     },
     onStop() {
+      stopFollowing();
       cancelGlide();
       skipButton.disabled = true;
       holdProgress = 0;
@@ -319,19 +391,33 @@ export function practiceScreen(pieceId?: string): Screen {
     }),
     bpmValue,
   );
-  const tempoSwitch = h(
-    "label",
-    {},
-    h("input", {
-      type: "checkbox",
-      checked: settings.tempoOn,
-      onchange(event) {
-        settings.tempoOn = (event.target as HTMLInputElement).checked;
-        saveSettings();
-      },
-    }),
-    ` ${t.tempo}`,
-  );
+  // Tempo smooths the move to the next note after a hit, which has no meaning when the lanes don't wait for one.
+  const tempoInput = h("input", {
+    type: "checkbox",
+    checked: settings.tempoOn,
+    disabled: settings.followOn,
+    onchange() {
+      settings.tempoOn = tempoInput.checked;
+      saveSettings();
+    },
+  });
+  const tempoSwitch = h("label", {}, tempoInput, ` ${t.tempo}`);
+  const followButton = h("button", {
+    className: "secondary outline icon-button",
+    innerHTML: DONT_WAIT_ICON,
+    title: `${t.dontWait}: ${t.dontWaitHint}`,
+    ariaLabel: t.dontWait,
+    ariaPressed: String(settings.followOn),
+    async onclick() {
+      await controls.stop();
+      settings.followOn = !settings.followOn;
+      followButton.ariaPressed = String(settings.followOn);
+      tempoInput.disabled = settings.followOn;
+      saveSettings();
+      stats.replaceChildren();
+      renderNotes();
+    },
+  });
   const metronomeSwitch = h(
     "label",
     {},
@@ -364,7 +450,7 @@ export function practiceScreen(pieceId?: string): Screen {
 
   let fullscreen = false;
   const fullscreenButton = h("button", { className: "secondary outline icon-button", onclick: toggleFullscreen });
-  const actions = h("div", { className: "row actions" }, controls.startButton, referenceButton, skipButton, controls.message, fullscreenButton);
+  const actions = h("div", { className: "row actions" }, controls.startButton, referenceButton, skipButton, controls.message, followButton, fullscreenButton);
 
   function labelFullscreenButton() {
     const label = fullscreen ? t.exitFullscreen : t.fullscreen;
@@ -378,7 +464,7 @@ export function practiceScreen(pieceId?: string): Screen {
     fullscreen = value;
     setFullscreenLayout(value);
     document.documentElement.classList.toggle("fullscreen", value);
-    if (value) actions.insertBefore(bpmControl, fullscreenButton);
+    if (value) actions.insertBefore(bpmControl, followButton);
     else optionsBpmRow.append(bpmControl);
     // A full sheet wouldn't fit, so fullscreen uses the moving line, without changing the saved choice.
     staff.setCollapsed(value || !settings.staffOpen);

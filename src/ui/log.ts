@@ -10,8 +10,9 @@ const describeSession = (entry: LogEntry) =>
     new Date(entry.startedAt).toLocaleString(t.locale),
     localTitle(entry.pieceId, entry.pieceTitle),
     `${localNumber(entry.minutes, 1)} min`,
-    t.passes(entry.passes),
-    t.hitSkipped(entry.notesHit, entry.notesSkipped),
+    ...(entry.score === undefined
+      ? [t.passes(entry.passes), t.hitSkipped(entry.notesHit, entry.notesSkipped)]
+      : [t.score(entry.score), t.hitMissed(entry.notesHit, entry.notesSkipped)]),
     entry.averageCents === null ? null : t.centsOff(Math.round(entry.averageCents)),
     entry.slowest.length ? t.slowestLower(entry.slowest.map((note) => `${note.pitch} ${localNumber(note.seconds, 1)} s`).join(", ")) : null,
   ]

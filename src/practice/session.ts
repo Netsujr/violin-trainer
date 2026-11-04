@@ -11,6 +11,8 @@ export class Session {
   skipped = 0;
   passSeconds: number[] = [];
   lastRunSeconds = 0;
+  // The lanes set the pace, so a run's length says nothing about the playing and it isn't a timed pass.
+  following = false;
   private noteStart: number;
   private passStart: number;
   private wholePass = true;
@@ -47,7 +49,7 @@ export class Session {
   jumpTo(index: number, now: number) {
     this.index = index;
     this.noteStart = this.passStart = now;
-    this.wholePass = index === 0 && !this.piece.pattern;
+    this.wholePass = index === 0 && !this.piece.pattern && !this.following;
   }
 
   private advance(now: number) {

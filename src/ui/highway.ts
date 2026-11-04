@@ -21,6 +21,9 @@ const LETTER_COLOR = "#666";
 const TILE_COLOR = "#f3ead9";
 const CURRENT_COLOR = "#ff9500";
 const HOLD_COLOR = "#4cd07d";
+// Pale enough to keep a tile's labels readable.
+const HIT_TILE_COLOR = "#c9edd4";
+const MISS_TILE_COLOR = "#f6cfc8";
 // Matches the palette in style.css.
 const LANE_COLORS = ["#211c16", "#1b1712"];
 const LANE_LABEL_COLOR = "#a39a8b";
@@ -68,6 +71,8 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
   let currentIndex = 0;
   let holdProgress = 0;
   let glideFrame = 0;
+  // While the lanes keep moving: each finished note's result, and the lanes are moved by moveToBeat alone.
+  let results: Map<number, boolean> | null = null;
 
   const pixelsPerBeat = () => BEAT_WIDTH * scale;
   const fitTrack = () => (track.style.width = `calc(100% + ${starts.at(-1)! * pixelsPerBeat()}px)`);
@@ -126,11 +131,11 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
     context.fillRect(HIT_X - 1, 0, 2, HEIGHT);
   }
 
-  function drawTile(note: PieceNote, x: number) {
+  function drawTile(note: PieceNote, x: number, result?: boolean) {
     const { toggles } = getSettings();
     const y = laneCenter(note);
     const width = tileWidth(note);
-    context.fillStyle = TILE_COLOR;
+    context.fillStyle = result === undefined ? TILE_COLOR : result ? HIT_TILE_COLOR : MISS_TILE_COLOR;
     context.beginPath();
     context.roundRect(x, y - TILE_HEIGHT / 2, width, TILE_HEIGHT, 8);
     context.fill();
@@ -176,7 +181,7 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
       const x = tileX(noteIndex);
       if (x + tileWidth(note) < 0 || x > viewWidth) return;
 
-      drawTile(note, x);
+      drawTile(note, x, results?.get(noteIndex));
       if (noteIndex !== currentIndex) return;
 
       outlineTile(note, x, CURRENT_COLOR);
@@ -204,7 +209,7 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
       holdProgress = progress;
       if (index !== currentIndex) {
         currentIndex = index;
-        scroller.scrollTo({ left: scrollLeftOf(index), behavior: "smooth" });
+        if (!results) scroller.scrollTo({ left: scrollLeftOf(index), behavior: "smooth" });
       }
       paint();
     },
@@ -221,6 +226,12 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
       glideFrame = requestAnimationFrame(step);
     },
     jumpTo,
+    showResults(value: Map<number, boolean> | null) {
+      results = value;
+    },
+    moveToBeat(beat: number) {
+      scroller.scrollLeft = beat * pixelsPerBeat();
+    },
     resize() {
       fitToScreen();
       jumpTo(currentIndex);

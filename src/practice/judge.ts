@@ -3,7 +3,7 @@ import { centsFrom } from "../music/notes";
 const GAP_GRACE_MS = 60;
 const RELEASE_MS = 60;
 
-const centsToTarget = (frequency: number, target: number) =>
+export const centsToTarget = (frequency: number, target: number) =>
   [target, target - 12, target + 12]
     .map((midi) => centsFrom(frequency, midi))
     .reduce((closest, cents) => (Math.abs(cents) < Math.abs(closest) ? cents : closest));

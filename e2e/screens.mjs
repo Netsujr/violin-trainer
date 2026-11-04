@@ -8,6 +8,7 @@ const SIZES = [
   ["phone", 360, 640, true],
   ["iPhone", 390, 844, true],
   ["large phone", 430, 932, true],
+  ["smallest phone landscape", 568, 320, true],
   ["small phone landscape", 667, 375, true],
   ["phone landscape", 844, 390, true],
   ["iPad mini", 768, 1024, true],
