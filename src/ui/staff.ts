@@ -1,5 +1,5 @@
 import { Note } from "tonal";
-import { noteLabels } from "../music/notes";
+import { midiOf, noteLabels, staffStepsFrom } from "../music/notes";
 import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice } from "vexflow/bravura";
 import { h } from "./dom";
 import type { Section } from "./highway";
@@ -33,6 +33,9 @@ const COLLAPSED_NOTE_START = 118;
 const COLLAPSED_MARGIN = 16;
 const COLLAPSED_BEAT_WIDTH = 72;
 const SECTION_COLOR = "rgba(255, 149, 0, 0.28)";
+const STAFF_STEP_HEIGHT = 5;
+const PLAYED_COLOR = "#1f6fd1";
+const PLAYED_IN_TUNE_COLOR = "#14914a";
 // How far a note's clickable slot and the section's band start before its notehead, and how far the last one runs after it.
 const NOTE_LEAD = 20;
 const NOTE_TAIL = 40;
@@ -108,6 +111,25 @@ function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: s
   svg.append(element);
 }
 
+// The ghost notehead showing what's being played, and an arrow saying which way to move.
+function createPlayedNote() {
+  const svgElement = <Tag extends keyof SVGElementTagNameMap>(tag: Tag) => document.createElementNS("http://www.w3.org/2000/svg", tag);
+  const group = svgElement("g");
+  const head = svgElement("ellipse");
+  const arrow = svgElement("text");
+  group.classList.add("played-note");
+  group.setAttribute("pointer-events", "none");
+  head.setAttribute("rx", "7");
+  head.setAttribute("ry", "5");
+  head.setAttribute("opacity", "0.8");
+  arrow.setAttribute("font-size", "18");
+  arrow.setAttribute("font-weight", "700");
+  arrow.setAttribute("stroke", "none");
+  arrow.setAttribute("font-family", "system-ui, sans-serif");
+  group.append(head, arrow);
+  return { group, head, arrow };
+}
+
 export function createStaff(width = 300, startCollapsed = false, scale = 1, onPick?: (noteIndex: number, extend: boolean) => void) {
   const element = h("div", { className: "staff" });
   if (onPick) {
@@ -129,6 +151,9 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   let noteXs: number[] = [];
   // The line each note is on, and the sheet's measurements, to find the note under a click.
   let noteLines: number[] = [];
+  let noteYs: number[] = [];
+  let shownNotes: StaffNote[] = [];
+  const played = createPlayedNote();
   let sheet = { width: 0, height: 0, top: 0 };
   let section: Section | null = null;
   let followedBeat = 0;
@@ -232,6 +257,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     });
 
     noteXs = allNotes.map((note) => note.getAbsoluteX());
+    noteYs = allNotes.map((note) => note.getYs()[0]);
+    shownNotes = notes;
     drawSection(svg);
     noteBeats = [];
     let beat = 0;
@@ -265,6 +292,28 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       scrollToBeat();
       // The first draw happens before the staff is on the page, when it has no width to scroll in.
       if (!element.isConnected) requestAnimationFrame(scrollToBeat);
+    },
+    // Shows a note being played against the note at index, or nothing with cents null.
+    showPlayed(index: number, cents: number | null, inTune: boolean) {
+      const note = shownNotes[index];
+      if (cents === null || !note) {
+        played.group.remove();
+        return;
+      }
+      const x = noteXs[index] + NOTEHEAD_CENTER;
+      // Right on the note it lands exactly on it, which is the moment it clears.
+      const y = noteYs[index] - (inTune ? 0 : staffStepsFrom(midiOf(note.pitch), cents) * STAFF_STEP_HEIGHT);
+      const color = inTune ? PLAYED_IN_TUNE_COLOR : PLAYED_COLOR;
+      played.head.setAttribute("cx", String(x));
+      played.head.setAttribute("cy", String(y));
+      played.head.setAttribute("fill", color);
+      played.head.setAttribute("transform", `rotate(-20 ${x} ${y})`);
+      played.arrow.textContent = inTune ? "" : cents < 0 ? "↑" : "↓";
+      played.arrow.setAttribute("x", String(x + 12));
+      played.arrow.setAttribute("y", String(y + 6));
+      played.arrow.setAttribute("fill", color);
+      played.group.dataset.inTune = String(inTune);
+      if (played.group.parentNode !== element.querySelector("svg")) element.querySelector("svg")?.append(played.group);
     },
     setCollapsed(value: boolean) {
       collapsed = value;

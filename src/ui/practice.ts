@@ -233,6 +233,7 @@ export function practiceScreen(pieceId?: string): Screen {
   }
 
   function tickCountIn(now: number) {
+    staff.showPlayed(startIndex, null, false);
     const state = countIn!;
     state.beatsLeft -= (now - state.at) / beatMs();
     state.at = now;
@@ -320,7 +321,10 @@ export function practiceScreen(pieceId?: string): Screen {
     if (session.finished) return;
 
     holdProgress = state.tracker.progress;
-    needle.show(frequency === null ? null : centsToTarget(frequency, session.currentMidi));
+    const cents = frequency === null ? null : centsToTarget(frequency, session.currentMidi);
+    needle.show(cents);
+    const played = heard === null || state.counting || state.beat < state.tracker.startBeat ? null : cents;
+    staff.showPlayed(session.index, played, played !== null && Math.abs(played) <= settings.toleranceCents);
     hertz.textContent = frequency === null ? "" : `${localNumber(frequency, 1)} Hz`;
   }
 
@@ -359,6 +363,7 @@ export function practiceScreen(pieceId?: string): Screen {
     holdProgress = 0;
     if (session.finished) {
       needle.show(null);
+      staff.showPlayed(session.index, null, false);
       hertz.textContent = "";
       if (settings.loopOn) loopAgain(session, previousMidi);
       else showStats(session);
@@ -380,6 +385,7 @@ export function practiceScreen(pieceId?: string): Screen {
       const verdict = judge.update(isMuted(now) ? null : frequency, now);
       holdProgress = pendingHit ? 1 : verdict.progress;
       needle.show(verdict.cents);
+      staff.showPlayed(session.index, verdict.cents, verdict.inTune);
       hertz.textContent = frequency === null ? "" : `${localNumber(frequency, 1)} Hz`;
       if (verdict.hit && !pendingHit) {
         if (settings.tempoOn && session.index < endIndex() - 1) {
@@ -411,6 +417,7 @@ export function practiceScreen(pieceId?: string): Screen {
       lastScore = null;
       holdProgress = 0;
       needle.show(null);
+      staff.showPlayed(startIndex, null, false);
       hertz.textContent = "";
       renderNotes();
     },
