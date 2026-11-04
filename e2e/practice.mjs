@@ -124,7 +124,7 @@ wav(OUT + "longbow.wav", [note(62, 4)]);
   await s.page.reload();
   await s.page.waitForSelector("nav button");
   await nav(s.page, "Library");
-  await s.page.locator(".piece", { hasText: "Repeat" }).locator('button:text-is("Practice")').click();
+  await s.page.locator(".piece", { hasText: "Repeat" }).locator('button[aria-label="Practice"]').click();
   await start(s.page);
   await sleep(1000);
   const during = await progress(s.page);
@@ -141,7 +141,7 @@ wav(OUT + "bowed.wav", [note(62, 1), rest(0.15), note(62, 1), rest(0.15), note(6
   await s.page.reload();
   await s.page.waitForSelector("nav button");
   await nav(s.page, "Library");
-  await s.page.locator(".piece", { hasText: "Repeat" }).locator('button:text-is("Practice")').click();
+  await s.page.locator(".piece", { hasText: "Repeat" }).locator('button[aria-label="Practice"]').click();
   await start(s.page);
   await sleep(8000);
   check("a fresh bow stroke clears the repeated note", (await progress(s.page)) === "All 3 notes done", await progress(s.page));

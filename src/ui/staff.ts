@@ -122,6 +122,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1) {
     const totalBeats = notes.reduce((sum, note) => sum + beatsOf(note), 0);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
     const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : width;
+    // Bars can hold different numbers of notes, so the fullest line sets the width of a bar, not the first line.
+    const mostBars = Math.max(...lines.map((line) => line.length));
     const labelled = labels.names || labels.fingers;
     const top = labelled ? LABELLED_TOP : TOP;
     const height = top + lines.length * LINE_HEIGHT + (labelled ? LABELLED_BOTTOM : 0);
@@ -160,7 +162,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1) {
 
       const lineBeats = lineNotes.reduce((sum, note) => sum + beatsOf(note), 0);
       const voice = new Voice({ numBeats: lineBeats, beatValue: 4 }).addTickables(tickables);
-      const barredWidth = ((room - 20) * line.length) / lines[0].length;
+      const barredWidth = ((room - 20) * line.length) / mostBars;
       const formatWidth = collapsed ? lineBeats * COLLAPSED_BEAT_WIDTH : barred ? barredWidth : lineNotes.length * NOTE_WIDTH;
       new Formatter().joinVoices([voice]).format([voice], formatWidth);
       voice.draw(context, stave);

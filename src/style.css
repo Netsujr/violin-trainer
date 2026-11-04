@@ -668,6 +668,10 @@ a[download] {
     --pico-form-element-spacing-horizontal: 0.625rem;
   }
 
+  .actions .icon-button {
+    flex: none;
+  }
+
   /* The needle's cents are enough here, and the Hz would wrap in and out as notes change. */
   .tuning > span {
     display: none;
@@ -766,6 +770,22 @@ a[download] {
     display: none;
   }
 
+  /* On the smallest phones the buttons leave the needle little room, so it shrinks to stay out from under them. */
+  .practice > .tuning,
+  .practice > .tuning .row {
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+  }
+
+  .practice > .tuning .needle,
+  .practice > .tuning .needle ~ span {
+    min-width: 0;
+  }
+
+  .practice > .actions {
+    gap: 0.375rem;
+  }
+
   /* Listen: the note and needle on the left, the staff beside them. */
   .listen {
     display: grid;
@@ -856,5 +876,80 @@ a[download] {
     display: inline-flex;
     align-items: center;
     min-height: 2.25rem;
+  }
+}
+
+/* Fullscreen: only the run controls, the timeline and the moving staff. Last, to win over the sizes above. */
+.fullscreen #app {
+  max-width: none;
+  padding-block: 0.5rem;
+}
+
+.fullscreen header,
+.fullscreen .options,
+.fullscreen .tuning,
+.fullscreen .patterns,
+.fullscreen .section-bar {
+  display: none;
+}
+
+.fullscreen .practice {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.fullscreen .practice > p,
+.fullscreen .practice > .actions {
+  grid-row: 1;
+  margin: 0;
+}
+
+.fullscreen .practice > p {
+  grid-column: 1;
+}
+
+.fullscreen .practice > .actions {
+  grid-column: 2;
+}
+
+.fullscreen .timeline-section,
+.fullscreen .staff-section {
+  margin-block: 0.25rem;
+}
+
+.fullscreen .highway canvas {
+  border-radius: var(--pico-border-radius);
+}
+
+.fullscreen .staff-panel .staff {
+  border-radius: var(--pico-border-radius);
+}
+
+/* The results sit over the lanes, because there's no room left for them on the page. */
+.fullscreen .stats:not(:empty) {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 10;
+  width: min(30rem, calc(100vw - 2rem));
+  margin: 0;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+}
+
+@media (max-width: 600px) {
+  .fullscreen .practice > p,
+  .fullscreen .practice > .actions {
+    grid-row: auto;
+    grid-column: 1 / -1;
+  }
+
+  .fullscreen .practice > .actions {
+    margin-top: 0.25rem;
+  }
+}
+
+@media (max-height: 500px) {
+  .fullscreen .bpm {
+    min-width: 7rem;
   }
 }

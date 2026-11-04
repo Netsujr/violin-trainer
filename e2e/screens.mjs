@@ -130,6 +130,14 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   check(`${tag}: the timeline fills the width`, fillsWidth(view.canvasWidth, view.width), JSON.stringify(view));
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
 
+  // Fullscreen: only the controls, lanes and staff, with nothing to scroll
+  await go('button[aria-label="Fullscreen"]'); await sleep(400);
+  const full = await page.evaluate(() => { const canvas = document.querySelector("canvas").getBoundingClientRect(), staff = document.querySelector(".staff").getBoundingClientRect(); return { down: document.documentElement.scrollHeight - innerHeight, canvasWidth: Math.round(canvas.width), staffBottom: Math.round(staff.bottom), inner: innerHeight, width: innerWidth, header: !!document.querySelector("header").checkVisibility(), bpm: !!document.querySelector(".actions .bpm") }; });
+  check(`${tag} fullscreen: lanes and staff fit with no scrolling`, full.down <= 0 && full.staffBottom <= full.inner && Math.abs(full.canvasWidth - (full.width - 32)) <= 2 && !full.header && full.bpm, JSON.stringify(full));
+  await auditCheck(page, `${tag} fullscreen`);
+  await go('button[aria-label="Exit fullscreen"]'); await sleep(400);
+  check(`${tag} fullscreen: exits to the normal layout`, fillsWidth(await page.locator("canvas").evaluate((c) => Math.round(c.getBoundingClientRect().width)), width) && (await page.locator("header").isVisible()));
+
   // Tapping a tile, on the D string
   const tile = async (index) => { const box = await page.locator("canvas").boundingBox(); const scale = box.height / (84 * 4); const position = { x: (130 + index * 120 + 40) * scale, y: 2.5 * 84 * scale }; await page.locator(".highway-scroll").scrollIntoViewIfNeeded(); touch ? await page.locator(".highway-scroll").tap({ position }) : await page.locator(".highway-scroll").click({ position }); };
   await tile(1); await sleep(700);

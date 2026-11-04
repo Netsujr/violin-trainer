@@ -9,11 +9,11 @@ import type { Session } from "../practice/session";
 import { allPieces, getSettings, saveSettings } from "../storage";
 import { h, type Screen } from "./dom";
 import { createHighway } from "./highway";
-import { contentWidth, timelineScale } from "./layout";
+import { contentWidth, setFullscreenLayout, timelineScale } from "./layout";
 import { createNeedle } from "./listen";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
-import { createIconToggle } from "./toggles";
+import { COMPRESS_ICON, createIconToggle, EXPAND_ICON } from "./toggles";
 
 const REFERENCE_ECHO_MS = 150;
 // A hit closer to the beat than this waits for the following beat, so the glide never looks rushed.
@@ -346,6 +346,7 @@ export function practiceScreen(pieceId?: string): Screen {
     }),
     ` ${t.metronome}`,
   );
+  const optionsBpmRow = h("div", { className: "row" }, pieceSelect, controls.recordLabel, bpmControl);
   const optionsPanel = h(
     "details",
     {
@@ -358,8 +359,49 @@ export function practiceScreen(pieceId?: string): Screen {
     },
     h("summary", {}, t.options),
     h("div", { className: "row toggles" }, tempoSwitch, metronomeSwitch),
-    h("div", { className: "row" }, pieceSelect, controls.recordLabel, bpmControl),
+    optionsBpmRow,
   );
+
+  let fullscreen = false;
+  const fullscreenButton = h("button", { className: "secondary outline icon-button", onclick: toggleFullscreen });
+  const actions = h("div", { className: "row actions" }, controls.startButton, referenceButton, skipButton, controls.message, fullscreenButton);
+
+  function labelFullscreenButton() {
+    const label = fullscreen ? t.exitFullscreen : t.fullscreen;
+    fullscreenButton.innerHTML = fullscreen ? COMPRESS_ICON : EXPAND_ICON;
+    fullscreenButton.title = label;
+    fullscreenButton.ariaLabel = label;
+  }
+  labelFullscreenButton();
+
+  function setFullscreen(value: boolean) {
+    fullscreen = value;
+    setFullscreenLayout(value);
+    document.documentElement.classList.toggle("fullscreen", value);
+    if (value) actions.insertBefore(bpmControl, fullscreenButton);
+    else optionsBpmRow.append(bpmControl);
+    // A full sheet wouldn't fit, so fullscreen uses the moving line, without changing the saved choice.
+    staff.setCollapsed(value || !settings.staffOpen);
+    labelFullscreenButton();
+    fitToScreen();
+    renderNotes();
+  }
+
+  // Works without the browser's own fullscreen too, which iPhones don't offer to web pages.
+  function toggleFullscreen() {
+    setFullscreen(!fullscreen);
+    if (fullscreen) document.documentElement.requestFullscreen?.().catch(() => {});
+    else if (document.fullscreenElement) document.exitFullscreen();
+  }
+
+  function onFullscreenChange() {
+    if (fullscreen && !document.fullscreenElement) setFullscreen(false);
+  }
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key === "Escape" && fullscreen) toggleFullscreen();
+  }
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  addEventListener("keydown", onKeyDown);
 
   const patternButtons = PATTERNS.map((_, pattern) =>
     h("button", {
@@ -384,7 +426,7 @@ export function practiceScreen(pieceId?: string): Screen {
       { className: "practice" },
       optionsPanel,
       progress,
-      h("div", { className: "row actions" }, controls.startButton, referenceButton, skipButton, controls.message),
+      actions,
       h("div", { className: "row tuning" }, needle.element, hertz),
       h("div", { className: "timeline-section" }, timelineBar, highway.element),
       stats,
@@ -392,6 +434,9 @@ export function practiceScreen(pieceId?: string): Screen {
       h("div", { className: "row patterns" }, t.pattern, h("div", { role: "group", ariaLabel: t.pattern }, ...patternButtons)),
     ),
     leave() {
+      if (fullscreen) toggleFullscreen();
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      removeEventListener("keydown", onKeyDown);
       removeEventListener("resize", fitToScreen);
       return controls.leave();
     },
