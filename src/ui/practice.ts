@@ -1,8 +1,8 @@
 import { createMetronome, FIRST_CLICK_DELAY_MS } from "../audio/metronome";
-import { playReference, REFERENCE_MS } from "../audio/reference";
+import { startReference } from "../audio/reference";
 import { localNumber, localTitle, t } from "../i18n";
 import { midiOf, noteLabels } from "../music/notes";
-import { PATTERNS, withPattern } from "../music/patterns";
+import { PATTERNS, withPattern, withRepeatedTop } from "../music/patterns";
 import { createFollow } from "../practice/follow";
 import { centsToTarget, createJudge } from "../practice/judge";
 import { buildEntry, scorePercent } from "../practice/log";
@@ -14,9 +14,10 @@ import { contentWidth, setFullscreenLayout, timelineScale } from "./layout";
 import { createNeedle } from "./listen";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
-import { COMPRESS_ICON, createIconToggle, DONT_WAIT_ICON, EXPAND_ICON } from "./toggles";
+import { COMPRESS_ICON, createIconToggle, DONT_WAIT_ICON, EXPAND_ICON, LOOP_ICON } from "./toggles";
 
-const REFERENCE_ECHO_MS = 150;
+// Long enough for the tone to fade out as well as for the room to go quiet.
+const REFERENCE_ECHO_MS = 300;
 // A hit closer to the beat than this waits for the following beat, so the glide never looks rushed.
 const MIN_GLIDE_BEATS = 0.1;
 // With tempo on, a pattern note clears after about half its length, leaving the rest for the glide to the next beat.
@@ -33,8 +34,14 @@ export function practiceScreen(pieceId?: string): Screen {
   const settings = getSettings();
   const pieces = allPieces();
   let basePiece = pieces.find((candidate) => candidate.id === pieceId) ?? pieces[0];
-  let piece = withPattern(basePiece, settings.pattern);
+  const isScale = () => basePiece.source === "built-in";
+  const buildPiece = () => withPattern(settings.repeatTopOn && isScale() ? withRepeatedTop(basePiece) : basePiece, settings.pattern);
+  let piece = buildPiece();
   let mutedUntil = 0;
+  let reference: ReturnType<typeof startReference> | null = null;
+  // While looping: which time round this is, and the score of the one before, in place of the results card.
+  let loopCount = 1;
+  let lastScore: number | null = null;
   let holdProgress = 0;
   let startIndex = 0;
   let lastBeat: number | null = null;
@@ -128,20 +135,24 @@ export function practiceScreen(pieceId?: string): Screen {
   }
 
   function loadPiece() {
-    piece = withPattern(basePiece, settings.pattern);
+    piece = buildPiece();
+    showModes();
     stats.replaceChildren();
     startIndex = 0;
     highway.jumpTo(0);
     renderNotes();
   }
 
+  const withLoopNumber = (text: string) => (loopCount > 1 ? `${text} · ${t.loopNumber(loopCount, lastScore)}` : text);
+
   function renderNotes() {
     const index = currentIndex();
     const note = piece.notes[index];
     staff.draw(piece.notes, index, { names: settings.toggles.staffNames, fingers: settings.toggles.staffFingers });
-    progress.textContent = note
-      ? `${t.noteOf(index + 1, piece.notes.length)}${note.bar ? t.bar(note.bar) : ""}`
-      : t.allDone(piece.notes.length);
+    const noteText = note ? `${t.noteOf(index + 1, piece.notes.length)}${note.bar ? t.bar(note.bar) : ""}` : t.allDone(piece.notes.length);
+    progress.textContent = withLoopNumber(following?.counting ? t.startsIn(COUNT_IN_BEATS) : noteText);
+    if (note) reference?.setNote(midiOf(note.pitch));
+    else stopReferenceTone();
     highway.draw(piece.notes, index, holdProgress);
   }
 
@@ -190,8 +201,24 @@ export function practiceScreen(pieceId?: string): Screen {
       if (session.following) startFollowing(index);
     }
     holdProgress = 0;
+    loopCount = 1;
+    lastScore = null;
     stats.replaceChildren();
     renderNotes();
+  }
+
+  // Goes round again with no results card in the way. The last note and the first can be the same, so it needs a fresh bow.
+  function loopAgain(session: Session, previousMidi?: number) {
+    if (following) {
+      const results = [...following.results.values()];
+      lastScore = scorePercent(results.filter(Boolean).length, results.length);
+    }
+    loopCount++;
+    lastBeat = null;
+    session.jumpTo(startIndex, performance.now());
+    judge.setTarget(session.currentMidi, piece.pattern ? undefined : previousMidi);
+    if (session.following) startFollowing(startIndex);
+    else highway.jumpTo(startIndex);
   }
 
   // The first click comes after a short delay and counts in the first note, so the two share a beat.
@@ -209,12 +236,15 @@ export function practiceScreen(pieceId?: string): Screen {
     highway.showResults(null);
   }
 
+  // The speakers mustn't score a hit, so what the mic hears doesn't count during a reference tone or just after it.
+  const isMuted = (now: number) => reference !== null || now < mutedUntil;
+
   function followReading(session: Session, frequency: number | null, now: number) {
     const state = following!;
     const stepBeats = (now - state.at) / beatMs();
     state.at = now;
     state.beat += stepBeats;
-    const heard = now < mutedUntil ? null : frequency;
+    const heard = isMuted(now) ? null : frequency;
     // What the mic hears now was played a moment ago.
     const micBeat = state.beat - MIC_DELAY_MS / beatMs();
     for (const { index, hit, cents } of state.tracker.update(heard, micBeat, stepBeats)) {
@@ -227,9 +257,12 @@ export function practiceScreen(pieceId?: string): Screen {
       holdProgress = 0;
       moveOn(session);
     }
+    // Looping has already started the next time round.
+    if (following !== state) return;
+
     if (state.counting) {
       const left = state.tracker.startBeat - state.beat;
-      if (left > 0) progress.textContent = t.startsIn(Math.min(COUNT_IN_BEATS, Math.ceil(left)));
+      if (left > 0) progress.textContent = withLoopNumber(t.startsIn(Math.min(COUNT_IN_BEATS, Math.ceil(left))));
       else {
         state.counting = false;
         renderNotes();
@@ -279,7 +312,8 @@ export function practiceScreen(pieceId?: string): Screen {
     if (session.finished) {
       needle.show(null);
       hertz.textContent = "";
-      showStats(session);
+      if (settings.loopOn) loopAgain(session, previousMidi);
+      else showStats(session);
     }
     // Fast bow changes are too short to detect, so inside a pattern the beat and hold time separate repeated notes.
     else judge.setTarget(session.currentMidi, piece.pattern ? undefined : previousMidi);
@@ -293,7 +327,7 @@ export function practiceScreen(pieceId?: string): Screen {
       if (!session.finished) followReading(session, frequency, now);
     } else if (!session.finished) {
       if (pendingHit && now >= pendingHit.arrivesAt) arriveOnBeat(session);
-      const verdict = judge.update(now < mutedUntil ? null : frequency, now);
+      const verdict = judge.update(isMuted(now) ? null : frequency, now);
       holdProgress = pendingHit ? 1 : verdict.progress;
       needle.show(verdict.cents);
       hertz.textContent = frequency === null ? "" : `${localNumber(frequency, 1)} Hz`;
@@ -316,14 +350,14 @@ export function practiceScreen(pieceId?: string): Screen {
     onStart() {
       metronome.reset();
       controls.session!.following = settings.followOn;
-      skipButton.disabled = settings.followOn;
       highway.jumpTo(startIndex);
       startFrom(startIndex);
     },
     onStop() {
       stopFollowing();
       cancelGlide();
-      skipButton.disabled = true;
+      loopCount = 1;
+      lastScore = null;
       holdProgress = 0;
       needle.show(null);
       hertz.textContent = "";
@@ -348,29 +382,27 @@ export function practiceScreen(pieceId?: string): Screen {
   const referenceButton = h("button", {
     textContent: t.playReference,
     className: "secondary outline",
+    ariaPressed: "false",
     onclick() {
       const note = piece.notes[currentIndex()];
-      if (!note) return;
-
-      playReference(midiOf(note.pitch));
-      mutedUntil = performance.now() + REFERENCE_MS + REFERENCE_ECHO_MS;
+      if (reference) stopReferenceTone();
+      else if (note) {
+        reference = startReference(midiOf(note.pitch));
+        referenceButton.textContent = t.stopReference;
+        referenceButton.ariaPressed = "true";
+      }
     },
   });
 
-  const skipButton = h("button", {
-    textContent: t.skip,
-    className: "secondary outline",
-    disabled: true,
-    onclick() {
-      const session = controls.session!;
-      if (session.finished) return;
+  function stopReferenceTone() {
+    if (!reference) return;
 
-      cancelGlide();
-      const previousMidi = session.currentMidi;
-      session.skip(performance.now());
-      moveOn(session, previousMidi);
-    },
-  });
+    reference.stop();
+    reference = null;
+    mutedUntil = performance.now() + REFERENCE_ECHO_MS;
+    referenceButton.textContent = t.playReference;
+    referenceButton.ariaPressed = "false";
+  }
 
   const bpmValue = h("output", { textContent: `${settings.bpm} BPM` });
   const bpmControl = h(
@@ -402,6 +434,43 @@ export function practiceScreen(pieceId?: string): Screen {
     },
   });
   const tempoSwitch = h("label", {}, tempoInput, ` ${t.tempo}`);
+  const modeNote = h("div", { className: "mode-note" });
+  function showModes() {
+    repeatTopButton.disabled = !isScale();
+    modeNote.textContent = [
+      settings.followOn ? t.keepsMoving : t.waitsForNotes,
+      settings.loopOn ? t.loopsUntilStop : t.playsOnce,
+      ...(isScale() ? [settings.repeatTopOn ? t.topTwice : t.topOnce] : []),
+    ].join(" · ");
+  }
+
+  const loopButton = h("button", {
+    className: "secondary outline icon-button",
+    innerHTML: LOOP_ICON,
+    title: t.loop,
+    ariaLabel: t.loop,
+    ariaPressed: String(settings.loopOn),
+    onclick() {
+      settings.loopOn = !settings.loopOn;
+      loopButton.ariaPressed = String(settings.loopOn);
+      saveSettings();
+      showModes();
+    },
+  });
+  const repeatTopButton = h("button", {
+    className: "secondary outline icon-button",
+    textContent: "×2",
+    title: t.repeatTop,
+    ariaLabel: t.repeatTop,
+    ariaPressed: String(settings.repeatTopOn),
+    async onclick() {
+      await controls.stop();
+      settings.repeatTopOn = !settings.repeatTopOn;
+      repeatTopButton.ariaPressed = String(settings.repeatTopOn);
+      saveSettings();
+      loadPiece();
+    },
+  });
   const followButton = h("button", {
     className: "secondary outline icon-button",
     innerHTML: DONT_WAIT_ICON,
@@ -414,6 +483,7 @@ export function practiceScreen(pieceId?: string): Screen {
       followButton.ariaPressed = String(settings.followOn);
       tempoInput.disabled = settings.followOn;
       saveSettings();
+      showModes();
       stats.replaceChildren();
       renderNotes();
     },
@@ -450,7 +520,7 @@ export function practiceScreen(pieceId?: string): Screen {
 
   let fullscreen = false;
   const fullscreenButton = h("button", { className: "secondary outline icon-button", onclick: toggleFullscreen });
-  const actions = h("div", { className: "row actions" }, controls.startButton, referenceButton, skipButton, controls.message, followButton, fullscreenButton);
+  const actions = h("div", { className: "row actions" }, controls.startButton, referenceButton, controls.message, loopButton, repeatTopButton, followButton, fullscreenButton);
 
   function labelFullscreenButton() {
     const label = fullscreen ? t.exitFullscreen : t.fullscreen;
@@ -464,7 +534,7 @@ export function practiceScreen(pieceId?: string): Screen {
     fullscreen = value;
     setFullscreenLayout(value);
     document.documentElement.classList.toggle("fullscreen", value);
-    if (value) actions.insertBefore(bpmControl, followButton);
+    if (value) actions.insertBefore(bpmControl, loopButton);
     else optionsBpmRow.append(bpmControl);
     // A full sheet wouldn't fit, so fullscreen uses the moving line, without changing the saved choice.
     staff.setCollapsed(value || !settings.staffOpen);
@@ -504,6 +574,7 @@ export function practiceScreen(pieceId?: string): Screen {
     }),
   );
 
+  showModes();
   renderNotes();
 
   return {
@@ -513,6 +584,7 @@ export function practiceScreen(pieceId?: string): Screen {
       optionsPanel,
       progress,
       actions,
+      modeNote,
       h("div", { className: "row tuning" }, needle.element, hertz),
       h("div", { className: "timeline-section" }, timelineBar, highway.element),
       stats,
@@ -520,6 +592,7 @@ export function practiceScreen(pieceId?: string): Screen {
       h("div", { className: "row patterns" }, t.pattern, h("div", { role: "group", ariaLabel: t.pattern }, ...patternButtons)),
     ),
     leave() {
+      stopReferenceTone();
       if (fullscreen) toggleFullscreen();
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       removeEventListener("keydown", onKeyDown);

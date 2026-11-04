@@ -27,7 +27,7 @@ wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), 
   check("D major clears all 15, one step at a time", steps.at(-1) === "All 15 notes done" && nums.every((n, i) => i === 0 || n === nums[i - 1] + 1), steps.at(-1) + " | " + nums.join(","));
   const stats = await s.page.locator(".stats").innerText();
   console.log("  stats:", stats.replaceAll("\n", " / "));
-  check("stats show 15 hits", stats.includes("15 hit, 0 skipped"));
+  check("stats show 15 hits", stats.includes("15 hit"));
   await s.page.screenshot({ path: OUT + "practice-done.png" });
   await s.page.click('button:text-is("Play again")');
   check("Play again restarts", (await progress(s.page)).startsWith("Note 1 of"), await progress(s.page));
@@ -41,26 +41,26 @@ wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), 
 }
 
 // Finishing, then stopping
+wav(OUT + "ended.wav", [note(62, 3)]);
 {
-  const s = await open(OUT + "silent.wav");
+  const s = await open(OUT + "ended.wav");
+  await s.page.evaluate(() => localStorage.setItem("pieces", JSON.stringify([{ id: "one", title: "One", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }] }])));
+  await s.page.reload();
+  await s.page.waitForSelector("nav button");
   await nav(s.page, "Practice");
+  await s.page.locator("select").selectOption("one");
   await start(s.page);
-  await s.page.waitForSelector('button:text-is("Stop")');
-  for (let i = 0; i < 15; i++) await s.page.click('button:text-is("Skip")');
-  await sleep(150);
-  const stats = await s.page.locator(".stats").innerText();
-  check("with no hits, stats don't claim an accuracy", stats.includes("0 hit, 15 skipped") && !stats.includes("cents off") && stats.includes("Slowest: none"), stats.replaceAll("\n", " / "));
+  await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 8000 });
   await stop(s.page);
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
   await s.page.click('button:text-is("Play again")');
   await s.page.waitForSelector('button:text-is("Stop")');
-  check("Play again after Stop starts a new run", (await progress(s.page)).startsWith("Note 1 of") && (await s.page.locator(".stats").innerText()) === "");
+  check("Play again after Stop starts a new run", (await s.page.locator(".stats").innerText()) === "");
   await stop(s.page);
   await sleep(150);
   check("that made a second log entry", (await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")).length)) === 2);
   await s.close();
 }
-wav(OUT + "ended.wav", [note(62, 3)]);
 {
   const s = await open(OUT + "ended.wav");
   await s.page.evaluate(() => localStorage.setItem("pieces", JSON.stringify([{ id: "one", title: "One", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }] }])));
@@ -99,19 +99,18 @@ wav(OUT + "wrong.wav", [note(63, 3), note(61, 3)]);
   await s.close();
 }
 
-// Skip, reference button and its mute window
+// No Skip, and the reference doesn't advance
 wav(OUT + "silent.wav", [rest(3)]);
 {
   const s = await open(OUT + "silent.wav");
   await nav(s.page, "Practice");
-  check("Skip is off before Start", await s.page.locator('button:text-is("Skip")').isDisabled());
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
-  await s.page.click('button:text-is("Skip")');
-  check("Skip advances", (await progress(s.page)).startsWith("Note 2 of"), await progress(s.page));
+  check("there's no Skip button", (await s.page.locator('button:text-is("Skip")').count()) === 0);
   await s.page.click('button:text-is("Play reference")');
   await sleep(200);
-  check("Play reference does not advance", (await progress(s.page)).startsWith("Note 2 of"));
+  check("Play reference does not advance", (await progress(s.page)).startsWith("Note 1 of"));
+  await s.page.click('button:text-is("Stop reference")');
   await stop(s.page);
   await s.close();
 }

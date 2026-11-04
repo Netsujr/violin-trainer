@@ -15,3 +15,9 @@ export function withPattern(piece: Piece, pattern: number): Piece {
 
   return { ...piece, pattern, notes: piece.notes.flatMap((note) => beats.map((length) => ({ ...note, beats: length }))) };
 }
+
+// A scale runs up and back down, so its top note is the middle one.
+export function withRepeatedTop(piece: Piece): Piece {
+  const top = (piece.notes.length - 1) / 2;
+  return { ...piece, notes: [...piece.notes.slice(0, top + 1), ...piece.notes.slice(top)] };
+}

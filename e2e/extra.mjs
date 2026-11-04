@@ -2,37 +2,24 @@ import { wav, note, rest } from "./wav.mjs";
 import { open, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
 const progress = (page) => page.locator("section > p").first().innerText();
 
-wav(OUT + "d4.wav", [note(62, 5)]);
-// Reference mute: mic hears the target the whole time
-{
-  const s = await open(OUT + "d4.wav");
-  await nav(s.page, "Practice");
-  await s.page.evaluate(() => {
-    const original = HTMLButtonElement.prototype.click;
-  });
-  await start(s.page);
-  await s.page.waitForSelector('button:text-is("Stop")');
-  await s.page.click('button:text-is("Skip")');
-  await s.page.click('button:text-is("Play reference")');
-  await sleep(700);
-  const during = await progress(s.page);
-  check("reference tone is ignored by the judge", during.startsWith("Note 2 of"), during);
-  await s.close();
-}
+// The mic hears the target the whole time, which mustn't count while the reference sounds.
 wav(OUT + "e4.wav", [note(64, 5)]);
 {
   const s = await open(OUT + "e4.wav");
   await nav(s.page, "Practice");
+  const box = await s.page.locator("canvas").boundingBox();
+  await s.page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84);
+  await sleep(600);
+  await s.page.click('button:text-is("Play reference")');
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
-  await s.page.click('button:text-is("Skip")');
-  await s.page.click('button:text-is("Play reference")');
-  await sleep(600);
+  await sleep(1500);
   const during = await progress(s.page);
-  check("target heard during the reference does not count", during.startsWith("Note 2 of"), during);
-  await sleep(1200);
+  check("the target doesn't count while the reference sounds", during.startsWith("Note 2 of"), during);
+  await s.page.click('button:text-is("Stop reference")');
+  await sleep(800);
   const after = await progress(s.page);
-  check("target counts once the reference ends", after.startsWith("Note 3 of"), after);
+  check("it counts once the reference stops", after.startsWith("Note 3 of"), after);
   await s.close();
 }
 // Hold ring and low-finger colour

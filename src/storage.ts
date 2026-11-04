@@ -13,6 +13,8 @@ export type Settings = {
   minRms: number;
   tempoOn: boolean;
   followOn: boolean;
+  loopOn: boolean;
+  repeatTopOn: boolean;
   metronomeOn: boolean;
   bpm: number;
   pattern: number;
@@ -31,6 +33,8 @@ const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   minRms: 0.01,
   tempoOn: false,
   followOn: false,
+  loopOn: false,
+  repeatTopOn: false,
   metronomeOn: false,
   bpm: 60,
   pattern: 0,

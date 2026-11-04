@@ -18,7 +18,7 @@ const before = await canvasWidth();
 await enter();
 check("uses the browser's own fullscreen", await page.evaluate(() => !!document.fullscreenElement));
 for (const hidden of ["header", ".options", ".tuning", ".patterns", ".section-bar"]) check(`hides ${hidden}`, await page.locator(hidden).first().isHidden());
-for (const shown of ['button:text-is("Start")', 'button:text-is("Play reference")', 'button:text-is("Skip")', ".bpm input", "section > p", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
+for (const shown of ['button:text-is("Start")', 'button:text-is("Play reference")', ".bpm input", "section > p", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
 check("the lanes grow past the normal width", before === 960 && (await canvasWidth()) === 1408, `${before} > ${await canvasWidth()}`);
 check("the staff is one moving line, and the saved choice stays open", (await page.locator(".staff.collapsed").count()) === 1 && (await saved()).staffOpen === true);
 const lines = await page.evaluate(() => { const hit = 130 * Number(getComputedStyle(document.querySelector(".staff-panel")).getPropertyValue("--timeline-scale")), canvas = document.querySelector("canvas").getBoundingClientRect(); return { hit: Math.round(hit), scale: canvas.height / 336 }; });

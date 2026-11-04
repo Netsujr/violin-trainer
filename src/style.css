@@ -541,9 +541,15 @@ section > ul > li {
 }
 
 /* Set directly, because Pico's hover and focus styles replace its variables. */
-.icon-button[aria-pressed="true"] {
+.actions button[aria-pressed="true"] {
   color: #4cd07d;
   border-color: #4cd07d;
+}
+
+.mode-note {
+  font-size: 0.8125rem;
+  color: var(--pico-muted-color);
+  text-align: right;
 }
 
 .day-picker {
@@ -652,6 +658,10 @@ a[download] {
 
 /* Phones in portrait. */
 @media (max-width: 600px) {
+  .mode-note {
+    text-align: left;
+  }
+
   nav [role="group"] button {
     --pico-form-element-spacing-horizontal: 0.5rem;
   }
@@ -690,6 +700,10 @@ a[download] {
 
 /* Phones in landscape: everything that isn't the timeline gets as little height as possible. */
 @media (max-height: 500px) {
+  .mode-note {
+    display: none;
+  }
+
   #app {
     padding-block: 0.5rem;
   }
@@ -895,6 +909,24 @@ a[download] {
   color: var(--pico-primary);
 }
 
+/* The smallest phones in landscape: the buttons fill the line, so the needle takes its own. */
+@media (max-height: 500px) and (max-width: 600px) {
+  .practice {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .practice > .actions {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+
+  .practice > .tuning {
+    grid-row: 3;
+    grid-column: 1 / -1;
+    margin-block: 0;
+  }
+}
+
 /* Fullscreen: only the run controls, the timeline and the moving staff. Last, to win over the sizes above. */
 .fullscreen #app {
   max-width: none;
@@ -904,6 +936,7 @@ a[download] {
 .fullscreen header,
 .fullscreen .options,
 .fullscreen .tuning,
+.fullscreen .mode-note,
 .fullscreen .patterns,
 .fullscreen .section-bar {
   display: none;

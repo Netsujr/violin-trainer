@@ -131,6 +131,9 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   check(`${tag}: the timeline fills the width`, fillsWidth(view.canvasWidth, view.width), JSON.stringify(view));
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
 
+  const needleWidth = await page.locator(".needle").evaluate((needle) => Math.round(needle.getBoundingClientRect().width));
+  check(`${tag}: the tuning needle stays readable`, needleWidth >= 60, `${needleWidth}px`);
+
   // Fullscreen: only the controls, lanes and staff, with nothing to scroll
   await go('button[aria-label="Fullscreen"]'); await sleep(400);
   const full = await page.evaluate(() => { const canvas = document.querySelector("canvas").getBoundingClientRect(), staff = document.querySelector(".staff").getBoundingClientRect(); return { down: document.documentElement.scrollHeight - innerHeight, canvasWidth: Math.round(canvas.width), staffBottom: Math.round(staff.bottom), inner: innerHeight, width: innerWidth, header: !!document.querySelector("header").checkVisibility(), bpm: !!document.querySelector(".actions .bpm") }; });
@@ -165,7 +168,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
   try {
     await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
-    check(`${tag}: a whole scale plays through`, (await page.locator(".stats").innerText()).includes("15 hit, 0 skipped"), (await page.locator(".stats").innerText()).replaceAll("\n", " / "));
+    check(`${tag}: a whole scale plays through`, (await page.locator(".stats").innerText()).includes("15 hit"), (await page.locator(".stats").innerText()).replaceAll("\n", " / "));
   } catch { check(`${tag}: a whole scale plays through`, false, await progress(page)); }
   await auditCheck(page, `${tag} finished`);
   await go('button:text-is("Stop")'); await sleep(200);

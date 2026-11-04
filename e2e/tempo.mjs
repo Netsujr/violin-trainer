@@ -119,9 +119,6 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.page.mouse.click(box.x + 130 + 5 * 120 - (await scroll(s.page)), box.y + 126);
   await sleep(700);
   check("tempo: clicking a note during a glide goes there", (await progress(s.page)) === "Note 6 of 15" && Math.abs((await scroll(s.page)) - 600) <= 1);
-  await s.page.click('button:text-is("Skip")');
-  await sleep(500);
-  check("tempo: Skip moves on", (await progress(s.page)) === "Note 7 of 15" && Math.abs((await scroll(s.page)) - 720) <= 1);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

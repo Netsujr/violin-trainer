@@ -51,7 +51,6 @@ await fresh();
 check("it stays on after a reload", !(await waiting()));
 await watch();
 await begin();
-check("Skip stays off, since nothing waits", await page.locator('button:text-is("Skip")').isDisabled());
 await allDone();
 await sleep(150);
 const run = await frames();
@@ -133,7 +132,7 @@ await dontWait().click(); await sleep(300);
 check("switching it off ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await log()).length === before + 1 && !(await page.locator('.options label:has-text("Tempo") input').isDisabled()));
 check("back to waiting, on the first note", (await progress(page)) === "Note 1 of 15", await progress(page));
 await begin(); await sleep(1200);
-check("waiting again: Skip is on, and nothing moves on its own", (await progress(page)) === "Note 1 of 15" && (await page.locator('button:text-is("Skip")').isEnabled()));
+check("waiting again: nothing moves on its own", (await progress(page)) === "Note 1 of 15");
 await stop(page); await sleep(200);
 
 // Starting partway, and restarting by clicking a note

@@ -85,7 +85,7 @@ flow("3. The microphone is refused");
   await nav(s.page, "Practice"); await sleep(200);
   await start(s.page); await sleep(1500);
   const practice = await s.page.locator(".warning").innerText().catch(() => "");
-  check("Practice says so too, and Skip stays off", practice.startsWith("Microphone unavailable") && (await s.page.locator('button:text-is("Skip")').isDisabled()), practice);
+  check("Practice says so too", practice.startsWith("Microphone unavailable"), practice);
   await s.page.screenshot({ path: SHOTS + "3-denied-practice.png" });
   await s.close();
 }
@@ -98,7 +98,7 @@ flow("4. Practice: a whole scale, again, and stop");
   await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 25000 });
   await sleep(300);
   const stats = await s.page.locator(".stats").innerText();
-  check("finishes with useful stats", stats.includes("Pass 1 done") && stats.includes("15 hit, 0 skipped"), stats.replaceAll("\n", " / "));
+  check("finishes with useful stats", stats.includes("Pass 1 done") && stats.includes("15 hit"), stats.replaceAll("\n", " / "));
   await s.page.screenshot({ path: SHOTS + "4-done.png", fullPage: true });
   await s.page.click('button:text-is("Play again")'); await sleep(900);
   check("Play again goes back to the start, stats cleared, view back", (await s.page.locator(".stats").innerText()) === "" && (await s.page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) < 240);
@@ -112,22 +112,14 @@ flow("4. Practice: a whole scale, again, and stop");
   await s.close();
 }
 
-flow("5. Practice: skipping, reference, clicking, scrolling");
+flow("5. Practice: the reference tone");
 {
   const s = await open("q-silent.wav");
   await nav(s.page, "Practice"); await sleep(200);
-  check("Skip is off until started", await s.page.locator('button:text-is("Skip")').isDisabled());
   await s.page.click('button:text-is("Play reference")'); await sleep(150);
-  check("Play reference works before starting, and doesn't start anything", (await progress(s.page)) === "Note 1 of 15" && (await s.page.locator('button:text-is("Start")').count()) === 1);
-  await start(s.page); await s.page.waitForSelector('button:text-is("Stop")');
-  for (let i = 0; i < 15; i++) await s.page.click('button:text-is("Skip")');
-  await sleep(300);
-  check("skipping everything finishes", (await progress(s.page)) === "All 15 notes done");
-  const stats = await s.page.locator(".stats").innerText();
-  check("stats read sensibly with no hits", stats.includes("0 hit, 15 skipped") && stats.includes("Slowest: none") && !stats.includes("cents off") && !stats.includes("NaN"), stats.replaceAll("\n", " / "));
-  check("Skip and reference at the end do nothing harmful", await s.page.evaluate(() => { [...document.querySelectorAll("button")].find((b) => b.textContent === "Skip").click(); [...document.querySelectorAll("button")].find((b) => b.textContent === "Play reference").click(); return document.querySelector("section > p").textContent === "All 15 notes done"; }));
-  await stop(s.page); await sleep(200);
-  check("all-skipped is left out of Trends", !(await (async () => { await nav(s.page, "Log"); await sleep(200); return (await s.page.locator("section").innerText()).includes("D major: "); })()));
+  check("Play reference works before starting, and doesn't start anything", (await progress(s.page)) === "Note 1 of 15" && (await s.page.locator('button:text-is("Start")').count()) === 1 && (await s.page.locator('button:text-is("Stop reference")').count()) === 1);
+  await s.page.click('button:text-is("Stop reference")'); await sleep(100);
+  check("and it turns off again", (await s.page.locator('button:text-is("Play reference")').count()) === 1);
   await s.close();
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Piece } from "../src/music/notes";
-import { PATTERNS, withPattern } from "../src/music/patterns";
+import { PATTERNS, withPattern, withRepeatedTop } from "../src/music/patterns";
 
 const piece: Piece = { id: "p", title: "P", source: "test", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] };
 
@@ -34,5 +34,12 @@ describe("rhythm patterns", () => {
     withPattern(piece, 3);
     expect(piece.notes).toHaveLength(2);
     expect(piece.notes[0].beats).toBeUndefined();
+  });
+});
+
+describe("repeating a scale's top note", () => {
+  it("plays the middle note twice, and only that", () => {
+    const scale = { id: "s", title: "S", source: "built-in", notes: ["D4", "E4", "F4", "E4", "D4"].map((pitch) => ({ pitch })) };
+    expect(withRepeatedTop(scale).notes.map((note) => note.pitch)).toEqual(["D4", "E4", "F4", "F4", "E4", "D4"]);
   });
 });
