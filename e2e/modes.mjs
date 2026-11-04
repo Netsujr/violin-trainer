@@ -161,16 +161,21 @@ await s.close();
   const { page } = c;
   const box_ = () => page.locator('.options label:has-text("count-in") input');
   const showing = () => page.evaluate(() => document.querySelector("section > p").textContent);
-  // Logs the text as the app changes it. Checking once a frame would see it a frame or two late, depending on how busy the page is.
+  // Logs the text the moment the app sets it. Anything later, even a MutationObserver, also counts the time to draw that frame.
   const watch = () => page.evaluate(() => {
     window.seen = [];
-    window.seenObserver?.disconnect();
     const text = document.querySelector("section > p");
-    let last = "";
-    const note = () => { if (text.textContent !== last) { last = text.textContent; window.seen.push({ at: performance.now(), text: last }); } };
-    note();
-    window.seenObserver = new MutationObserver(note);
-    window.seenObserver.observe(text, { childList: true, characterData: true, subtree: true });
+    const { get, set } = Object.getOwnPropertyDescriptor(Node.prototype, "textContent");
+    let last = get.call(text);
+    window.seen.push({ at: performance.now(), text: last });
+    Object.defineProperty(text, "textContent", {
+      configurable: true,
+      get() { return get.call(this); },
+      set(value) {
+        if (value !== last) { last = value; window.seen.push({ at: performance.now(), text: value }); }
+        set.call(this, value);
+      },
+    });
   });
   await nav(page, "Practice"); await sleep(250);
   check("count-in: on by default, in Options", (await box_().isChecked()) && (await page.locator('.options label:has-text("count-in")').getAttribute("title")).includes("3 beats"));
