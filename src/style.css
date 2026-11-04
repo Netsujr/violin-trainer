@@ -406,7 +406,7 @@ section > ul > li {
   gap: 0.875rem;
   min-height: 2.75rem;
   padding: 0.5rem 0.875rem;
-  background: var(--pico-card-background-color);
+  background: #2f281f;
   border: 1px solid var(--pico-muted-border-color);
   border-bottom: 0;
   border-radius: 0.625rem 0.625rem 0 0;
@@ -780,7 +780,14 @@ a[download] {
     min-height: 2.25rem;
   }
 
-  .bpm input {
+  .bpm input,
+  .setting input {
     height: 2.25rem;
+  }
+
+  a[download] {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
   }
 }
