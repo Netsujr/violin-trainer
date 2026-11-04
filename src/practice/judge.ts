@@ -10,7 +10,7 @@ export const centsToTarget = (frequency: number, target: number) =>
 
 const soundsLikeSameNote = (midi: number, other: number) => midi === other || Math.abs(midi - other) === 12;
 
-export type Verdict = { cents: number | null; inTune: boolean; progress: number; hit: boolean; averageCents: number };
+type Verdict = { cents: number | null; inTune: boolean; progress: number; hit: boolean; averageCents: number };
 
 export function createJudge(options: { toleranceCents: number; holdMs: number }) {
   let target = 0;

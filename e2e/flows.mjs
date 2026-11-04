@@ -1,9 +1,7 @@
 // Each user flow on a computer, from start to finish, as a person would do it.
 import { chromium } from "playwright-core";
 import { wav, note, rest } from "./wav.mjs";
-import { nav, start, stop, sleep, check, seed, skipCountIn, trackNotes, noteGaps, progress, OUT } from "./lib.mjs";
-const SHOTS = OUT;
-const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
+import { nav, start, stop, sleep, check, skipCountIn, trackNotes, progress, D_MAJOR as D, OUT } from "./lib.mjs";
 wav(OUT + "q-scale.wav", [...D.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);
 wav(OUT + "q-a4.wav", [note(69, 5)]);
 wav(OUT + "q-silent.wav", [rest(3)]);
@@ -29,8 +27,8 @@ flow("1. First visit");
   const s = await open("q-silent.wav");
   check("opens on Listen, in English, nothing started", (await s.page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await s.page.locator(".big-note").innerText()) === "Press Start and play");
   check("no recording, no log yet", (await log(s.page)).length === 0);
-  await s.page.screenshot({ path: SHOTS + "1-listen.png" });
-  for (const name of ["Practice", "Library", "Log"]) { await nav(s.page, name); await sleep(250); await s.page.screenshot({ path: `${SHOTS}1-${name}.png` }); }
+  await s.page.screenshot({ path: OUT + "1-listen.png" });
+  for (const name of ["Practice", "Library", "Log"]) { await nav(s.page, name); await sleep(250); await s.page.screenshot({ path: `${OUT}1-${name}.png` }); }
   const empty = await s.page.locator("section").innerText();
   check("an empty Log reads sensibly", empty.includes("This week") && !empty.includes("undefined") && !empty.includes("NaN"), empty.replaceAll("\n", " | ").slice(0, 160));
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
@@ -82,12 +80,12 @@ flow("3. The microphone is refused");
   const warning = await s.page.locator(".warning").innerText().catch(() => "");
   check("says so, and can be tried again", warning.startsWith("Microphone unavailable") && (await s.page.locator('button:text-is("Start")').isEnabled()), warning);
   check("nothing was logged", (await log(s.page)).length === 0);
-  await s.page.screenshot({ path: SHOTS + "3-denied.png" });
+  await s.page.screenshot({ path: OUT + "3-denied.png" });
   await nav(s.page, "Practice"); await sleep(200);
   await start(s.page); await sleep(1500);
   const practice = await s.page.locator(".warning").innerText().catch(() => "");
   check("Practice says so too", practice.startsWith("Microphone unavailable"), practice);
-  await s.page.screenshot({ path: SHOTS + "3-denied-practice.png" });
+  await s.page.screenshot({ path: OUT + "3-denied-practice.png" });
   await s.close();
 }
 
@@ -100,7 +98,7 @@ flow("4. Practice: a whole scale, again, and stop");
   await sleep(300);
   const stats = await s.page.locator(".stats").innerText();
   check("finishes with useful stats", stats.includes("Pass 1 done") && stats.includes("15 hit"), stats.replaceAll("\n", " / "));
-  await s.page.screenshot({ path: SHOTS + "4-done.png", fullPage: true });
+  await s.page.screenshot({ path: OUT + "4-done.png", fullPage: true });
   await s.page.click('button:text-is("Play again")'); await sleep(900);
   check("Play again goes back to the start, stats cleared, view back", (await s.page.locator(".stats").innerText()) === "" && (await s.page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) < 240);
   await sleep(10500);
@@ -171,7 +169,7 @@ flow("7. Library: adding a piece, through to practising it");
   check("listed with a note count and Delete", (await row.innerText()).includes("3 notes") && (await row.locator('button:text-is("Delete")').count()) === 1);
   check("built-ins can't be deleted", (await s.page.locator(".piece", { hasText: "D major" }).first().locator('button:text-is("Delete")').count()) === 0);
   await row.locator("select").selectOption("2");
-  await s.page.screenshot({ path: SHOTS + "7-library.png", fullPage: true });
+  await s.page.screenshot({ path: OUT + "7-library.png", fullPage: true });
   await s.page.reload(); await s.page.waitForSelector("nav button"); await nav(s.page, "Library"); await sleep(200);
   check("it survives a reload, with its target day", (await s.page.locator(".piece", { hasText: "My tune" }).locator("select").inputValue()) === "2");
   await s.page.locator(".piece", { hasText: "My tune" }).locator('button[aria-label="Practice"]').click(); await sleep(300);
@@ -205,7 +203,7 @@ flow("8. Log: recordings");
   await stop(s.page);
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
   await nav(s.page, "Log"); await s.page.waitForSelector("audio"); await sleep(800);
-  await s.page.screenshot({ path: SHOTS + "8-log.png", fullPage: true });
+  await s.page.screenshot({ path: OUT + "8-log.png", fullPage: true });
   const audio = s.page.locator("audio");
   check("the player knows its length", await audio.evaluate((a) => Number.isFinite(a.duration) && a.duration > 5));
   const markers = s.page.locator("button.marker");
@@ -230,7 +228,7 @@ flow("9. Settings change how notes are judged");
   const s = await open("q-a4.wav");
   await nav(s.page, "Practice"); await sleep(200);
   await s.page.click("header summary"); await sleep(200);
-  await s.page.screenshot({ path: SHOTS + "9-settings.png" });
+  await s.page.screenshot({ path: OUT + "9-settings.png" });
   const fill = (name, value) => s.page.locator(`label.setting:has-text("${name}") input`).fill(String(value));
   await fill("Hold time", 500);
   const box = await s.page.locator("canvas").boundingBox();
@@ -258,6 +256,6 @@ for (const viewport of [{ width: 1024, height: 768 }, { width: 1280, height: 720
   await nav(s.page, "Practice"); await sleep(200);
   const r = await s.page.evaluate(() => { const c = document.querySelector("canvas").getBoundingClientRect(), row = [...document.querySelectorAll(".section-bar")][0].getBoundingClientRect(); return { canvas: `${Math.round(c.width)}x${Math.round(c.height)}`, left: Math.round(c.left), right: Math.round(innerWidth - c.right), bottom: Math.round(c.bottom), fold: innerHeight, bar: Math.round(row.height), headerRows: new Set([...document.querySelector("header").children].map((e) => Math.round(e.getBoundingClientRect().top / 30))).size }; });
   check(`${viewport.width}x${viewport.height}: no sideways scroll, centred`, out.every((value) => value <= 0) && Math.abs(r.left - r.right) <= 1, JSON.stringify(r));
-  if (viewport.width === 1920) await s.page.screenshot({ path: SHOTS + "10-1920.png" });
+  if (viewport.width === 1920) await s.page.screenshot({ path: OUT + "10-1920.png" });
   await s.close();
 }

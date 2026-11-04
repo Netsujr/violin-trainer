@@ -1,8 +1,7 @@
 // Tempo mode, rhythm patterns and the metronome.
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, D_MAJOR as D, OUT } from "./lib.mjs";
 
-const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 const REPEAT = [{ id: "r", title: "Repeat", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
 const TWO = [{ id: "two", title: "Two", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
 const scroll = (page) => page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);

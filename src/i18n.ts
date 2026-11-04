@@ -60,6 +60,7 @@ const en = {
   collapseSheet: "Collapse to one moving line",
   patternDone: (pattern: number, seconds: string) => `Pattern ${pattern} done in ${seconds} s.`,
   micUnavailable: (message: string) => `Microphone unavailable: ${message}`,
+  recordingNotSaved: "The session is in the Log, but its recording couldn't be saved.",
 
   listening: "Listening…",
   pressStart: "Press Start and play",
@@ -69,17 +70,15 @@ const en = {
   recentNotes: "Recent notes",
 
   noteOf: (note: number, total: number) => `Note ${note} of ${total}`,
-  bar: (bar: number) => ` · bar ${bar}`,
   allDone: (total: number) => `All ${total} notes done`,
   passDone: (pass: number, seconds: string) => `Pass ${pass} done in ${seconds} s.`,
   partialDone: (note: number, seconds: string) => `Note ${note} to the end done in ${seconds} s.`,
   sectionDone: (first: number, last: number, seconds: string) => `Notes ${first} to ${last} done in ${seconds} s.`,
   sectionInfo: (first: number, last: number) => `Section: notes ${first} to ${last} (click a note to clear)`,
+  // Skipping is gone, but sessions saved before that still show theirs.
   hitSkipped: (hit: number, skipped: number) => `${hit} hit${skipped ? `, ${skipped} skipped` : ""}`,
-  summary: (hitSkipped: string, cents: number | null) =>
-    `This session: ${hitSkipped}${cents === null ? "" : `, ${centsText(cents)} off on average`}.`,
+  summary: (hitSkipped: string, cents: number) => `This session: ${hitSkipped}, ${centsText(cents)} off on average.`,
   slowest: (notes: string) => `Slowest: ${notes}`,
-  slowestNone: "none",
   playAgain: "Play again",
   playReference: "Play reference",
   stopReference: "Stop reference",
@@ -181,6 +180,7 @@ const pt: Strings = {
   collapseSheet: "Recolher em uma linha contínua",
   patternDone: (pattern, seconds) => `Padrão ${pattern} concluído em ${seconds} s.`,
   micUnavailable: (message) => `Microfone indisponível: ${message}`,
+  recordingNotSaved: "A sessão está no Registro, mas não foi possível salvar a gravação.",
 
   listening: "Ouvindo…",
   pressStart: "Aperte Iniciar e toque",
@@ -190,16 +190,14 @@ const pt: Strings = {
   recentNotes: "Notas recentes",
 
   noteOf: (note, total) => `Nota ${note} de ${total}`,
-  bar: (bar) => ` · compasso ${bar}`,
   allDone: (total) => `Todas as ${total} notas concluídas`,
   passDone: (pass, seconds) => `Passada ${pass} concluída em ${seconds} s.`,
   partialDone: (note, seconds) => `Da nota ${note} até o fim em ${seconds} s.`,
   sectionDone: (first, last, seconds) => `Notas ${first} a ${last} em ${seconds} s.`,
   sectionInfo: (first, last) => `Trecho: notas ${first} a ${last} (clique em uma nota para limpar)`,
   hitSkipped: (hit, skipped) => `${plural(hit, "acerto", "acertos")}${skipped ? `, ${plural(skipped, "pulada", "puladas")}` : ""}`,
-  summary: (hitSkipped, cents) => `Nesta sessão: ${hitSkipped}${cents === null ? "" : `, ${centsText(cents)} de desvio em média`}.`,
+  summary: (hitSkipped, cents) => `Nesta sessão: ${hitSkipped}, ${centsText(cents)} de desvio em média.`,
   slowest: (notes) => `Mais lentas: ${notes}`,
-  slowestNone: "nenhuma",
   playAgain: "Tocar de novo",
   playReference: "Ouvir referência",
   stopReference: "Parar referência",

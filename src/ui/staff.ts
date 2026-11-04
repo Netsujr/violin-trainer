@@ -4,14 +4,14 @@ import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, 
 import { h } from "./dom";
 import type { Section } from "./highway";
 
-export type StaffNote = { pitch: string; beats?: number; finger?: string };
-export type StaffLabels = { names: boolean; fingers: boolean };
+type StaffNote = { pitch: string; beats?: number; finger?: string };
+type StaffLabels = { names: boolean; fingers: boolean };
 
 const TOP = 30;
 const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
 const NOTE_WIDTH = 56;
-// Rhythm patterns are drawn in bars, packed tighter because they hold more notes.
+// Notes with written lengths are drawn in bars, packed tighter because they hold more notes.
 const BAR_BEATS = 4;
 const BAR_NOTE_WIDTH = 40;
 const MAX_BARS_PER_LINE = 6;
@@ -77,7 +77,7 @@ function toBars(notes: StaffNote[]) {
   return bars;
 }
 
-// Lines of bars. Without a rhythm pattern, each line is one long "bar" with no barlines.
+// Lines of bars. Without written lengths, each line is one long "bar" with no barlines.
 function layOut(notes: StaffNote[], room: number, barred: boolean) {
   if (!barred) {
     const perLine = Math.floor(room / NOTE_WIDTH);
@@ -293,7 +293,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       // The first draw happens before the staff is on the page, when it has no width to scroll in.
       if (!element.isConnected) requestAnimationFrame(scrollToBeat);
     },
-    // Shows a note being played against the note at index, or nothing with cents null.
+    hidePlayed: () => played.group.remove(),
+    // Shows what's being played against the note at index, or nothing with cents null.
     showPlayed(index: number, cents: number | null, inTune: boolean) {
       const note = shownNotes[index];
       if (cents === null || !note) {

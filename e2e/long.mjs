@@ -1,7 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
-const D_MAJOR = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
+import { open, nav, start, stop, sleep, check, D_MAJOR, OUT } from "./lib.mjs";
 const profile = OUT + "profile-long";
 rmSync(profile, { recursive: true, force: true });
 wav(OUT + "dmajor-long.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);

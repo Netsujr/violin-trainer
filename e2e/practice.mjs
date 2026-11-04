@@ -1,7 +1,6 @@
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, progress, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, progress, freshPractice, canvasHasColor, D_MAJOR, OUT } from "./lib.mjs";
 
-const D_MAJOR = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 const indexOf = (text) => Number(text.match(/Note (\d+) of/)?.[1] ?? 99);
 
 // Full D major, looped
@@ -96,6 +95,44 @@ wav(OUT + "wrong.wav", [note(63, 3), note(61, 3)]);
   await start(s.page);
   await sleep(6000);
   check("wrong notes never advance", (await progress(s.page)).startsWith("Note 1 of"), await progress(s.page));
+  await s.close();
+}
+
+// The mic hears the target the whole time, which mustn't count while the reference sounds.
+wav(OUT + "e4.wav", [note(64, 5)]);
+{
+  const s = await open(OUT + "e4.wav");
+  await nav(s.page, "Practice");
+  const box = await s.page.locator("canvas").boundingBox();
+  await s.page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84);
+  await sleep(600);
+  await s.page.click('button:text-is("Play reference")');
+  await start(s.page);
+  await s.page.waitForSelector('button:text-is("Stop")');
+  await sleep(1500);
+  const during = await progress(s.page);
+  check("the target doesn't count while the reference sounds", during.startsWith("Note 2 of"), during);
+  await s.page.click('button:text-is("Stop reference")');
+  await sleep(800);
+  const after = await progress(s.page);
+  check("it counts once the reference stops", after.startsWith("Note 3 of"), after);
+  await s.close();
+}
+
+// The ring that shows a note filling up
+wav(OUT + "c4.wav", [note(60, 6)]);
+{
+  const s = await open(OUT + "c4.wav");
+  await s.page.evaluate(() => localStorage.setItem("settings", JSON.stringify({ holdMs: 500 })));
+  await nav(s.page, "Practice");
+  await freshPractice(s.page);
+  await s.page.locator("select").selectOption("c-major-1oct");
+  const green = () => canvasHasColor(s.page, 76, 208, 125);
+  check("no hold ring before playing", !(await green()));
+  await start(s.page);
+  await s.page.waitForSelector('button:text-is("Stop")');
+  await sleep(320);
+  check("the hold ring appears while the note is held", (await green()) && (await progress(s.page)).startsWith("Note 1 of"), await progress(s.page));
   await s.close();
 }
 

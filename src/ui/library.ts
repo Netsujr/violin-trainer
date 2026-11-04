@@ -1,7 +1,7 @@
 import { localTitle, t } from "../i18n";
 import { parseQuickText } from "../music/parse";
 import { noteLabels } from "../music/notes";
-import { allPieces, deletePiece, getSettings, savePiece, saveSettings } from "../storage";
+import { allPieces, deletePiece, getSettings, isScale, savePiece, saveSettings } from "../storage";
 import type { Piece } from "../music/notes";
 import { h, type Screen } from "./dom";
 import { CALENDAR_ICON, PLAY_ICON } from "./toggles";
@@ -73,7 +73,6 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
 
   function renderList() {
     const pieces = allPieces();
-    const isScale = (piece: Piece) => piece.source === "built-in";
     list.replaceChildren(
       h("div", {}, h("h3", {}, t.scales), ...pieces.filter(isScale).map(pieceRow)),
       h("div", {}, h("h3", {}, t.songs), ...pieces.filter((piece) => !isScale(piece)).map(pieceRow)),

@@ -77,7 +77,8 @@ addEventListener("pagehide", () => current?.leave());
 
 // The Settings panel covers the run buttons, so anything outside it closes it, as a menu would.
 const closeSettings = () => header.querySelector("details")?.removeAttribute("open");
-addEventListener("click", (event) => {
+// A press rather than a click, because iOS sends no click for a tap on plain content.
+addEventListener("pointerdown", (event) => {
   if (!header.querySelector("details")?.contains(event.target as Node)) closeSettings();
 });
 addEventListener("keydown", (event) => {

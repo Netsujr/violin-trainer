@@ -90,3 +90,17 @@ wav(OUT + "silence.wav", [rest(4)]);
   check("Listen writes a log entry on Stop", log.length === 1 && log[0].pieceTitle === "Free play", JSON.stringify(log[0]));
   await s.close();
 }
+
+// Recording from Listen
+{
+  const s = await open(OUT + "a440.wav");
+  await s.page.locator('label:has-text("Record") input').check();
+  await start(s.page);
+  await s.page.waitForSelector('button:text-is("Stop")');
+  await sleep(1500);
+  await nav(s.page, "Log");
+  await s.page.waitForSelector("audio");
+  check("Listen can record too", (await s.page.locator("audio").count()) === 1);
+  check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}

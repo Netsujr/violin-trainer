@@ -1,7 +1,7 @@
 // The Options panel, the section bars, the staff's labels and its two modes, and the needle's zones.
 import { readFileSync, writeFileSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, progress, OUT } from "./lib.mjs";
+import { open, nav, start, sleep, check, seed, progress, OUT } from "./lib.mjs";
 
 wav(OUT + "s-silent.wav", [rest(3)]);
 const detuned = (cents) => 440 * 2 ** (cents / 1200);

@@ -1,9 +1,8 @@
 // The ghost note on the staff: where it sits against the current note, which way its arrow points, and when it shows.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, OUT } from "./lib.mjs";
+import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT } from "./lib.mjs";
 
 wav(OUT + "played-silent.wav", [rest(3)]);
-const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 const s = await open(OUT + "played-silent.wav");
 const { page } = s;
 const ghost = () => page.evaluate(() => {
@@ -23,11 +22,9 @@ const ghost = () => page.evaluate(() => {
 const GREEN = "#14914a", BLUE = "#1f6fd1";
 // Plays one fixed pitch whatever the note is, and starts.
 const playing = async (midi, bpm) => {
-  await page.reload(); await page.waitForSelector("nav button");
-  await nav(page, "Practice"); await sleep(250);
-  if (bpm) await page.locator(".bpm input").fill(String(bpm));
+  await freshPractice(page, bpm);
   await followNotes(page, { midis: Array(16).fill(midi) });
-  await page.click('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
+  await begin(page);
   await sleep(400);
 };
 
@@ -62,13 +59,12 @@ check("a bit out, past the tolerance, still points the way", seen.arrow === "↓
 await stop(page); await sleep(200);
 
 // Right on it, caught in the moment before the note clears
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
+await freshPractice(page);
 await page.click("header summary"); await sleep(150);
 await page.locator('label.setting:has-text("Hold time") input').fill("500");
 await page.keyboard.press("Escape"); await sleep(150);
 await followNotes(page, { midis: Array(16).fill(62.2) });
-await page.click('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
+await begin(page);
 for (let tries = 0; tries < 40; tries++) {
   seen = await ghost();
   if (seen?.color === GREEN) break;
@@ -88,8 +84,7 @@ check("an octave up counts, as it does for clearing", octave !== "Note 1 of 15",
 await stop(page); await sleep(200);
 
 // Following the scale
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
+await freshPractice(page);
 await page.locator(".bpm input").fill("120");
 await followNotes(page, { midis: D, delays: { 5: 60000 } });
 await page.click('button:text-is("Start")');
@@ -98,8 +93,7 @@ await sleep(200);
 check("silence shows nothing", (await ghost()) === null);
 await stop(page); await sleep(200);
 
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
+await freshPractice(page);
 await page.locator(".staff-toggle").click(); await sleep(300);
 await followNotes(page, { midis: D.map((midi, index) => (index === 6 ? midi - 2 : midi)) });
 await page.click('button:text-is("Start")');
@@ -125,30 +119,27 @@ await page.click('button:text-is("Stop reference")'); await sleep(300);
 await stop(page); await sleep(200);
 
 // At the end
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
+await freshPractice(page);
 await page.locator(".bpm input").fill("120");
 await followNotes(page, { midis: D, delayMs: 150 });
 await page.click('button:text-is("Start")');
-await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 20000 });
+await waitForText(page, "All", 20000);
 await sleep(150);
 check("finishing removes it, even with the note still sounding", await page.evaluate(() => !document.querySelector(".played-note")));
 await stop(page); await sleep(200);
 
 // The count-in, and Don't wait
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
+await freshPractice(page);
 await page.locator('.options label:has-text("count-in") input').check();
 await followNotes(page, { midis: Array(16).fill(62) });
-await page.click('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
+await begin(page);
 await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("Starts in"), null, { timeout: 3000 });
 await sleep(200);
 check("the count-in shows none", (await ghost()) === null);
 await stop(page); await sleep(200);
 await page.locator('.options label:has-text("count-in") input').uncheck();
 
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
+await freshPractice(page);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
 await page.locator(".bpm input").fill("120");
 await followNotes(page, { midis: D.map((midi) => midi + 2) });
@@ -160,8 +151,5 @@ check("Don't wait shows it too, moving with the notes", seen && seen.arrow === "
 await stop(page); await sleep(200);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
 
-// Clicking isn't blocked by it
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

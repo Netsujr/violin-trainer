@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Piece } from "../src/music/notes";
-import { buildEntry, pieceTrends, plannedThisWeek, weekMinutes, type LogEntry } from "../src/practice/log";
+import { buildEntry, pieceTrends, plannedThisWeek, scorePercent, weekMinutes, type LogEntry } from "../src/practice/log";
 import { Session } from "../src/practice/session";
 
 const piece: Piece = { id: "p", title: "P", source: "test", notes: [{ pitch: "D4" }, { pitch: "E4" }, { pitch: "F#4" }, { pitch: "G4" }] };
@@ -37,7 +37,7 @@ describe("session and log entry", () => {
     expect(session.passSeconds).toEqual([]);
   });
 
-  it("jumps without counting a hit or a skip, and times a partial run but not as a pass", () => {
+  it("jumps without counting a hit or a miss, and times a partial run but not as a pass", () => {
     const session = new Session(piece, 0);
     session.hit(10, 1000);
     session.jumpTo(2, 5000);
@@ -47,7 +47,7 @@ describe("session and log entry", () => {
     expect(session.finished).toBe(true);
     expect(session.lastRunSeconds).toBe(3);
     expect(session.passSeconds).toEqual([]);
-    expect(session.skipped).toBe(0);
+    expect(session.missed).toBe(0);
     expect(session.hits.map((hit) => hit.ms)).toEqual([1000, 1000, 2000]);
     expect(buildEntry(session, 8000).passes).toBe(0);
     expect(buildEntry(session, 8000).averagePassSeconds).toBeNull();
@@ -74,11 +74,34 @@ describe("session and log entry", () => {
     expect(session.finished).toBe(false);
   });
 
+  it("records a score, not a timed pass or slowest notes, when the lanes keep moving", () => {
+    const session = new Session(piece, 0);
+    session.following = true;
+    session.jumpTo(0, 0);
+    session.hit(10, 1000);
+    session.miss(2000);
+    session.hit(10, 3000);
+    session.hit(10, 4000);
+    expect(session.finished).toBe(true);
+    expect(buildEntry(session, 60000)).toMatchObject({ score: 75, passes: 0, averagePassSeconds: null, slowest: [], notesHit: 3, notesSkipped: 1 });
+  });
+
+  it("has no score when waiting for each note", () => {
+    const session = new Session(piece, 0);
+    expect(buildEntry(session, 1000).score).toBeUndefined();
+  });
+
+  it("works out a percentage, rounded, with nothing played as 0", () => {
+    expect(scorePercent(13, 15)).toBe(87);
+    expect(scorePercent(15, 15)).toBe(100);
+    expect(scorePercent(0, 0)).toBe(0);
+  });
+
   it("summarises a session", () => {
     const session = new Session(piece, 0);
     session.hit(10, 1000);
     session.hit(20, 6000);
-    session.skip(7000);
+    session.miss(7000);
     session.hit(30, 9000);
     expect(session.finished).toBe(true);
 

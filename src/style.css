@@ -151,6 +151,10 @@ header details[open] > summary {
   margin-inline-end: 0.125em;
 }
 
+.toggles label:has(input:disabled) {
+  opacity: 0.5;
+}
+
 /* Off reads grey and on reads white. An off option is still fully clickable. */
 label:has(> input[type="checkbox"]) {
   color: var(--pico-muted-color);
@@ -343,6 +347,32 @@ section > ul > li {
   grid-column: 2;
 }
 
+/* Set directly, because Pico's hover and focus styles replace its variables. */
+.actions button[aria-pressed="true"] {
+  color: #4cd07d;
+  border-color: #4cd07d;
+}
+
+.mode-note {
+  font-size: 0.8125rem;
+  color: var(--pico-muted-color);
+  text-align: right;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
+
+.icon-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .options {
   padding: 0.5rem 0.875rem;
   margin-bottom: 0.5rem;
@@ -393,12 +423,18 @@ section > ul > li {
   font-weight: 600;
 }
 
+.stats .score {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--pico-primary);
+}
+
 .timeline-section,
 .staff-section {
   margin-block: 1rem;
 }
 
-/* A small bar on top of a section, so its controls never cover the lanes or the sheet. */
+/* A small bar on top of the lanes, so its controls never cover them. */
 .section-bar {
   display: flex;
   align-items: center;
@@ -498,8 +534,7 @@ section > ul > li {
   transform: rotate(180deg);
 }
 
-/* Library */
-/* Two columns while each still fits a title beside its icons, otherwise one. */
+/* Library: two columns while each still fits a title beside its icons, otherwise one. */
 .library {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
@@ -533,32 +568,6 @@ section > ul > li {
 .piece button {
   flex-shrink: 0;
   margin: 0;
-}
-
-.icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0;
-}
-
-.icon-button svg {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-/* Set directly, because Pico's hover and focus styles replace its variables. */
-.actions button[aria-pressed="true"] {
-  color: #4cd07d;
-  border-color: #4cd07d;
-}
-
-.mode-note {
-  font-size: 0.8125rem;
-  color: var(--pico-muted-color);
-  text-align: right;
 }
 
 .day-picker {
@@ -688,13 +697,20 @@ a[download] {
     margin-top: 0.25rem;
   }
 
+  /* Tight enough that the buttons share a line on most phones, keeping the lanes on screen. */
+  .actions {
+    gap: 0.375rem;
+  }
+
   .actions button {
     flex: 1 1 auto;
-    --pico-form-element-spacing-horizontal: 0.625rem;
+    --pico-form-element-spacing-horizontal: 0.5rem;
   }
 
   .actions .icon-button {
     flex: none;
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   /* The needle's cents are enough here, and the Hz would wrap in and out as notes change. */
@@ -911,14 +927,11 @@ a[download] {
   }
 }
 
-.toggles label:has(input:disabled) {
-  opacity: 0.5;
-}
-
-.stats .score {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--pico-primary);
+/* Small phones in landscape: the reading would squeeze the needle to nothing, and the needle says it anyway. */
+@media (max-height: 500px) and (max-width: 760px) {
+  .practice > .tuning .needle ~ span {
+    display: none;
+  }
 }
 
 /* The smallest phones in landscape: the buttons fill the line, so the needle takes its own. */
@@ -995,6 +1008,10 @@ a[download] {
 }
 
 @media (max-width: 600px) {
+  .fullscreen .bpm {
+    min-width: 7rem;
+  }
+
   .fullscreen .practice > p,
   .fullscreen .practice > .actions {
     grid-row: auto;

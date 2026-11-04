@@ -48,7 +48,10 @@ export function createRunControls(options: {
     run = null;
     button.disabled = true;
     showRunning();
-    saving = finishing.stop();
+    // A failed save, like Safari's private browsing or a full disk, mustn't leave the button stuck or the screen unleavable.
+    saving = finishing.stop().catch(() => {
+      message.textContent = t.recordingNotSaved;
+    });
     await saving;
     button.disabled = false;
     options.onStop?.();

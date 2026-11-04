@@ -1,6 +1,6 @@
 import { midiOf, type Piece, type PieceNote } from "../music/notes";
 
-export type NoteHit = { pitch: string; ms: number; cents: number; at: number };
+type NoteHit = { pitch: string; ms: number; cents: number; at: number };
 
 export class Session {
   readonly piece: Piece;
@@ -8,7 +8,8 @@ export class Session {
   readonly startedAtIso = new Date().toISOString();
   index = 0;
   hits: NoteHit[] = [];
-  skipped = 0;
+  // Notes that passed unplayed while the lanes kept moving.
+  missed = 0;
   passSeconds: number[] = [];
   lastRunSeconds = 0;
   // The lanes set the pace, so a run's length says nothing about the playing and it isn't a timed pass.
@@ -43,12 +44,12 @@ export class Session {
     this.advance(nextStartsAt);
   }
 
-  skip(now: number) {
-    this.skipped++;
+  miss(now: number) {
+    this.missed++;
     this.advance(now);
   }
 
-  // A jump is neither a hit nor a skip. Only a run from note 1 with no rhythm pattern counts as a timed pass, so pass times stay comparable.
+  // A jump is neither a hit nor a miss. Only a whole run with no rhythm pattern counts as a timed pass, so pass times stay comparable.
   jumpTo(index: number, now: number, end = this.piece.notes.length) {
     this.index = index;
     this.end = end;

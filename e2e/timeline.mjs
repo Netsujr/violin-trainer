@@ -1,11 +1,8 @@
 import { wav, note } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, followNotes, OUT } from "./lib.mjs";
-
-const D_MAJOR = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
+import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT } from "./lib.mjs";
 
 const LANES = ["E", "A", "D", "G"];
 const HIT_X = 130, SPACING = 120, LANE_HEIGHT = 84;
-const progress = (page) => page.locator("section > p").first().innerText();
 const scrollLeft = (page) => page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);
 
 // Clicks a spot on the canvas, given the note slot and string lane, at the current scroll position.

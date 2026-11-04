@@ -25,8 +25,7 @@ export type Settings = {
   targetDays: Record<string, number>;
 };
 
-export type Marker = { pitch: string; seconds: number };
-export type Recording = { blob: Blob; markers: Marker[] };
+export type Recording = { blob: Blob; markers: { pitch: string; seconds: number }[] };
 
 const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   toleranceCents: 40,
@@ -74,6 +73,8 @@ export const saveSettings = () => write("settings", getSettings());
 const withWayDown = (notes: PieceNote[]) => [...notes, ...notes.slice(0, -1).reverse()];
 
 const fingered = (piece: Piece): Piece => ({ ...piece, notes: piece.notes.map(fillFingering) });
+
+export const isScale = (piece: Piece) => piece.source === "built-in";
 
 export const builtInPieces = () =>
   (scales as Piece[]).map((scale) => fingered({ ...scale, notes: withWayDown(scale.notes) }));

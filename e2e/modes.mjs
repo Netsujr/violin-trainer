@@ -1,26 +1,16 @@
 // Loop, repeating a scale's top note, the steady reference tone, and the line that says which of them is on.
-import { wav, note, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, OUT } from "./lib.mjs";
+import { wav, rest } from "./wav.mjs";
+import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT } from "./lib.mjs";
 
-const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 const D_TOP_TWICE = [62, 64, 66, 67, 69, 71, 73, 74, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "modes-silent.wav", [rest(3)]);
-wav(OUT + "modes-e4.wav", [note(64, 6)]);
 const s = await open(OUT + "modes-silent.wav");
 const { page } = s;
-const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
 const loop = () => page.locator('button[aria-label="Loop"]');
 const top = () => page.locator('button[aria-label="Repeat the top note"]');
 const dontWait = () => page.locator('button[aria-label="Don\'t wait"]');
 const note_ = () => page.locator(".mode-note").innerText();
 const pressed = async (button) => (await button.getAttribute("aria-pressed")) === "true";
-const textIs = (text) => page.waitForFunction((text) => document.querySelector("section > p").textContent.includes(text), text, { timeout: 40000 });
-const begin = async () => { await page.click('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")'); };
-const fresh = async (bpm) => {
-  await page.reload(); await page.waitForSelector("nav button"); // Also ends the last run's synthetic player.
-  await nav(page, "Practice"); await sleep(250);
-  if (bpm) await page.locator(".bpm input").fill(String(bpm));
-};
 const color = (button) => button.evaluate((element) => getComputedStyle(element).color);
 const GREEN = "rgb(76, 208, 125)";
 
@@ -39,11 +29,11 @@ check("×2 turns green, and the line says what it does", (await pressed(top())) 
 check("the scale gains one note", (await progress(page)) === "Note 1 of 16" && (await page.locator(".staff .vf-stavenote").count()) === 16, await progress(page));
 const middle = await page.locator(".staff .vf-stavenote").evaluateAll((notes) => notes.slice(7, 9).map((note) => Math.round(note.getBoundingClientRect().top)));
 check("the top note is written twice", middle[0] === middle[1], middle.join());
-check("saved", (await saved()).repeatTopOn === true);
-await fresh();
+check("saved", (await savedSettings(page)).repeatTopOn === true);
+await freshPractice(page);
 check("it stays on after a reload", (await pressed(top())) && (await progress(page)) === "Note 1 of 16");
 await followNotes(page, { midis: D_TOP_TWICE, delayMs: 150 });
-await begin(); await textIs("All 16 notes done"); await sleep(150);
+await begin(page); await waitForText(page, "All 16 notes done"); await sleep(150);
 check("it plays through, with the top note twice", (await page.locator(".stats").innerText()).includes("16 hit"), (await page.locator(".stats").innerText()).replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 await page.locator(".options select").selectOption("g-major-2oct"); await sleep(250);
@@ -58,60 +48,60 @@ await top().click(); await sleep(250);
 check("off again, the scale is back to 15", (await progress(page)) === "Note 1 of 15" && (await note_()).includes("Top note once"));
 
 // Loop, waiting for each note
-await fresh();
+await freshPractice(page);
 await loop().click(); await sleep(300);
 check("Loop turns green, and the line says what it does", (await color(loop())) === GREEN && (await note_()).includes("Loops until you press Stop"), await note_());
 await followNotes(page, { midis: D, delayMs: 150 });
-await begin();
-await textIs("Loop 2");
+await begin(page);
+await waitForText(page, "Loop 2");
 check("reaching the end goes back to the start, with no results card", (await progress(page)) === "Note 1 of 15 · Loop 2" && (await page.locator(".stats").innerText()) === "" && (await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) === 0, await progress(page));
-await textIs("Loop 3");
+await waitForText(page, "Loop 3");
 check("and again", (await progress(page)).startsWith("Note 1 of 15"), await progress(page));
 await stop(page); await sleep(200);
-const looped = (await page.evaluate(() => JSON.parse(localStorage.getItem("log")))).at(-1);
+const looped = (await savedLog(page)).at(-1);
 check("one log entry, with each time round as a pass", looped.passes === 2 && looped.notesHit >= 30, JSON.stringify({ passes: looped.passes, hit: looped.notesHit }));
 check("Stop clears the loop count", (await progress(page)) === "Note 1 of 15", await progress(page));
 
 // The last note and the first are the same, so a held note can't carry over the join
-await fresh();
+await freshPractice(page);
 await followNotes(page, { midis: D });
-await begin();
-await textIs("Loop 2");
+await begin(page);
+await waitForText(page, "Loop 2");
 await sleep(1200);
 check("a note held across the join needs a fresh bow", (await progress(page)) === "Note 1 of 15 · Loop 2", await progress(page));
 await stop(page); await sleep(200);
 
 // Looping from a picked note
-await fresh();
+await freshPractice(page);
 const box = await page.locator("canvas").boundingBox();
 await page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 13 * 120)); await sleep(200);
 await page.mouse.click(box.x + 130 + 40, box.y + 2.5 * 84); await sleep(500);
 await followNotes(page, { midis: D, delayMs: 150 });
-await begin();
-await textIs("Loop 2");
+await begin(page);
+await waitForText(page, "Loop 2");
 check("it loops back to the picked note", (await progress(page)).startsWith("Note 14 of 15"), await progress(page));
 await loop().click(); await sleep(100);
 check("switching off mid-run doesn't stop the run", (await page.locator('button:text-is("Stop")').count()) === 1);
-await textIs("All 15 notes done"); await sleep(150);
+await waitForText(page, "All 15 notes done"); await sleep(150);
 check("it finishes that time round, with results", (await page.locator(".stats").innerText()).includes("done"));
 await stop(page); await sleep(200);
 
 // Loop with Don't wait
-await fresh(120);
+await freshPractice(page, 120);
 await loop().click(); await dontWait().click(); await sleep(200);
 await page.locator('.options label:has-text("count-in") input').check();
 check("the line follows both", (await note_()).startsWith("Keeps moving · Loops until you press Stop"), await note_());
 await followNotes(page, { midis: D });
-await begin();
-await textIs("last 100%");
+await begin(page);
+await waitForText(page, "last 100%");
 check("each time round counts in again and shows the last score", (await progress(page)).startsWith("Starts in"), await progress(page));
-await textIs("Note 3 of 15");
+await waitForText(page, "Note 3 of 15");
 check("and the next run goes on", (await progress(page)).includes("Loop 2 · last 100%"), await progress(page));
 
 // Fullscreen, while that keeps going
 await page.click('button[aria-label="Fullscreen"]'); await sleep(300);
 check("in fullscreen the toggles stay, and the line goes", (await loop().isVisible()) && (await top().isVisible()) && (await page.locator(".mode-note").isHidden()));
-await textIs("Loop 3");
+await waitForText(page, "Loop 3");
 check("no results card covers the lanes when looping", (await page.locator(".stats .score").count()) === 0);
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(200);
 await stop(page); await sleep(200);
@@ -119,7 +109,7 @@ await dontWait().click(); await loop().click(); await sleep(100);
 await page.locator('.options label:has-text("count-in") input').uncheck();
 
 // The reference tone keeps sounding
-await fresh();
+await freshPractice(page);
 await page.evaluate(() => {
   window.tones = [];
   const start = OscillatorNode.prototype.start, stop = OscillatorNode.prototype.stop;
@@ -147,14 +137,14 @@ await nav(page, "Practice"); await sleep(200);
 check("and it reads as off on return", (await page.locator('button:text-is("Play reference")').count()) === 1);
 
 await page.evaluate(() => localStorage.setItem("pieces", JSON.stringify([{ id: "one", title: "One", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }] }])));
-await fresh();
+await freshPractice(page);
 await page.locator(".options select").selectOption("one"); await sleep(200);
 await followNotes(page, { midis: [62] });
-await begin();
+await begin(page);
 await play(); await sleep(400);
 check("while it sounds, what the mic hears doesn't count", (await progress(page)) === "Note 1 of 1", await progress(page));
 await off();
-await textIs("All 1 notes done");
+await waitForText(page, "All 1 notes done");
 check("once it stops, it does", true);
 await stop(page); await sleep(200);
 
@@ -171,8 +161,7 @@ await s.close();
   const { page } = c;
   const box_ = () => page.locator('.options label:has-text("count-in") input');
   const showing = () => page.evaluate(() => document.querySelector("section > p").textContent);
-  const start_ = async () => { await page.click('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")'); };
-  const watch = () => page.evaluate(() => {
+    const watch = () => page.evaluate(() => {
     window.seen = [];
     const text = document.querySelector("section > p");
     let last = "";
@@ -193,7 +182,7 @@ await s.close();
   await page.locator('.options label:has-text("Metronome") input').check();
   await followNotes(page, { midis: D });
   await watch();
-  await start_();
+  await begin(page);
   await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 2 of 15", null, { timeout: 15000 });
   await sleep(60);
   const seen = await page.evaluate(() => window.seen);
@@ -214,20 +203,20 @@ await s.close();
 
   await page.reload(); await page.waitForSelector("nav button");
   await nav(page, "Practice"); await sleep(250);
-  await start_(); await sleep(100);
+  await begin(page); await sleep(100);
   check("count-in: Stop during it leaves things as they were", (await showing()).startsWith("Starts in"), await showing());
   await stop(page); await sleep(200);
   check("count-in: and it clears", (await showing()) === "Note 1 of 15", await showing());
 
   await box_().uncheck();
   check("count-in: saved when switched off", (await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).countInOn)) === false);
-  await start_(); await sleep(100);
+  await begin(page); await sleep(100);
   check("count-in: off starts on the sheet straight away", (await showing()) === "Note 1 of 15", await showing());
   await stop(page); await sleep(200);
   await page.click('button[aria-label="Don\'t wait"]'); await sleep(100);
   await page.locator(".bpm input").fill("120");
   await watch();
-  await start_(); await sleep(1000);
+  await begin(page); await sleep(1000);
   const lanes = await page.evaluate(() => window.seen.map((entry) => entry.text));
   check("count-in: Don't wait with it off has no countdown", !lanes.some((text) => text.startsWith("Starts in")) && (await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) > 0, lanes.join());
   await stop(page); await sleep(200);

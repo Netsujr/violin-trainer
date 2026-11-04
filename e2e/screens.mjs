@@ -1,7 +1,7 @@
 // Every screen and the main flows on phone and tablet sizes, by touch, plus small computer windows.
 // This is Chrome emulating those sizes: it checks layout and touch handling, not Safari or a real device's mic.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, sleep, check, followNotes, progress, OUT } from "./lib.mjs";
+import { open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT } from "./lib.mjs";
 
 const SIZES = [
   ["small phone", 320, 568, true],
@@ -19,44 +19,11 @@ const SIZES = [
   ["narrow window", 500, 700, false],
   ["short window", 900, 450, false],
 ];
-const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
-const MIN_TOUCH_TARGET = 24; // WCAG 2.5.8
 const fillsWidth = (canvas, screen) => Math.abs(canvas - Math.min(960, screen - 32)) <= 2; // style.css caps the page at 960.
 const ARROW_TURN_MS = 350; // The arrow overflows its row by a pixel while it turns.
 const LONG_TITLE = "Concerto for Violin and Orchestra in D major, first movement";
 const longPiece = Array(10).fill("D4 E4 F#4 G4").join(" | ");
 wav(OUT + "screens-silent.wav", [rest(3)]);
-
-// What a person would notice on the current view: sideways scroll, things off the edge, cut-off labels, covered or tiny controls.
-// scope limits the covered and tap checks, because an open dropdown is meant to cover what's under it.
-const audit = (page, scope = "#app") =>
-  page.evaluate(async ({ scope, minTarget }) => {
-    const seen = (element) => element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
-    const name = (element) => `${element.tagName.toLowerCase()}${element.className && typeof element.className === "string" ? "." + element.className.split(" ")[0] : ""}"${(element.textContent || element.title || "").trim().slice(0, 18)}"`;
-    const scrolls = (element) => { for (let e = element.parentElement; e; e = e.parentElement) if (/auto|scroll|hidden/.test(getComputedStyle(e).overflowX)) return true; return false; };
-    const result = { sideways: document.documentElement.scrollWidth - innerWidth, offEdge: [], cut: [], covered: [], small: [] };
-    for (const element of document.querySelectorAll("#app *")) {
-      if (!seen(element) || element.closest("svg") || scrolls(element)) continue;
-      const box = element.getBoundingClientRect();
-      if (box.width && box.height && (box.right > innerWidth + 1 || box.left < -1)) result.offEdge.push(name(element));
-    }
-    const controls = [...document.querySelector(scope).querySelectorAll("button, select, summary, a[download], textarea, input:not([type=checkbox]), label:has(> input[type=checkbox])")].filter(seen);
-    for (const control of controls) {
-      if (control.matches("button, summary") && control.scrollWidth > control.clientWidth + 1) result.cut.push(name(control));
-      control.scrollIntoView({ block: "center", behavior: "instant" });
-      const box = control.getBoundingClientRect();
-      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-      if (!top || !(control === top || control.contains(top) || top.contains(control))) result.covered.push(`${name(control)} by ${top ? name(top) : "nothing"}`);
-      if (Math.min(box.width, box.height) < minTarget && matchMedia("(pointer: coarse)").matches) result.small.push(`${name(control)} ${Math.round(box.width)}x${Math.round(box.height)}`);
-    }
-    scrollTo({ top: 0, behavior: "instant" });
-    return result;
-  }, { scope, minTarget: MIN_TOUCH_TARGET });
-const auditCheck = async (page, label, scope) => {
-  const r = await audit(page, scope);
-  check(`${label}: fits, nothing cut off or covered`, r.sideways <= 0 && !r.offEdge.length && !r.cut.length && !r.covered.length, r.sideways > 0 || r.offEdge.length || r.cut.length || r.covered.length ? JSON.stringify({ sideways: r.sideways, offEdge: r.offEdge.slice(0, 5), cut: r.cut.slice(0, 5), covered: r.covered.slice(0, 5) }) : "");
-  if (r.small.length) check(`${label}: controls are big enough to tap (${MIN_TOUCH_TARGET}px)`, false, r.small.slice(0, 6).join(", "));
-};
 
 // The audit has to catch a broken page, or its passes mean nothing.
 {
@@ -247,11 +214,8 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await auditCheck(page, `${tag} Log with a recording`);
   const audio = await page.locator("audio").boundingBox();
   check(`${tag}: the player fits`, audio.x >= 0 && audio.x + audio.width <= width + 1, JSON.stringify(audio));
-  await page.screenshot({ path: `${OUT}screens-${tag}-log.png`, fullPage: true });
   await goNav("Practice"); await sleep(250);
-  await page.screenshot({ path: `${OUT}screens-${tag}-practice.png`, fullPage: true });
   await goNav("Listen"); await sleep(250);
-  await page.screenshot({ path: `${OUT}screens-${tag}-listen.png`, fullPage: true });
 
   check(`${tag}: no page errors`, s.problems.length === 0, s.problems.slice(0, 3).join(" | "));
   await s.close();

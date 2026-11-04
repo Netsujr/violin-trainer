@@ -1,5 +1,5 @@
 // Portuguese across the app, including what only appears with data in it.
-import { wav, note, rest } from "./wav.mjs";
+import { wav, note } from "./wav.mjs";
 import { open, nav, start, stop, sleep, check, seed, OUT } from "./lib.mjs";
 
 wav(OUT + "l-a4.wav", [note(69, 4)]);

@@ -14,7 +14,6 @@ const outputLatencyMs = () => (sharedAudioContext().outputLatency || 0) * 1000;
 
 function playClick(atMs: number, accent: boolean) {
   const context = sharedAudioContext();
-  if (context.state === "suspended") context.resume();
   // Sent early by the output latency, so the sound reaches the speakers on the beat rather than leaving for them then.
   const startsAt = context.currentTime + Math.max(0, (atMs - performance.now() - outputLatencyMs()) / 1000);
   const oscillator = context.createOscillator();
@@ -35,10 +34,7 @@ export function createMetronome() {
   return {
     // Runs from the mic loop, so clicks stop by themselves when a session ends.
     tick(now: number, bpm: number) {
-      if (nextClick === null || nextClick < now) {
-        sharedAudioContext();
-        nextClick = now + FIRST_CLICK_DELAY_MS;
-      }
+      if (nextClick === null || nextClick < now) nextClick = now + FIRST_CLICK_DELAY_MS;
       while (nextClick - now < SCHEDULE_AHEAD_MS + outputLatencyMs()) {
         playClick(nextClick, count % BEATS_PER_BAR === 0);
         lastClick = nextClick;

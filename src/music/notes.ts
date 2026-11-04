@@ -7,7 +7,6 @@ export type PieceNote = {
   pitch: string;
   string?: StringName;
   finger?: string;
-  bar?: number;
   beats?: number;
 };
 

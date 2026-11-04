@@ -5,7 +5,12 @@ const FADE_SECONDS = 0.02;
 
 let context: AudioContext | undefined;
 
-export const sharedAudioContext = () => (context ??= new AudioContext());
+export function sharedAudioContext() {
+  context ??= new AudioContext();
+  // Safari can start one suspended.
+  if (context.state === "suspended") context.resume().catch(() => {});
+  return context;
+}
 
 // A steady tone that sounds until it's stopped, with short fades so it doesn't click.
 export function startReference(midi: number) {

@@ -19,7 +19,9 @@ const describeSession = (entry: LogEntry) =>
     .filter(Boolean)
     .join(" · ");
 
-const recordingName = (entry: LogEntry) => `${localTitle(entry.pieceId, entry.pieceTitle)} ${entry.startedAt.slice(0, 16).replace(":", "-")}.webm`;
+// Chrome records WebM and Safari MP4.
+const recordingName = (entry: LogEntry, blob: Blob) =>
+  `${localTitle(entry.pieceId, entry.pieceTitle)} ${entry.startedAt.slice(0, 16).replace(":", "-")}.${blob.type.includes("mp4") ? "m4a" : "webm"}`;
 
 function makeSeekable(audio: HTMLAudioElement) {
   audio.addEventListener(
@@ -55,7 +57,7 @@ function recordingPlayer(entry: LogEntry, recording: Recording, urls: string[], 
     "div",
     {},
     audio,
-    h("a", { href: url, download: recordingName(entry), textContent: t.download }),
+    h("a", { href: url, download: recordingName(entry, recording.blob), textContent: t.download }),
     " ",
     h("button", { textContent: t.deleteRecording, className: "secondary outline", onclick: onDelete }),
     h("div", { className: "row" }, ...markers),

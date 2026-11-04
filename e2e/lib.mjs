@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright-core";
-export const URL = "http://localhost:5199/";
+const URL = "http://localhost:5199/";
+export const D_MAJOR = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 // Generated WAVs, screenshots and Chrome profiles. Vite's watcher skips this folder name.
 export const OUT = new global.URL("test-results/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
@@ -71,7 +72,9 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
     oscillator.connect(gain);
     oscillator.start();
     // A fresh stream each time, because stopping a session ends the one it was using.
-    navigator.mediaDevices.getUserMedia = async () => {
+    // On the prototype, because WebKit can ignore this set directly on navigator.mediaDevices.
+    MediaDevices.prototype.getUserMedia = async () => {
+      await context.resume(); // Safari starts it suspended.
       const output = context.createMediaStreamDestination();
       gain.connect(output);
       return output.stream;
@@ -83,7 +86,7 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
         current = note;
         const wait = delays[note] ?? delayMs;
         const play = () => {
-          if (current !== note) return;
+          if (current !== note || midis[note - 1] === undefined) return;
           oscillator.frequency.value = 440 * 2 ** ((midis[note - 1] - 69) / 12);
           gain.gain.value = 0.3;
         };
@@ -107,3 +110,58 @@ export function check(name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  " + detail : ""}`);
   if (!ok) process.exitCode = 1;
 }
+export const begin = async (page) => {
+  await start(page);
+  await page.waitForSelector('button:text-is("Stop")');
+};
+export const waitForText = (page, text, timeout = 30000) =>
+  page.waitForFunction((text) => document.querySelector("section > p").textContent.includes(text), text, { timeout });
+// Practice from a fresh page load, which also ends the last run's synthetic player.
+export const freshPractice = async (page, bpm) => {
+  await page.reload();
+  await page.waitForSelector("nav button");
+  await nav(page, "Practice");
+  await sleep(250);
+  if (bpm) await page.locator(".bpm input").fill(String(bpm));
+};
+export const savedLog = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("log") ?? "[]"));
+export const savedSettings = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
+export const canvasHasColor = (page, r, g, b) =>
+  page.locator("canvas").evaluate((canvas, [r, g, b]) => {
+    const { data } = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < data.length; i += 4) if (Math.abs(data[i] - r) < 4 && Math.abs(data[i + 1] - g) < 4 && Math.abs(data[i + 2] - b) < 4) return true;
+    return false;
+  }, [r, g, b]);
+
+// What a person would notice on the current view: sideways scroll, things off the edge, cut-off labels, covered or tiny controls.
+// scope limits the covered and tap checks, because an open dropdown is meant to cover what's under it.
+const MIN_TOUCH_TARGET = 24; // WCAG 2.5.8
+export const audit = (page, scope = "#app") =>
+  page.evaluate(async ({ scope, minTarget }) => {
+    const seen = (element) => element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+    const name = (element) => `${element.tagName.toLowerCase()}${element.className && typeof element.className === "string" ? "." + element.className.split(" ")[0] : ""}"${(element.textContent || element.title || "").trim().slice(0, 18)}"`;
+    const scrolls = (element) => { for (let e = element.parentElement; e; e = e.parentElement) if (/auto|scroll|hidden/.test(getComputedStyle(e).overflowX)) return true; return false; };
+    const result = { sideways: document.documentElement.scrollWidth - innerWidth, offEdge: [], cut: [], covered: [], small: [] };
+    for (const element of document.querySelectorAll("#app *")) {
+      if (!seen(element) || element.closest("svg") || scrolls(element)) continue;
+      const box = element.getBoundingClientRect();
+      if (box.width && box.height && (box.right > innerWidth + 1 || box.left < -1)) result.offEdge.push(name(element));
+    }
+    const controls = [...document.querySelector(scope).querySelectorAll("button, select, summary, a[download], textarea, input:not([type=checkbox]), label:has(> input[type=checkbox])")].filter(seen);
+    for (const control of controls) {
+      if (control.matches("button, summary") && control.scrollWidth > control.clientWidth + 1) result.cut.push(name(control));
+      control.scrollIntoView({ block: "center", behavior: "instant" });
+      const box = control.getBoundingClientRect();
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      if (!top || !(control === top || control.contains(top) || top.contains(control))) result.covered.push(`${name(control)} by ${top ? name(top) : "nothing"}`);
+      if (Math.min(box.width, box.height) < minTarget && matchMedia("(pointer: coarse)").matches) result.small.push(`${name(control)} ${Math.round(box.width)}x${Math.round(box.height)}`);
+    }
+    scrollTo({ top: 0, behavior: "instant" });
+    return result;
+  }, { scope, minTarget: MIN_TOUCH_TARGET });
+export const auditCheck = async (page, label, scope) => {
+  const r = await audit(page, scope);
+  const broken = r.sideways > 0 || r.offEdge.length || r.cut.length || r.covered.length;
+  check(`${label}: fits, nothing cut off or covered`, !broken, broken ? JSON.stringify({ sideways: r.sideways, offEdge: r.offEdge.slice(0, 5), cut: r.cut.slice(0, 5), covered: r.covered.slice(0, 5) }) : "");
+  if (r.small.length) check(`${label}: controls are big enough to tap (${MIN_TOUCH_TARGET}px)`, false, r.small.slice(0, 6).join(", "));
+};

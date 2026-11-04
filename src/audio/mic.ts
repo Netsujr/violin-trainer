@@ -2,16 +2,17 @@ import { createDetector } from "./detector";
 
 const FRAME_SIZE = 2048;
 
-export type Mic = { stream: MediaStream; stop(): void };
-
 export async function startMic(
   minRms: () => number,
   onReading: (frequency: number | null, now: number) => void,
-): Promise<Mic> {
+) {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   });
   const context = new AudioContext();
+  // Made after the permission prompt rather than during the tap, which can leave it suspended on Safari, hearing silence.
+  // A refusal isn't fatal, since it may already be running.
+  context.resume().catch(() => {});
   const analyser = context.createAnalyser();
   analyser.fftSize = FRAME_SIZE;
   context.createMediaStreamSource(stream).connect(analyser);
