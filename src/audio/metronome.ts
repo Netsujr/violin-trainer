@@ -51,10 +51,12 @@ export function createMetronome() {
       count = 0;
     },
     nearestBeat(time: number, bpm: number) {
-      if (lastClick === null) return null;
+      // Before the first click is scheduled, the time it's due still sets the beat.
+      const reference = lastClick ?? nextClick;
+      if (reference === null) return null;
 
       const beatMs = 60000 / bpm;
-      return lastClick + Math.round((time - lastClick) / beatMs) * beatMs;
+      return reference + Math.round((time - reference) / beatMs) * beatMs;
     },
   };
 }

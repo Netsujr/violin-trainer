@@ -80,6 +80,14 @@ describe("metronome", () => {
     expect(metronome.nearestBeat(1000, 120)).toBe(1000);
   });
 
+  it("knows the beat from the moment it starts, before its first click is scheduled", () => {
+    const metronome = createMetronome();
+    metronome.tick(1000, 60);
+    expect(clicks).toHaveLength(0);
+    expect(metronome.nearestBeat(1100, 60)).toBe(1500);
+    expect(metronome.nearestBeat(2400, 60)).toBe(2500);
+  });
+
   it("schedules further ahead on a slow audio device", () => {
     audio.outputLatency = 0.3;
     const metronome = createMetronome();
