@@ -124,7 +124,6 @@ wav(OUT + "c4.wav", [note(60, 6)]);
 {
   const s = await open(OUT + "c4.wav");
   await s.page.evaluate(() => localStorage.setItem("settings", JSON.stringify({ holdMs: 500 })));
-  await nav(s.page, "Practice");
   await freshPractice(s.page);
   await s.page.locator("select").selectOption("c-major-1oct");
   const green = () => canvasHasColor(s.page, 76, 208, 125);
