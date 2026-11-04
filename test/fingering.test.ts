@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fillFingering, fingerOn, stringFor } from "../src/music/fingering";
 import { midiOf } from "../src/music/notes";
-import { builtInPieces } from "../src/storage";
+import { builtInPieces, committedPieces } from "../src/storage";
 
 const EXPECTED: [string, string, string][] = [
   ["G3", "G", "0"], ["G#3", "G", "L1"], ["A3", "G", "1"], ["A#3", "G", "L2"], ["B3", "G", "2"], ["C4", "G", "3"], ["C#4", "G", "H3"],
@@ -55,5 +55,30 @@ describe("built-in scales match the practice PDF", () => {
   it("append the way down without repeating the top note", () => {
     const pitches = builtInPieces().find((piece) => piece.id === "d-major-1oct")!.notes.map((note) => note.pitch);
     expect(pitches).toEqual(["D4", "E4", "F#4", "G4", "A4", "B4", "C#5", "D5", "C#5", "B4", "A4", "G4", "F#4", "E4", "D4"]);
+  });
+});
+
+describe("built-in songs", () => {
+  const songs = committedPieces();
+
+  it("are in order, easiest first", () => {
+    expect(songs.map((song) => song.id)).toEqual(["hot-cross-buns", "mary-had-a-little-lamb", "twinkle-twinkle", "lightly-row", "frere-jacques", "ode-to-joy"]);
+  });
+
+  it.each(songs.map((song) => [song.id, song] as const))("%s fills whole 4-beat bars", (_, song) => {
+    let inBar = 0;
+    for (const note of song.notes) {
+      inBar += note.beats!;
+      expect(inBar).toBeLessThanOrEqual(4);
+      if (inBar === 4) inBar = 0;
+    }
+    expect(inBar).toBe(0);
+  });
+
+  it.each(songs.map((song) => [song.id, song] as const))("%s uses only the beginner finger pattern, on the strings it lists", (_, song) => {
+    expect(song.notes.every((note) => ["0", "1", "2", "3"].includes(note.finger!))).toBe(true);
+    const used = ["G", "D", "A", "E"].filter((name) => song.notes.some((note) => note.string === name));
+    const listed = song.subtitle!.split(" · ")[1].match(/\b[GDAE]\b/g);
+    expect(used).toEqual(listed);
   });
 });

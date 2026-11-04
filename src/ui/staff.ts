@@ -1,6 +1,6 @@
 import { Note } from "tonal";
 import { noteLabels } from "../music/notes";
-import { Accidental, BarNote, Beam, Formatter, Renderer, Stave, StaveNote, Voice } from "vexflow/bravura";
+import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice } from "vexflow/bravura";
 import { h } from "./dom";
 
 export type StaffNote = { pitch: string; beats?: number; finger?: string };
@@ -14,7 +14,7 @@ const NOTE_WIDTH = 56;
 const BAR_BEATS = 4;
 const BAR_NOTE_WIDTH = 40;
 const MAX_BARS_PER_LINE = 6;
-const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 2: "h", 4: "w" };
+const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 4: "w" };
 // Rows relative to a stave's y: clear of the highest and lowest first-position notes, as on the printed sheet.
 const FINGER_ROW = 14;
 const NAME_ROW = 126;
@@ -36,6 +36,7 @@ function toStaveNote({ pitch, beats = 1 }: StaffNote, showAccidental: boolean) {
   const { letter, acc, oct } = Note.get(pitch);
   const note = new StaveNote({ keys: [`${letter.toLowerCase()}${acc}/${oct}`], duration: DURATIONS[beats], autoStem: true });
   if (acc && showAccidental) note.addModifier(new Accidental(acc));
+  if (beats === 1.5) Dot.buildAndAttach([note], { all: true });
   return note;
 }
 

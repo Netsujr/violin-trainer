@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, followNotes, progress, OUT } from "./lib.mjs";
 
 const D_MAJOR = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 const profile = OUT + "profile";
@@ -12,7 +12,8 @@ const page = s.page;
 
 // Library: built-ins, parse, preview, save
 await nav(page, "Library");
-check("six built-in scales listed", (await page.locator(".piece").count()) === 6, String(await page.locator(".piece").count()));
+const column = (index) => page.locator(".library > div").nth(index);
+check("scales in the first column, songs in the second", (await column(0).locator("h3").innerText()) === "Scales" && (await column(0).locator(".piece").count()) === 6 && (await column(1).locator("h3").innerText()) === "Songs" && (await column(1).locator(".piece").count()) === 6);
 await page.fill('input[placeholder="Title"]', "Pasted D major");
 await page.fill("textarea", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
 const items = await page.locator("ol li").allInnerTexts();
@@ -24,7 +25,7 @@ await page.fill("textarea", "C6 D4");
 check("a note above first position is flagged", (await page.locator(".warning").first().innerText()).includes("outside first position"));
 await page.fill("textarea", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
 await page.click('button:text-is("Save piece")');
-check("saved piece listed", (await page.locator(".piece").count()) === 7);
+check("a saved piece joins the songs", (await column(1).locator(".piece").count()) === 7 && (await column(1).locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
 await page.locator(".piece", { hasText: "D major" }).first().locator("select").selectOption("0");
 await page.screenshot({ path: OUT + "library.png" });
 
@@ -54,7 +55,7 @@ await page.click("summary");
 // Record a full practice pass
 await nav(page, "Library");
 check("saved piece survives a reload", (await page.locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
-await page.locator(".piece", { hasText: "D major" }).first().locator('button:text-is("Practice")').click();
+await page.locator(".piece", { hasText: "D major" }).first().locator('button[aria-label="Practice"]').click();
 await page.locator('label:has-text("Record") input').check();
 await start(page);
 const deadline = Date.now() + 30000;
@@ -133,3 +134,62 @@ const after = await page.evaluate(() => JSON.parse(localStorage.getItem("log")).
 check("a reload mid-session still logs it", after === before + 1, `${before} -> ${after}`);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();
+
+// Songs: the columns, the icons, and each song on the staff and played through
+{
+  const s = await open(OUT + "dmajor.wav");
+  const { page } = s;
+  await nav(page, "Library"); await sleep(200);
+  const [left, right] = await page.locator(".library > div").evaluateAll((columns) => columns.map((column) => column.getBoundingClientRect().toJSON()));
+  check("the columns sit side by side", left.right <= right.left && Math.abs(left.top - right.top) < 2);
+  const row = page.locator(".piece", { hasText: "Twinkle" });
+  check("Practice is an icon, named for screen readers", (await row.locator('button[aria-label="Practice"]').innerText()) === "" && (await row.locator('button[aria-label="Practice"] svg').count()) === 1);
+  const picker = row.locator(".day-picker");
+  const shownDay = () => page.locator(".piece", { hasText: "Twinkle" }).locator(".day-picker > span:not(.icon)").innerText();
+  check("no target day shows only the icon", (await shownDay()) === "" && (await picker.locator("svg").count()) === 1);
+  await picker.locator("select").selectOption("2");
+  check("a target day shows beside the icon", (await shownDay()) === "Wed" && (await picker.getAttribute("class")).includes("set"));
+  await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
+  check("it survives a reload", (await shownDay()) === "Wed");
+  await page.locator(".piece", { hasText: "Twinkle" }).locator("select").selectOption("");
+  check("and can be cleared", (await shownDay()) === "");
+
+  for (const [title, count] of [["Hot Cross Buns", 17], ["Mary Had a Little Lamb", 26], ["Twinkle Twinkle Little Star", 42], ["Lightly Row", 57], ["Frère Jacques", 32], ["Ode to Joy", 62]]) {
+    await nav(page, "Library"); await sleep(150);
+    await page.locator(".piece", { hasText: title }).locator('button[aria-label="Practice"]').click(); await sleep(300);
+    const closed = await page.locator(".staff .vf-stavenote").count();
+    await page.click(".staff-toggle"); await sleep(250);
+    const sheet = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), notes = [...document.querySelectorAll(".staff .vf-stavenote")]; return { notes: notes.length, outside: notes.filter((note) => { const box = note.getBoundingClientRect(); return box.right > panel.right + 1 || box.left < panel.left - 1; }).length }; });
+    await page.click(".staff-toggle"); await sleep(150);
+    check(`${title}: opens with all its notes on the staff`, (await progress(page)) === `Note 1 of ${count}` && closed === count && sheet.notes === count && sheet.outside === 0, `${await progress(page)} ${closed} ${JSON.stringify(sheet)}`);
+  }
+  // Note 28 is a dotted E and note 25 a plain D, neither with a sharp, so the dot is the only extra glyph.
+  const glyphs = await page.locator(".staff .vf-stavenote").evaluateAll((notes) => [notes[27], notes[24]].map((note) => note.querySelectorAll("text").length));
+  check("Ode to Joy draws its dotted notes", glyphs.join() === "2,1", glyphs.join());
+
+  const play = async (title, midis, tempo) => {
+    await page.reload(); await page.waitForSelector("nav button"); // Ends the last song's synthetic player.
+    await nav(page, "Library"); await sleep(150);
+    await page.locator(".piece", { hasText: title }).locator('button[aria-label="Practice"]').click(); await sleep(300);
+    await page.locator(".bpm input").fill(tempo ? "90" : "120");
+    if (tempo) await page.locator('.options label:has-text("Tempo") input').check();
+    await followNotes(page, { midis, delayMs: 150 });
+    await start(page); await page.waitForSelector('button:text-is("Stop")');
+    await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 60000 }).catch(() => {});
+    const result = await page.locator(".stats").innerText();
+    await stop(page); await sleep(200);
+    return result;
+  };
+  const buns = await play("Hot Cross Buns", [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62]);
+  check("Hot Cross Buns plays through, with its repeated notes", buns.includes("17 hit, 0 skipped"), buns.replaceAll("\n", " / "));
+  const mary = await play("Mary Had a Little Lamb", [66, 64, 62, 64, 66, 66, 66, 64, 64, 64, 66, 69, 69, 66, 64, 62, 64, 66, 66, 66, 66, 64, 64, 66, 64, 62], true);
+  check("Mary plays through with Tempo on", mary.includes("26 hit, 0 skipped"), mary.replaceAll("\n", " / "));
+  await page.locator('.options label:has-text("Tempo") input').uncheck();
+
+  await page.click('.language button:text-is("PT")'); await sleep(200);
+  await page.locator("nav button").nth(2).click(); await sleep(200);
+  const text = await page.locator(".library").innerText();
+  check("pt: columns and song titles are translated", text.includes("Escalas") && text.includes("Músicas") && text.includes("Brilha, Brilha, Estrelinha") && text.includes("Ode à Alegria") && text.includes("Lá maior · cordas Lá e Mi"));
+  check("songs: no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}

@@ -1,0 +1,25 @@
+{
+  "id": "hot-cross-buns",
+  "title": "Hot Cross Buns",
+  "subtitle": "D major · D string",
+  "source": "song",
+  "notes": [
+    {"pitch": "F#4", "beats": 1},
+    {"pitch": "E4", "beats": 1},
+    {"pitch": "D4", "beats": 2},
+    {"pitch": "F#4", "beats": 1},
+    {"pitch": "E4", "beats": 1},
+    {"pitch": "D4", "beats": 2},
+    {"pitch": "D4", "beats": 0.5},
+    {"pitch": "D4", "beats": 0.5},
+    {"pitch": "D4", "beats": 0.5},
+    {"pitch": "D4", "beats": 0.5},
+    {"pitch": "E4", "beats": 0.5},
+    {"pitch": "E4", "beats": 0.5},
+    {"pitch": "E4", "beats": 0.5},
+    {"pitch": "E4", "beats": 0.5},
+    {"pitch": "F#4", "beats": 1},
+    {"pitch": "E4", "beats": 1},
+    {"pitch": "D4", "beats": 2}
+  ]
+}

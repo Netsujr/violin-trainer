@@ -181,7 +181,7 @@ flow("7. Library: adding a piece, through to practising it");
   await s.page.screenshot({ path: SHOTS + "7-library.png", fullPage: true });
   await s.page.reload(); await s.page.waitForSelector("nav button"); await nav(s.page, "Library"); await sleep(200);
   check("it survives a reload, with its target day", (await s.page.locator(".piece", { hasText: "My tune" }).locator("select").inputValue()) === "2");
-  await s.page.locator(".piece", { hasText: "My tune" }).locator('button:text-is("Practice")').click(); await sleep(300);
+  await s.page.locator(".piece", { hasText: "My tune" }).locator('button[aria-label="Practice"]').click(); await sleep(300);
   check("Practice opens that piece", (await s.page.locator(".options select").evaluate((select) => select.selectedOptions[0].textContent)) === "My tune" && (await progress(s.page)) === "Note 1 of 3");
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")'); await sleep(1200);
   check("playing it works: the first A clears, the repeat waits for a fresh bow", (await progress(s.page)) === "Note 2 of 3", await progress(s.page));

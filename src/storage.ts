@@ -70,7 +70,7 @@ const fingered = (piece: Piece): Piece => ({ ...piece, notes: piece.notes.map(fi
 export const builtInPieces = () =>
   (scales as Piece[]).map((scale) => fingered({ ...scale, notes: withWayDown(scale.notes) }));
 
-const committedPieces = () =>
+export const committedPieces = () =>
   Object.values(import.meta.glob<Piece>("./content/pieces/*.json", { eager: true, import: "default" })).map(fingered);
 
 const savedPieces = () => read<Piece[]>("pieces", []);

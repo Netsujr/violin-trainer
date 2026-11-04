@@ -2,11 +2,13 @@ import { localTitle, t } from "../i18n";
 import { parseQuickText } from "../music/parse";
 import { noteLabels } from "../music/notes";
 import { allPieces, deletePiece, getSettings, savePiece, saveSettings } from "../storage";
+import type { Piece } from "../music/notes";
 import { h, type Screen } from "./dom";
+import { CALENDAR_ICON, PLAY_ICON } from "./toggles";
 
 export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
   const settings = getSettings();
-  const list = h("div");
+  const list = h("div", { className: "library" });
   const title = h("input", { placeholder: t.pieceTitle, oninput: () => preview() });
   const text = h("textarea", {
     rows: 6,
@@ -16,14 +18,24 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
   const previewView = h("div");
   const saveButton = h("button", { textContent: t.savePiece, disabled: true, onclick: save });
 
-  function targetDaySelect(pieceId: string) {
+  // The select is clear and sits over the icon, so tapping the icon opens the native list.
+  function targetDayPicker(pieceId: string) {
+    const day = h("span");
+    const showDay = () => {
+      const index = settings.targetDays[pieceId];
+      day.textContent = t.days[index] ?? "";
+      picker.classList.toggle("set", index !== undefined);
+    };
     const select = h(
       "select",
       {
+        title: t.targetDay,
+        ariaLabel: t.targetDay,
         onchange() {
           if (select.value === "") delete settings.targetDays[pieceId];
           else settings.targetDays[pieceId] = Number(select.value);
           saveSettings();
+          showDay();
         },
       },
       h("option", { value: "", textContent: t.noTargetDay }),
@@ -31,24 +43,40 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
         h("option", { value: String(index), selected: settings.targetDays[pieceId] === index, textContent: day }),
       ),
     );
-    return select;
+    const picker = h("div", { className: "day-picker" }, h("span", { className: "icon", innerHTML: CALENDAR_ICON }), day, select);
+    showDay();
+    return picker;
   }
 
-  function renderList() {
-    list.replaceChildren(
-      ...allPieces().map((piece) =>
-        h(
-          "div",
-          { className: "row piece" },
-          h("strong", {}, localTitle(piece.id, piece.title)),
-          h("span", {}, t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length)),
-          h("button", { textContent: t.screens.Practice, className: "outline", onclick: () => goPractice(piece.id) }),
-          targetDaySelect(piece.id),
-          ...(piece.source === "imported"
-            ? [h("button", { textContent: t.deletePiece, className: "secondary outline", onclick: () => remove(piece.id) })]
-            : []),
-        ),
+  const pieceRow = (piece: Piece) =>
+    h(
+      "div",
+      { className: "row piece" },
+      h(
+        "div",
+        { className: "piece-name" },
+        h("strong", {}, localTitle(piece.id, piece.title)),
+        h("span", {}, t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length)),
       ),
+      h("button", {
+        className: "outline icon-button",
+        innerHTML: PLAY_ICON,
+        title: t.screens.Practice,
+        ariaLabel: t.screens.Practice,
+        onclick: () => goPractice(piece.id),
+      }),
+      targetDayPicker(piece.id),
+      ...(piece.source === "imported"
+        ? [h("button", { textContent: t.deletePiece, className: "secondary outline", onclick: () => remove(piece.id) })]
+        : []),
+    );
+
+  function renderList() {
+    const pieces = allPieces();
+    const isScale = (piece: Piece) => piece.source === "built-in";
+    list.replaceChildren(
+      h("div", {}, h("h3", {}, t.scales), ...pieces.filter(isScale).map(pieceRow)),
+      h("div", {}, h("h3", {}, t.songs), ...pieces.filter((piece) => !isScale(piece)).map(pieceRow)),
     );
   }
 
