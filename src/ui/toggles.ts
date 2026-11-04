@@ -44,7 +44,7 @@ const GRID_ICON = svgIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><pat
 
 function iconFor(key: keyof Settings["toggles"]) {
   const icon = h("span", { className: "icon" });
-  if (key === "fingers" || key === "staffFingers") icon.innerHTML = HAND_ICON;
+  if (key === "fingers") icon.innerHTML = HAND_ICON;
   else if (key === "grid") icon.innerHTML = GRID_ICON;
   else icon.textContent = key === "letterNames" ? "A" : t.solfege.C;
   return icon;

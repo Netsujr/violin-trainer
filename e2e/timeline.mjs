@@ -62,7 +62,7 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await sleep(1500);
   const finishing = await open(OUT + "silent.wav");
   await nav(finishing.page, "Practice");
-  await finishing.page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 14 * SPACING));
+  await finishing.page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 14 * 120));
   await sleep(200);
   await clickTile(finishing.page, 14, "D");
   await followNotes(finishing.page, { midis: D_MAJOR });

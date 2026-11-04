@@ -6,7 +6,7 @@ const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 const BUNS = [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62];
 const BEAT_PX = 120;
 wav(OUT + "follow-silent.wav", [rest(3)]);
-const s = await open(OUT + "follow-silent.wav");
+const s = await open(OUT + "follow-silent.wav", undefined, { keepCountIn: true });
 const { page } = s;
 const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
 const log = () => page.evaluate(() => JSON.parse(localStorage.getItem("log") ?? "[]"));
@@ -56,7 +56,7 @@ await sleep(150);
 const run = await frames();
 const started = run.find((frame) => frame.text.startsWith("Starts in"));
 const counts = [...new Set(run.map((frame) => frame.text).filter((text) => text.startsWith("Starts in")))];
-check("counts in four beats", counts.join() === "Starts in 4…,Starts in 3…,Starts in 2…,Starts in 1…", counts.join());
+check("counts in three beats", counts.join() === "Starts in 3…,Starts in 2…,Starts in 1…", counts.join());
 const moving = run.filter((frame, index) => index > 0 && frame.left > run[index - 1].left);
 check("the lanes hold still during the count-in", run.filter((frame) => frame.text.startsWith("Starts in")).every((frame) => frame.left === 0));
 const seconds = (moving.at(-1).at - moving[0].at) / 1000;
@@ -65,7 +65,7 @@ check("then move at the BPM, with nothing played", Math.abs(speed - 2 * BEAT_PX)
 const steps = moving.slice(1).map((frame, index) => frame.left - moving[index].left);
 check("smoothly", Math.max(...steps) < 12, `largest step ${Math.max(...steps)}`);
 const total = (run.find((frame) => frame.text.startsWith("All")).at - started.at) / 1000;
-check("a run lasts delay + count-in + every beat", Math.abs(total - (0.5 + 2 + 7.5)) < 0.4, `${total.toFixed(2)} s`);
+check("a run lasts delay + count-in + every beat", Math.abs(total - (0.5 + 1.5 + 7.5)) < 0.4, `${total.toFixed(2)} s`);
 const changes = run.filter((frame, index) => index > 0 && frame.text !== run[index - 1].text && frame.text.startsWith("Note"));
 const gaps = changes.slice(1).map((frame, index) => Math.round(frame.at - changes[index].at));
 // Note 1 shows on its beat, and the rest once the mic has had time to hear the note before, 70 ms later.
@@ -131,8 +131,8 @@ const before = (await log()).length;
 await dontWait().click(); await sleep(300);
 check("switching it off ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await log()).length === before + 1 && !(await page.locator('.options label:has-text("Tempo") input').isDisabled()));
 check("back to waiting, on the first note", (await progress(page)) === "Note 1 of 15", await progress(page));
-await begin(); await sleep(1200);
-check("waiting again: nothing moves on its own", (await progress(page)) === "Note 1 of 15");
+await begin(); await sleep(3200); // Past the count-in.
+check("waiting again: nothing moves on its own", (await progress(page)) === "Note 1 of 15", await progress(page));
 await stop(page); await sleep(200);
 
 // Starting partway, and restarting by clicking a note
@@ -169,9 +169,9 @@ await stop(page); await sleep(200);
 const clicks = (await page.evaluate(() => window.clicks)).filter((click) => click.hz >= 2500);
 const clickRun = await frames();
 const firstMove = clickRun.find((frame, index) => index > 0 && frame.left > clickRun[index - 1].left);
-const fifth = clicks[4];
-check("four clicks count in, and the fifth lands on the first note", clicks.length >= 6 && Math.abs(firstMove.at - fifth.at) < 40, `${Math.round(firstMove.at - fifth.at)} ms apart`);
-check("the first note's click is accented", fifth.hz === 3200 && clicks[1].hz === 2500);
+const fourth = clicks[3];
+check("three clicks count in, and the fourth lands on the first note", clicks.length >= 5 && Math.abs(firstMove.at - fourth.at) < 40, `${Math.round(firstMove.at - fourth.at)} ms apart`);
+check("the first note's click is accented", fourth.hz === 3200 && clicks[0].hz === 2500);
 await page.locator('.options label:has-text("Metronome") input').uncheck();
 
 // A recording's markers land on the notes
@@ -193,7 +193,7 @@ const times = await page.evaluate(async () => {
 });
 const markerGaps = times.slice(1).map((time, index) => Math.round((time - times[index]) * 1000));
 check("markers sit a beat apart", near(markerGaps, [500], 60), markerGaps.join(" "));
-check("the first marker is after the count-in", times[0] > 2.3 && times[0] < 2.8, String(times[0]));
+check("the first marker is after the count-in", times[0] > 1.8 && times[0] < 2.3, String(times[0]));
 
 // Fullscreen
 await fresh();

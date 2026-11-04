@@ -446,7 +446,11 @@ section > ul > li {
 
 .staff-panel .staff {
   width: 100%;
-  border-radius: 0 0 var(--pico-border-radius) var(--pico-border-radius);
+  border-radius: var(--pico-border-radius);
+}
+
+.staff.pickable {
+  cursor: pointer;
 }
 
 .staff.collapsed {
@@ -466,7 +470,12 @@ section > ul > li {
   pointer-events: none;
 }
 
+/* Bottom left of the sheet, under the clef and clear of the notes. */
 .staff-toggle {
+  position: absolute;
+  bottom: 0.375rem;
+  left: 0.375rem;
+  z-index: 1;
   padding: 0 0.5rem;
   font-size: 1rem;
   line-height: 1.375rem;
@@ -877,9 +886,12 @@ a[download] {
     min-height: 2.25rem;
   }
 
+  /* Wide for the finger, and low enough to stay under the clef. */
   .staff-toggle {
-    min-width: 2.5rem;
-    min-height: 2.25rem;
+    bottom: 0.125rem;
+    left: 0.125rem;
+    min-width: 2.75rem;
+    min-height: 1.5rem;
   }
 
   .section-bar label {
@@ -938,7 +950,8 @@ a[download] {
 .fullscreen .tuning,
 .fullscreen .mode-note,
 .fullscreen .patterns,
-.fullscreen .section-bar {
+.fullscreen .section-bar,
+.fullscreen .staff-toggle {
   display: none;
 }
 
@@ -966,10 +979,6 @@ a[download] {
 }
 
 .fullscreen .highway canvas {
-  border-radius: var(--pico-border-radius);
-}
-
-.fullscreen .staff-panel .staff {
   border-radius: var(--pico-border-radius);
 }
 

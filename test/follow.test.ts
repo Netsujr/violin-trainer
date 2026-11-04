@@ -79,4 +79,11 @@ describe("following along", () => {
     const [result] = play([{ pitch: "A4" }], () => sharp);
     expect(result.cents).toBeCloseTo(10, 5);
   });
+
+  it("stops at the end of a section", () => {
+    const follow = createFollow(notes, 0, () => 40, 2);
+    expect(follow.update(null, 10, 10).map((result) => result.index)).toEqual([0, 1]);
+    expect(follow.index).toBe(2);
+    expect(follow.progress).toBe(0);
+  });
 });

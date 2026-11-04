@@ -1,7 +1,7 @@
 // Each user flow on a computer, from start to finish, as a person would do it.
 import { chromium } from "playwright-core";
 import { wav, note, rest } from "./wav.mjs";
-import { nav, start, stop, sleep, check, seed, trackNotes, noteGaps, progress, OUT } from "./lib.mjs";
+import { nav, start, stop, sleep, check, seed, skipCountIn, trackNotes, noteGaps, progress, OUT } from "./lib.mjs";
 const SHOTS = OUT;
 const D = [62, 64, 66, 67, 69, 71, 73, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "q-scale.wav", [...D.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);
@@ -12,6 +12,7 @@ async function open(file, { viewport = { width: 1440, height: 900 }, grant = tru
   const args = [...(grant ? ["--use-fake-ui-for-media-stream"] : ["--deny-permission-prompts"]), "--use-fake-device-for-media-stream", `--use-file-for-fake-audio-capture=${OUT + file}`, "--autoplay-policy=no-user-gesture-required"];
   const browser = await chromium.launch({ channel: "chrome", headless: true, args });
   const context = await browser.newContext({ viewport, acceptDownloads: true });
+  await skipCountIn(context);
   const page = await context.newPage();
   const problems = [];
   page.on("pageerror", (e) => problems.push(e.message));

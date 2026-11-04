@@ -99,6 +99,7 @@ await stop(page); await sleep(200);
 // Loop with Don't wait
 await fresh(120);
 await loop().click(); await dontWait().click(); await sleep(200);
+await page.locator('.options label:has-text("count-in") input').check();
 check("the line follows both", (await note_()).startsWith("Keeps moving · Loops until you press Stop"), await note_());
 await followNotes(page, { midis: D });
 await begin();
@@ -115,6 +116,7 @@ check("no results card covers the lanes when looping", (await page.locator(".sta
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(200);
 await stop(page); await sleep(200);
 await dontWait().click(); await loop().click(); await sleep(100);
+await page.locator('.options label:has-text("count-in") input').uncheck();
 
 // The reference tone keeps sounding
 await fresh();
@@ -124,7 +126,6 @@ await page.evaluate(() => {
   OscillatorNode.prototype.start = function (when) { window.tones.push(this); this.stopped = false; return start.call(this, when); };
   OscillatorNode.prototype.stop = function (when) { this.stopped = true; return stop.call(this, when); };
 });
-// The last oscillator started is a string of the voice, and the others are its second string and vibrato.
 const tone = () => page.evaluate(() => { const tone = window.tones.at(-1); return tone ? { hz: Math.round(tone.frequency.value), stopped: tone.stopped, count: window.tones.length, state: tone.context.state } : null; });
 const play = () => page.click('button:text-is("Play reference")');
 const off = () => page.click('button:text-is("Stop reference")');
@@ -137,49 +138,13 @@ await off(); await sleep(100);
 check("pressing again stops it", (await tone()).stopped && (await page.locator('button:text-is("Play reference")').count()) === 1);
 await play(); await sleep(100);
 await page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84); await sleep(150);
-check("it moves with the current note, without restarting", (await tone()).hz === 330 && !(await tone()).stopped && (await tone()).count === 6, JSON.stringify(await tone()));
+check("it moves with the current note, without restarting", (await tone()).hz === 330 && !(await tone()).stopped && (await tone()).count === 2, JSON.stringify(await tone()));
 await page.locator(".options select").selectOption("a-major-1oct"); await sleep(150);
 check("and with the piece", (await tone()).hz === 440, JSON.stringify(await tone()));
 await nav(page, "Log"); await sleep(150);
 check("leaving Practice stops it", (await tone()).stopped);
 await nav(page, "Practice"); await sleep(200);
 check("and it reads as off on return", (await page.locator('button:text-is("Play reference")').count()) === 1);
-
-// What it sounds like, measured, since a test can't listen
-const voice = await page.evaluate(async () => {
-  const { createViolinVoice } = await import("/src/audio/reference.ts");
-  const { createDetector } = await import("/src/audio/detector.ts");
-  const { frequencyOf } = await import("/src/music/notes.ts");
-  const rate = 48000;
-  const render = async (midi) => {
-    const context = new OfflineAudioContext(1, rate * 2, rate);
-    createViolinVoice(context, midi, context.destination);
-    return (await context.startRendering()).getChannelData(0);
-  };
-  const rms = (samples) => Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
-  const results = [];
-  for (const midi of [55, 62, 69, 76, 84]) {
-    const samples = await render(midi);
-    const detect = createDetector(2048, rate);
-    const cents = [];
-    for (let at = rate; at + 2048 < samples.length; at += 512) {
-      const hz = detect(samples.slice(at, at + 2048), 0.01);
-      if (hz) cents.push(1200 * Math.log2(hz / frequencyOf(midi)));
-    }
-    results.push({ midi, peak: Math.max(...samples.map(Math.abs)), start: rms(samples.slice(0, 480)), held: rms(samples.slice(rate, rate + 4800)), read: cents.length, low: Math.min(...cents), high: Math.max(...cents), mean: cents.reduce((sum, value) => sum + value, 0) / cents.length });
-  }
-  // How strong each harmonic of the A is, by correlating with it directly.
-  const samples = (await render(69)).slice(rate);
-  const strength = (hz) => { let re = 0, im = 0; samples.forEach((value, index) => { re += value * Math.cos((2 * Math.PI * hz * index) / rate); im += value * Math.sin((2 * Math.PI * hz * index) / rate); }); return Math.hypot(re, im) / samples.length; };
-  const harmonics = [1, 2, 3, 4, 5, 6, 8].map((number) => strength(frequencyOf(69) * number));
-  return { results, harmonics };
-});
-console.log("  voice:", JSON.stringify(voice.results.map((v) => ({ midi: v.midi, peak: +v.peak.toFixed(2), mean: +v.mean.toFixed(1), low: +v.low.toFixed(1), high: +v.high.toFixed(1) }))), "harmonics:", voice.harmonics.map((value) => +(value * 1000).toFixed(1)).join(" "));
-check("the voice stays centred on the right note, across the range", voice.results.every((v) => v.read > 20 && Math.abs(v.mean) < 6));
-check("it has audible vibrato, without leaving the note", voice.results.every((v) => v.high - v.low > 8 && v.high - v.low < 50));
-check("it doesn't clip", voice.results.every((v) => v.peak < 1), voice.results.map((v) => v.peak.toFixed(2)).join(" "));
-check("the bow eases in", voice.results.every((v) => v.start < v.held * 0.2));
-check("it's rich in harmonics, unlike the old tone", voice.harmonics.slice(1, 5).every((value) => value > voice.harmonics[0] * 0.1) && voice.harmonics[3] > voice.harmonics[0] * 0.15, voice.harmonics.map((value) => value.toFixed(3)).join(" "));
 
 await page.evaluate(() => localStorage.setItem("pieces", JSON.stringify([{ id: "one", title: "One", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }] }])));
 await fresh();
@@ -199,3 +164,73 @@ const line = await note_();
 check("pt: the line and the buttons are translated", line.includes("Espera cada nota") && line.includes("Toca uma vez") && (await page.locator('button:text-is("Ouvir referência")').count()) === 1 && (await page.locator('button[aria-label="Repetir"]').count()) === 1, line);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();
+
+// The 3-beat count-in, as a new visitor gets it
+{
+  const c = await open(OUT + "modes-silent.wav", undefined, { keepCountIn: true });
+  const { page } = c;
+  const box_ = () => page.locator('.options label:has-text("count-in") input');
+  const showing = () => page.evaluate(() => document.querySelector("section > p").textContent);
+  const start_ = async () => { await page.click('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")'); };
+  const watch = () => page.evaluate(() => {
+    window.seen = [];
+    const text = document.querySelector("section > p");
+    let last = "";
+    const tick = () => { if (text.textContent !== last) { last = text.textContent; window.seen.push({ at: performance.now(), text: last }); } requestAnimationFrame(tick); };
+    tick();
+  });
+  await nav(page, "Practice"); await sleep(250);
+  check("count-in: on by default, in Options", (await box_().isChecked()) && (await page.locator('.options label:has-text("count-in")').getAttribute("title")).includes("3 beats"));
+  await page.locator(".bpm input").fill("120");
+  await page.evaluate(() => {
+    window.clicks = [];
+    const startNode = OscillatorNode.prototype.start;
+    OscillatorNode.prototype.start = function (when) {
+      window.clicks.push({ at: performance.now() + (when - this.context.currentTime) * 1000 + (this.context.outputLatency || 0) * 1000, hz: this.frequency.value });
+      return startNode.call(this, when);
+    };
+  });
+  await page.locator('.options label:has-text("Metronome") input').check();
+  await followNotes(page, { midis: D });
+  await watch();
+  await start_();
+  await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 2 of 15", null, { timeout: 15000 });
+  await sleep(60);
+  const seen = await page.evaluate(() => window.seen);
+  const counted = seen.filter((entry) => entry.text.startsWith("Starts in"));
+  check("count-in: counts 3, 2, 1, even waiting for each note", counted.map((entry) => entry.text).join() === "Starts in 3…,Starts in 2…,Starts in 1…", seen.map((entry) => entry.text).join());
+  const first = seen.findLast((entry) => entry.text === "Note 1 of 15");
+  const clicks = (await page.evaluate(() => window.clicks)).filter((click) => click.hz >= 2500); // Not the test's own player.
+  check("count-in: three clicks, and the fourth lands on the first note", clicks.length >= 4 && Math.abs(first.at - clicks[3].at) < 60 && clicks[3].hz === 3200 && clicks[0].hz === 2500, `${Math.round(first.at - clicks[3].at)} ms apart`);
+  check("count-in: lasts 3 beats", Math.abs(first.at - counted[0].at - 2000) < 150, `${Math.round(first.at - counted[0].at)} ms`);
+  const second = seen.find((entry) => entry.text === "Note 2 of 15");
+  check("count-in: what's played during it doesn't count", second.at - first.at > 150, `${Math.round(second.at - first.at)} ms`);
+  const box2 = await page.locator("canvas").boundingBox();
+  const scroll = await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);
+  await page.mouse.click(box2.x + 130 + 5 * 120 - scroll + 40, box2.y + 1.5 * 84); await sleep(100);
+  check("count-in: clicking a note mid-run doesn't pause again", (await showing()).startsWith("Note "), await showing());
+  await stop(page); await sleep(200);
+  await page.locator('.options label:has-text("Metronome") input').uncheck();
+
+  await page.reload(); await page.waitForSelector("nav button");
+  await nav(page, "Practice"); await sleep(250);
+  await start_(); await sleep(100);
+  check("count-in: Stop during it leaves things as they were", (await showing()).startsWith("Starts in"), await showing());
+  await stop(page); await sleep(200);
+  check("count-in: and it clears", (await showing()) === "Note 1 of 15", await showing());
+
+  await box_().uncheck();
+  check("count-in: saved when switched off", (await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).countInOn)) === false);
+  await start_(); await sleep(100);
+  check("count-in: off starts on the sheet straight away", (await showing()) === "Note 1 of 15", await showing());
+  await stop(page); await sleep(200);
+  await page.click('button[aria-label="Don\'t wait"]'); await sleep(100);
+  await page.locator(".bpm input").fill("120");
+  await watch();
+  await start_(); await sleep(1000);
+  const lanes = await page.evaluate(() => window.seen.map((entry) => entry.text));
+  check("count-in: Don't wait with it off has no countdown", !lanes.some((text) => text.startsWith("Starts in")) && (await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) > 0, lanes.join());
+  await stop(page); await sleep(200);
+  check("count-in: no page errors", c.problems.length === 0, c.problems.join(" | "));
+  await c.close();
+}

@@ -9,15 +9,14 @@ import { buildEntry, scorePercent } from "../practice/log";
 import type { Session } from "../practice/session";
 import { allPieces, getSettings, saveSettings } from "../storage";
 import { h, type Screen } from "./dom";
-import { createHighway } from "./highway";
+import { createHighway, type Section } from "./highway";
 import { contentWidth, setFullscreenLayout, timelineScale } from "./layout";
 import { createNeedle } from "./listen";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
 import { COMPRESS_ICON, createIconToggle, DONT_WAIT_ICON, EXPAND_ICON, LOOP_ICON } from "./toggles";
 
-// Long enough for the tone to fade out as well as for the room to go quiet.
-const REFERENCE_ECHO_MS = 300;
+const REFERENCE_ECHO_MS = 150;
 // A hit closer to the beat than this waits for the following beat, so the glide never looks rushed.
 const MIN_GLIDE_BEATS = 0.1;
 // With tempo on, a pattern note clears after about half its length, leaving the rest for the glide to the next beat.
@@ -28,7 +27,7 @@ const SHORTEST_TEMPO_HOLD_MS = 80;
 // Otherwise it clears just short of its full length, because the mic takes a moment to hear a note start.
 const FULL_HOLD_SHARE = 0.9;
 const STAFF_SIDE_PADDING = 16;
-const COUNT_IN_BEATS = 4;
+const COUNT_IN_BEATS = 3;
 
 export function practiceScreen(pieceId?: string): Screen {
   const settings = getSettings();
@@ -39,6 +38,9 @@ export function practiceScreen(pieceId?: string): Screen {
   let piece = buildPiece();
   let mutedUntil = 0;
   let reference: ReturnType<typeof startReference> | null = null;
+  // The selected notes, and the note that Shift+click selects from.
+  let section: Section | null = null;
+  let sectionAnchor = 0;
   // While looping: which time round this is, and the score of the one before, in place of the results card.
   let loopCount = 1;
   let lastScore: number | null = null;
@@ -46,6 +48,8 @@ export function practiceScreen(pieceId?: string): Screen {
   let startIndex = 0;
   let lastBeat: number | null = null;
   let pendingHit: { cents: number; at: number; arrivesAt: number } | null = null;
+  // The pause before a sheet when the notes wait for the player, counting down in beats so a BPM change applies.
+  let countIn: { beatsLeft: number; at: number } | null = null;
   // When "Don't wait" is on: the clock the lanes move to, in beats, negative during the count-in.
   let following: { tracker: ReturnType<typeof createFollow>; beat: number; at: number; results: Map<number, boolean>; counting: boolean } | null = null;
 
@@ -60,8 +64,8 @@ export function practiceScreen(pieceId?: string): Screen {
   const metronome = createMetronome();
   const needle = createNeedle();
   const staffWidth = () => (contentWidth() - STAFF_SIDE_PADDING) / timelineScale();
-  const staff = createStaff(staffWidth(), !settings.staffOpen, timelineScale());
-  const highway = createHighway(startFrom, staff.follow);
+  const staff = createStaff(staffWidth(), !settings.staffOpen, timelineScale(), pickNote);
+  const highway = createHighway(pickNote, staff.follow);
   const staffToggle = h("button", {
     className: "staff-toggle",
     textContent: "▾",
@@ -73,14 +77,7 @@ export function practiceScreen(pieceId?: string): Screen {
       renderNotes();
     },
   });
-  const staffPanel = h("div", { className: "staff-panel" }, staff.element);
-  const staffBar = h(
-    "div",
-    { className: "section-bar" },
-    createIconToggle("staffFingers", renderNotes),
-    createIconToggle("staffNames", renderNotes),
-    staffToggle,
-  );
+  const staffPanel = h("div", { className: "staff-panel" }, staff.element, staffToggle);
   const timelineBar = h(
     "div",
     { className: "section-bar" },
@@ -110,6 +107,18 @@ export function practiceScreen(pieceId?: string): Screen {
   const stats = h("div", { className: "stats" });
 
   const currentIndex = () => controls.session?.index ?? startIndex;
+  const endIndex = () => (section ? section.last + 1 : piece.notes.length);
+
+  function pickNote(index: number, extend: boolean) {
+    if (extend) section = { first: Math.min(sectionAnchor, index), last: Math.max(sectionAnchor, index) };
+    else {
+      section = null;
+      sectionAnchor = index;
+    }
+    highway.showSection(section);
+    showModes();
+    startFrom(section ? section.first : index);
+  }
 
   function labelStaffToggle() {
     const label = settings.staffOpen ? t.collapseSheet : t.showFullSheet;
@@ -128,7 +137,7 @@ export function practiceScreen(pieceId?: string): Screen {
     if (!beats) return settings.holdMs;
 
     const noteMs = beats * beatMs();
-    if (settings.tempoOn && index < piece.notes.length - 1) {
+    if (settings.tempoOn && index < endIndex() - 1) {
       return Math.max(SHORTEST_TEMPO_HOLD_MS, noteMs * TEMPO_HOLD_SHARE - MIC_DELAY_MS);
     }
     return noteMs * FULL_HOLD_SHARE;
@@ -136,6 +145,9 @@ export function practiceScreen(pieceId?: string): Screen {
 
   function loadPiece() {
     piece = buildPiece();
+    section = null;
+    sectionAnchor = 0;
+    highway.showSection(null);
     showModes();
     stats.replaceChildren();
     startIndex = 0;
@@ -145,24 +157,29 @@ export function practiceScreen(pieceId?: string): Screen {
 
   const withLoopNumber = (text: string) => (loopCount > 1 ? `${text} · ${t.loopNumber(loopCount, lastScore)}` : text);
 
+  // A finished section stays on its last note, rather than moving on to the one after it.
+  const shownIndex = () => (controls.session?.finished && section ? section.last : currentIndex());
+
   function renderNotes() {
-    const index = currentIndex();
-    const note = piece.notes[index];
-    staff.draw(piece.notes, index, { names: settings.toggles.staffNames, fingers: settings.toggles.staffFingers });
-    const noteText = note ? `${t.noteOf(index + 1, piece.notes.length)}${note.bar ? t.bar(note.bar) : ""}` : t.allDone(piece.notes.length);
-    progress.textContent = withLoopNumber(following?.counting ? t.startsIn(COUNT_IN_BEATS) : noteText);
+    const finished = controls.session?.finished ?? false;
+    const index = shownIndex();
+    const note = finished ? undefined : piece.notes[index];
+    staff.draw(piece.notes, index, { names: settings.toggles.noteNames, fingers: settings.toggles.fingers }, section);
+    const noteText = note ? `${t.noteOf(index + 1, piece.notes.length)}${note.bar ? t.bar(note.bar) : ""}` : t.allDone(section ? section.last - section.first + 1 : piece.notes.length);
+    progress.textContent = withLoopNumber(following?.counting || countIn ? t.startsIn(COUNT_IN_BEATS) : noteText);
     if (note) reference?.setNote(midiOf(note.pitch));
     else stopReferenceTone();
     highway.draw(piece.notes, index, holdProgress);
   }
 
   function runSummary(passes: number, seconds: string) {
+    if (section) return t.sectionDone(section.first + 1, section.last + 1, seconds);
     if (piece.pattern) return t.patternDone(piece.pattern + 1, seconds);
     return startIndex === 0 ? t.passDone(passes, seconds) : t.partialDone(startIndex + 1, seconds);
   }
 
   const playAgainButton = () =>
-    h("button", { textContent: t.playAgain, onclick: () => (controls.session ? startFrom(startIndex) : controls.startButton.click()) });
+    h("button", { textContent: t.playAgain, onclick: () => (controls.session ? beginRun(startIndex) : controls.startButton.click()) });
 
   function showScore(results: Map<number, boolean>) {
     const hit = [...results.values()].filter(Boolean).length;
@@ -192,11 +209,12 @@ export function practiceScreen(pieceId?: string): Screen {
 
   function startFrom(index: number) {
     cancelGlide();
+    countIn = null;
     lastBeat = null;
     startIndex = index;
     const session = controls.session;
     if (session) {
-      session.jumpTo(index, performance.now());
+      session.jumpTo(index, performance.now(), endIndex());
       judge.setTarget(session.currentMidi);
       if (session.following) startFollowing(index);
     }
@@ -207,6 +225,32 @@ export function practiceScreen(pieceId?: string): Screen {
     renderNotes();
   }
 
+  // The first click comes after a short delay and counts in the first note, so the two share a beat.
+  function startCountIn() {
+    metronome.reset(COUNT_IN_BEATS);
+    countIn = { beatsLeft: COUNT_IN_BEATS + FIRST_CLICK_DELAY_MS / beatMs(), at: performance.now() };
+    renderNotes();
+  }
+
+  function tickCountIn(now: number) {
+    const state = countIn!;
+    state.beatsLeft -= (now - state.at) / beatMs();
+    state.at = now;
+    if (state.beatsLeft > 0) {
+      progress.textContent = withLoopNumber(t.startsIn(Math.min(COUNT_IN_BEATS, Math.ceil(state.beatsLeft))));
+      return;
+    }
+    countIn = null;
+    renderNotes();
+  }
+
+  // Start and Play again pause first. Clicking a note doesn't, so moving past a stuck note stays quick.
+  function beginRun(index: number) {
+    startFrom(index);
+    const session = controls.session;
+    if (session && !session.following && settings.countInOn) startCountIn();
+  }
+
   // Goes round again with no results card in the way. The last note and the first can be the same, so it needs a fresh bow.
   function loopAgain(session: Session, previousMidi?: number) {
     if (following) {
@@ -215,18 +259,22 @@ export function practiceScreen(pieceId?: string): Screen {
     }
     loopCount++;
     lastBeat = null;
-    session.jumpTo(startIndex, performance.now());
+    session.jumpTo(startIndex, performance.now(), endIndex());
     judge.setTarget(session.currentMidi, piece.pattern ? undefined : previousMidi);
     if (session.following) startFollowing(startIndex);
-    else highway.jumpTo(startIndex);
+    else {
+      highway.jumpTo(startIndex);
+      if (settings.countInOn) startCountIn();
+    }
   }
 
-  // The first click comes after a short delay and counts in the first note, so the two share a beat.
+  // With or without a count-in, the lanes wait for the metronome's first click, so the two share a beat.
   function startFollowing(index: number) {
-    const tracker = createFollow(piece.notes, index, () => settings.toleranceCents);
-    const beat = tracker.startBeat - COUNT_IN_BEATS - FIRST_CLICK_DELAY_MS / beatMs();
-    following = { tracker, beat, at: performance.now(), results: new Map(), counting: true };
-    metronome.reset();
+    const tracker = createFollow(piece.notes, index, () => settings.toleranceCents, endIndex());
+    const leadBeats = settings.countInOn ? COUNT_IN_BEATS : 0;
+    const beat = tracker.startBeat - leadBeats - FIRST_CLICK_DELAY_MS / beatMs();
+    following = { tracker, beat, at: performance.now(), results: new Map(), counting: leadBeats > 0 };
+    metronome.reset(leadBeats);
     highway.showResults(following.results);
     highway.jumpTo(index);
   }
@@ -268,7 +316,7 @@ export function practiceScreen(pieceId?: string): Screen {
         renderNotes();
       }
     }
-    highway.moveToBeat(Math.max(state.tracker.startBeat, Math.min(state.beat, state.tracker.starts[piece.notes.length])));
+    highway.moveToBeat(Math.max(state.tracker.startBeat, Math.min(state.beat, state.tracker.starts[endIndex()])));
     if (session.finished) return;
 
     holdProgress = state.tracker.progress;
@@ -325,6 +373,8 @@ export function practiceScreen(pieceId?: string): Screen {
     if (settings.metronomeOn) metronome.tick(now, settings.bpm);
     if (following) {
       if (!session.finished) followReading(session, frequency, now);
+    } else if (countIn) {
+      tickCountIn(now);
     } else if (!session.finished) {
       if (pendingHit && now >= pendingHit.arrivesAt) arriveOnBeat(session);
       const verdict = judge.update(isMuted(now) ? null : frequency, now);
@@ -332,7 +382,7 @@ export function practiceScreen(pieceId?: string): Screen {
       needle.show(verdict.cents);
       hertz.textContent = frequency === null ? "" : `${localNumber(frequency, 1)} Hz`;
       if (verdict.hit && !pendingHit) {
-        if (settings.tempoOn && session.index < piece.notes.length - 1) {
+        if (settings.tempoOn && session.index < endIndex() - 1) {
           glideToNextNote(session, verdict.averageCents, now);
         } else {
           const previousMidi = session.currentMidi;
@@ -341,7 +391,7 @@ export function practiceScreen(pieceId?: string): Screen {
         }
       }
     }
-    highway.draw(piece.notes, session.index, holdProgress);
+    highway.draw(piece.notes, shownIndex(), holdProgress);
   }
 
   const controls = createRunControls({
@@ -351,10 +401,11 @@ export function practiceScreen(pieceId?: string): Screen {
       metronome.reset();
       controls.session!.following = settings.followOn;
       highway.jumpTo(startIndex);
-      startFrom(startIndex);
+      beginRun(startIndex);
     },
     onStop() {
       stopFollowing();
+      countIn = null;
       cancelGlide();
       loopCount = 1;
       lastScore = null;
@@ -384,7 +435,7 @@ export function practiceScreen(pieceId?: string): Screen {
     className: "secondary outline",
     ariaPressed: "false",
     onclick() {
-      const note = piece.notes[currentIndex()];
+      const note = controls.session?.finished ? undefined : piece.notes[currentIndex()];
       if (reference) stopReferenceTone();
       else if (note) {
         reference = startReference(midiOf(note.pitch));
@@ -438,6 +489,7 @@ export function practiceScreen(pieceId?: string): Screen {
   function showModes() {
     repeatTopButton.disabled = !isScale();
     modeNote.textContent = [
+      ...(section ? [t.sectionInfo(section.first + 1, section.last + 1)] : []),
       settings.followOn ? t.keepsMoving : t.waitsForNotes,
       settings.loopOn ? t.loopsUntilStop : t.playsOnce,
       ...(isScale() ? [settings.repeatTopOn ? t.topTwice : t.topOnce] : []),
@@ -502,6 +554,19 @@ export function practiceScreen(pieceId?: string): Screen {
     }),
     ` ${t.metronome}`,
   );
+  const countInSwitch = h(
+    "label",
+    { title: t.countInHint },
+    h("input", {
+      type: "checkbox",
+      checked: settings.countInOn,
+      onchange(event) {
+        settings.countInOn = (event.target as HTMLInputElement).checked;
+        saveSettings();
+      },
+    }),
+    ` ${t.countIn}`,
+  );
   const optionsBpmRow = h("div", { className: "row" }, pieceSelect, controls.recordLabel, bpmControl);
   const optionsPanel = h(
     "details",
@@ -514,7 +579,7 @@ export function practiceScreen(pieceId?: string): Screen {
       },
     },
     h("summary", {}, t.options),
-    h("div", { className: "row toggles" }, tempoSwitch, metronomeSwitch),
+    h("div", { className: "row toggles" }, tempoSwitch, metronomeSwitch, countInSwitch),
     optionsBpmRow,
   );
 
@@ -588,7 +653,7 @@ export function practiceScreen(pieceId?: string): Screen {
       h("div", { className: "row tuning" }, needle.element, hertz),
       h("div", { className: "timeline-section" }, timelineBar, highway.element),
       stats,
-      h("div", { className: "staff-section" }, staffBar, staffPanel),
+      h("div", { className: "staff-section" }, staffPanel),
       h("div", { className: "row patterns" }, t.pattern, h("div", { role: "group", ariaLabel: t.pattern }, ...patternButtons)),
     ),
     leave() {

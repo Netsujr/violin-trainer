@@ -2,6 +2,7 @@ import { Note } from "tonal";
 import { noteLabels } from "../music/notes";
 import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice } from "vexflow/bravura";
 import { h } from "./dom";
+import type { Section } from "./highway";
 
 export type StaffNote = { pitch: string; beats?: number; finger?: string };
 export type StaffLabels = { names: boolean; fingers: boolean };
@@ -31,6 +32,10 @@ const HIT_LINE_X = 130;
 const COLLAPSED_NOTE_START = 118;
 const COLLAPSED_MARGIN = 16;
 const COLLAPSED_BEAT_WIDTH = 72;
+const SECTION_COLOR = "rgba(255, 149, 0, 0.28)";
+// How far a note's clickable slot and the section's band start before its notehead, and how far the last one runs after it.
+const NOTE_LEAD = 20;
+const NOTE_TAIL = 40;
 
 function toStaveNote({ pitch, beats = 1 }: StaffNote, showAccidental: boolean) {
   const { letter, acc, oct } = Note.get(pitch);
@@ -103,15 +108,60 @@ function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: s
   svg.append(element);
 }
 
-export function createStaff(width = 300, startCollapsed = false, scale = 1) {
+export function createStaff(width = 300, startCollapsed = false, scale = 1, onPick?: (noteIndex: number, extend: boolean) => void) {
   const element = h("div", { className: "staff" });
+  if (onPick) {
+    element.classList.add("pickable");
+    element.addEventListener("click", (event) => {
+      const noteIndex = noteAt(event);
+      if (noteIndex >= 0) onPick(noteIndex, event.shiftKey);
+    });
+    // Otherwise Shift+click also selects the page's text.
+    element.addEventListener("mousedown", (event) => {
+      if (event.shiftKey) event.preventDefault();
+    });
+  }
   let collapsed = startCollapsed;
   let shown: string | null = null;
   let labels: StaffLabels = { names: false, fingers: false };
   // Where each note starts, in beats and in pixels on the collapsed line.
   let noteBeats: number[] = [];
   let noteXs: number[] = [];
+  // The line each note is on, and the sheet's measurements, to find the note under a click.
+  let noteLines: number[] = [];
+  let sheet = { width: 0, height: 0, top: 0 };
+  let section: Section | null = null;
   let followedBeat = 0;
+
+  function noteAt(event: MouseEvent) {
+    const box = element.querySelector("svg")!.getBoundingClientRect();
+    const x = ((event.clientX - box.left) * sheet.width) / box.width;
+    const y = ((event.clientY - box.top) * sheet.height) / box.height;
+    const line = Math.max(0, Math.min(noteLines.at(-1) ?? 0, Math.floor((y - sheet.top) / LINE_HEIGHT)));
+    const noteIndex = noteXs.findLastIndex((noteX, index) => noteLines[index] === line && noteX - NOTE_LEAD <= x);
+    const isLastOnLine = noteLines[noteIndex + 1] !== line;
+    return isLastOnLine && x > noteXs[noteIndex] + NOTE_TAIL ? -1 : noteIndex;
+  }
+
+  // A band behind each selected note, line by line, so a section can wrap across the sheet.
+  function drawSection(svg: SVGSVGElement) {
+    if (!section) return;
+
+    for (let index = section.first; index <= section.last; index++) {
+      const continues = index < section.last && noteLines[index + 1] === noteLines[index];
+      const left = noteXs[index] - NOTE_LEAD;
+      const right = continues ? noteXs[index + 1] - NOTE_LEAD : noteXs[index] + NOTE_TAIL;
+      const band = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      band.classList.add("section-band");
+      band.setAttribute("x", String(left));
+      band.setAttribute("y", String(sheet.top + noteLines[index] * LINE_HEIGHT));
+      band.setAttribute("width", String(right - left));
+      band.setAttribute("height", String(LINE_HEIGHT));
+      band.setAttribute("fill", SECTION_COLOR);
+      band.setAttribute("stroke", "none");
+      svg.prepend(band);
+    }
+  }
 
   function render(notes: StaffNote[]) {
     element.replaceChildren();
@@ -127,6 +177,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1) {
     const labelled = labels.names || labels.fingers;
     const top = labelled ? LABELLED_TOP : TOP;
     const height = top + lines.length * LINE_HEIGHT + (labelled ? LABELLED_BOTTOM : 0);
+    sheet = { width: fullWidth, height, top };
+    noteLines = [];
     const renderer = new Renderer(element, Renderer.Backends.SVG);
     renderer.resize(fullWidth, height);
     const context = renderer.getContext();
@@ -168,6 +220,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1) {
       voice.draw(context, stave);
       beams.forEach((beam) => beam.setContext(context).draw());
       const staveY = top + lineIndex * LINE_HEIGHT;
+      for (const _ of lineNotes) noteLines.push(lineIndex);
       lineNotes.forEach((note, index) => {
         const x = allNotes[firstNote + index].getAbsoluteX() + NOTEHEAD_CENTER;
         if (labels.fingers && note.finger) {
@@ -179,6 +232,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1) {
     });
 
     noteXs = allNotes.map((note) => note.getAbsoluteX());
+    drawSection(svg);
     noteBeats = [];
     let beat = 0;
     for (const note of notes) {
@@ -199,9 +253,10 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1) {
 
   return {
     element,
-    draw(notes: StaffNote[], current = 0, newLabels: StaffLabels = labels) {
+    draw(notes: StaffNote[], current = 0, newLabels: StaffLabels = labels, newSection: Section | null = null) {
       labels = newLabels;
-      const key = [labels.names, labels.fingers, ...notes.map((note) => `${note.pitch}:${note.beats}:${note.finger}`)].join();
+      section = newSection;
+      const key = [labels.names, labels.fingers, section?.first, section?.last, ...notes.map((note) => `${note.pitch}:${note.beats}:${note.finger}`)].join();
       if (key !== shown) {
         shown = key;
         render(notes);

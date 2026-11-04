@@ -61,6 +61,19 @@ describe("session and log entry", () => {
     expect(session.passSeconds).toEqual([4]);
   });
 
+  it("finishes at the end of a section, which isn't timed as a pass", () => {
+    const session = new Session(piece, 0);
+    session.jumpTo(0, 0, 1);
+    expect(session.finished).toBe(false);
+    session.hit(10, 1000);
+    expect(session.finished).toBe(true);
+    expect(session.index).toBe(1);
+    expect(session.lastRunSeconds).toBe(1);
+    expect(session.passSeconds).toEqual([]);
+    session.jumpTo(0, 2000);
+    expect(session.finished).toBe(false);
+  });
+
   it("summarises a session", () => {
     const session = new Session(piece, 0);
     session.hit(10, 1000);

@@ -22,6 +22,8 @@ const TILE_COLOR = "#f3ead9";
 const CURRENT_COLOR = "#ff9500";
 const HOLD_COLOR = "#4cd07d";
 // Pale enough to keep a tile's labels readable.
+const SECTION_COLOR = "rgba(255, 149, 0, 0.16)";
+const SECTION_EDGE_COLOR = "rgba(255, 149, 0, 0.7)";
 const HIT_TILE_COLOR = "#c9edd4";
 const MISS_TILE_COLOR = "#f6cfc8";
 // Matches the palette in style.css.
@@ -33,7 +35,9 @@ const BAR_LINE_COLOR = "#5a4e42";
 
 const tileWidth = (note: PieceNote) => (note.beats ?? 1) * BEAT_WIDTH - TILE_GAP;
 
-export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat: number) => void) {
+export type Section = { first: number; last: number };
+
+export function createHighway(onPick: (noteIndex: number, extend: boolean) => void, onMove: (beat: number) => void) {
   const canvas = h("canvas");
   const context = canvas.getContext("2d")!;
   let scale = 1;
@@ -52,15 +56,21 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
         onMove(position());
       },
       onclick(event) {
+        // Mouse clicks don't keep focus, or holding Shift for the next one draws the keyboard focus ring.
+        scroller.blur();
         const noteIndex = noteAt(event);
-        if (noteIndex !== null) onPick(noteIndex);
+        if (noteIndex !== null) onPick(noteIndex, event.shiftKey);
+      },
+      // Otherwise Shift+click also selects the page's text.
+      onmousedown(event) {
+        if (event.shiftKey) event.preventDefault();
       },
       onpointermove(event) {
         scroller.style.cursor = noteAt(event) === null ? "" : "pointer";
       },
       onkeydown(event) {
         // A little past the line, so a view that rounded just short of a note still picks it.
-        if (event.key === "Enter") onPick(Math.min(noteAtBeat(position() + 0.02), notes.length - 1));
+        if (event.key === "Enter") onPick(Math.min(noteAtBeat(position() + 0.02), notes.length - 1), event.shiftKey);
       },
     },
     track,
@@ -73,6 +83,7 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
   let glideFrame = 0;
   // While the lanes keep moving: each finished note's result, and the lanes are moved by moveToBeat alone.
   let results: Map<number, boolean> | null = null;
+  let section: Section | null = null;
 
   const pixelsPerBeat = () => BEAT_WIDTH * scale;
   const fitTrack = () => (track.style.width = `calc(100% + ${starts.at(-1)! * pixelsPerBeat()}px)`);
@@ -174,9 +185,23 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
     context.setLineDash([]);
   }
 
+  // Behind the tiles, so a note's result still shows on it.
+  function drawSection() {
+    if (!section) return;
+
+    const x = HIT_X + (starts[section.first] - position()) * BEAT_WIDTH;
+    const width = (starts[section.last + 1] - starts[section.first]) * BEAT_WIDTH;
+    context.fillStyle = SECTION_COLOR;
+    context.fillRect(x, 0, width, HEIGHT);
+    context.fillStyle = SECTION_EDGE_COLOR;
+    context.fillRect(x, 0, 2, HEIGHT);
+    context.fillRect(x + width - 2, 0, 2, HEIGHT);
+  }
+
   function paint() {
     context.clearRect(0, 0, viewWidth, HEIGHT);
     drawLanes();
+    drawSection();
     notes.forEach((note, noteIndex) => {
       const x = tileX(noteIndex);
       if (x + tileWidth(note) < 0 || x > viewWidth) return;
@@ -226,6 +251,10 @@ export function createHighway(onPick: (noteIndex: number) => void, onMove: (beat
       glideFrame = requestAnimationFrame(step);
     },
     jumpTo,
+    showSection(value: Section | null) {
+      section = value;
+      paint();
+    },
     showResults(value: Map<number, boolean> | null) {
       results = value;
     },

@@ -4,12 +4,21 @@ export const URL = "http://localhost:5199/";
 // Generated WAVs, screenshots and Chrome profiles. Vite's watcher skips this folder name.
 export const OUT = new global.URL("test-results/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
-export async function open(wavPath, userDataDir, contextOptions = {}) {
+// The count-in is on by default. Most checks are about what comes after it, so they start without one.
+export const skipCountIn = (context) =>
+  context.addInitScript(() => {
+    try {
+      const settings = JSON.parse(localStorage.getItem("settings") ?? "{}");
+      if (settings.countInOn === undefined) localStorage.setItem("settings", JSON.stringify({ ...settings, countInOn: false }));
+    } catch {}
+  });
+export async function open(wavPath, userDataDir, { keepCountIn = false, ...contextOptions } = {}) {
   const args = ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", `--use-file-for-fake-audio-capture=${wavPath}`, "--autoplay-policy=no-user-gesture-required"];
   const browser = userDataDir ? null : await chromium.launch({ channel: "chrome", headless: true, args });
   const context = userDataDir
     ? await chromium.launchPersistentContext(userDataDir, { channel: "chrome", headless: true, args, viewport: { width: 1100, height: 950 } })
     : await browser.newContext({ viewport: { width: 1100, height: 950 }, ...contextOptions });
+  if (!keepCountIn) await skipCountIn(context);
   const page = await context.newPage();
   const problems = [];
   page.on("pageerror", (e) => problems.push("pageerror: " + e.message));

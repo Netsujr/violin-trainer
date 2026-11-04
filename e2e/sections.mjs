@@ -47,13 +47,12 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
 
   // Bars
   check("bars: timeline order", (await titles(page, ".timeline-section")).join() === "Fingers,Note names (Do Ré Mi),Letter names (A G D),Grid", (await titles(page, ".timeline-section")).join());
-  check("bars: staff order starts the same way", (await titles(page, ".staff-section")).join() === "Fingers on the staff,Note names on the staff", (await titles(page, ".staff-section")).join());
-  check("bars: no music toggle", (await page.locator('.staff-section label[title="Staff"]').count()) === 0);
+  check("bars: only the lanes have a header", (await page.locator(".section-bar").count()) === 1 && (await page.locator(".staff-section label").count()) === 0);
   check("bars: icons instead of names", (await page.locator(".section-bar").first().innerText()).replace(/\s/g, "") === "DoA", await page.locator(".section-bar").first().innerText());
   const below = (selector) => page.evaluate((selector) => { const section = document.querySelector(selector); return section.querySelector(".section-bar").getBoundingClientRect().bottom <= section.querySelector("canvas, .staff").getBoundingClientRect().top + 0.5; }, selector);
   check("bars: nothing sits on the lanes", await below(".timeline-section"));
-  check("bars: nothing sits on the sheet", await below(".staff-section"));
-  check("bars: the arrow is in the bar", (await page.locator(".section-bar .staff-toggle").count()) === 1);
+  const arrow = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), button = document.querySelector(".staff-toggle").getBoundingClientRect(); return { left: Math.round(button.left - panel.left), bottom: Math.round(panel.bottom - button.bottom) }; });
+  check("staff: the arrow sits at its bottom left", arrow.left >= 0 && arrow.left < 16 && arrow.bottom >= 0 && arrow.bottom < 16, JSON.stringify(arrow));
   for (const key of ["Fingers", "Note names (Do Ré Mi)", "Letter names (A G D)", "Grid"]) {
     const input = page.locator(`.timeline-section label[title="${key}"] input`);
     const before = await picture(page);
@@ -68,14 +67,21 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   // Staff labels
   const labels = () => page.locator(".staff > svg > text").evaluateAll((texts) => texts.map((text) => text.textContent).join(" "));
   check("staff: fingers and names show by default", (await labels()).startsWith("0 Ré 1 Mi 2 Fa♯ 3 Sol"), await labels());
-  await page.locator('.staff-section label[title="Note names on the staff"] input').uncheck();
-  check("staff: names switch off alone", (await labels()) === "0 1 2 3 0 1 2 3 2 1 0 3 2 1 0", await labels());
-  await page.locator('.staff-section label[title="Fingers on the staff"] input').uncheck();
-  check("staff: both off", (await labels()) === "");
-  const timeline = await picture(page);
-  await page.locator('.staff-section label[title="Fingers on the staff"] input').check();
-  await page.locator('.staff-section label[title="Note names on the staff"] input').check();
-  check("staff: its switches leave the timeline alone", (await picture(page)) === timeline);
+  const lane = (name) => page.locator(`.timeline-section label[title="${name}"] input`);
+  await lane("Note names (Do Ré Mi)").uncheck();
+  check("staff: the lanes' names switch hides its names too", (await labels()) === "0 1 2 3 0 1 2 3 2 1 0 3 2 1 0", await labels());
+  await lane("Fingers").uncheck();
+  check("staff: the lanes' fingers switch hides its fingers too", (await labels()) === "");
+  await lane("Fingers").check();
+  await lane("Note names (Do Ré Mi)").check();
+  check("staff: both come back", (await labels()).startsWith("0 Ré 1 Mi"), await labels());
+  const sheet = () => page.locator(".staff svg").evaluate((svg) => svg.outerHTML);
+  const before = await sheet();
+  await lane("Letter names (A G D)").uncheck();
+  await lane("Grid").uncheck();
+  check("staff: letter names and the grid are only for the lanes", (await sheet()) === before);
+  await lane("Letter names (A G D)").check();
+  await lane("Grid").check();
   await page.locator(".options select").selectOption("c-major-1oct");
   await sleep(150);
   const low = await page.locator(".staff > svg > text").evaluateAll((texts) => texts.filter((text) => text.getAttribute("fill") === "#b03020").map((text) => text.textContent).join());

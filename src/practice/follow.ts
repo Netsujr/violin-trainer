@@ -8,7 +8,7 @@ export type FollowResult = { index: number; hit: boolean; cents: number };
 
 // Checks each note as the music passes it, for when the lanes keep moving whatever is played.
 // Repeated notes need no fresh bow stroke here, because each one is only judged during its own slot.
-export function createFollow(notes: PieceNote[], firstIndex: number, toleranceCents: () => number) {
+export function createFollow(notes: PieceNote[], firstIndex: number, toleranceCents: () => number, end = notes.length) {
   const starts = [0];
   for (const note of notes) starts.push(starts.at(-1)! + (note.beats ?? 1));
   let index = firstIndex;
@@ -23,20 +23,20 @@ export function createFollow(notes: PieceNote[], firstIndex: number, toleranceCe
     },
     startBeat: starts[firstIndex],
     get progress() {
-      return index < notes.length ? Math.min(1, heldBeats / needed(index)) : 0;
+      return index < end ? Math.min(1, heldBeats / needed(index)) : 0;
     },
 
     // beat is where the music has reached, and stepBeats how far it came since the last reading.
     update(frequency: number | null, beat: number, stepBeats: number) {
       const finished: FollowResult[] = [];
-      while (index < notes.length && beat >= starts[index + 1]) {
+      while (index < end && beat >= starts[index + 1]) {
         const cents = heldCents.length ? heldCents.reduce((sum, value) => sum + value, 0) / heldCents.length : 0;
         finished.push({ index, hit: heldBeats >= needed(index), cents });
         index++;
         heldBeats = 0;
         heldCents = [];
       }
-      if (frequency !== null && index < notes.length && beat >= starts[index]) {
+      if (frequency !== null && index < end && beat >= starts[index]) {
         const cents = centsToTarget(frequency, midiOf(notes[index].pitch));
         if (Math.abs(cents) <= toleranceCents()) {
           heldBeats += stepBeats;

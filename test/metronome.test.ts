@@ -98,6 +98,13 @@ describe("metronome", () => {
     expect(clicks).toHaveLength(1);
   });
 
+  it("accents the first note after a count-in", () => {
+    const metronome = createMetronome();
+    metronome.reset(3);
+    run(metronome, 0, 4000, 60);
+    expect(clicks.map((click) => click.hz)).toEqual([2500, 2500, 2500, 3200]);
+  });
+
   it("starts over after a reset", () => {
     const metronome = createMetronome();
     run(metronome, 0, 2000, 60);

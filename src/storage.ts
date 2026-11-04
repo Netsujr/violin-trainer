@@ -15,12 +15,13 @@ export type Settings = {
   followOn: boolean;
   loopOn: boolean;
   repeatTopOn: boolean;
+  countInOn: boolean;
   metronomeOn: boolean;
   bpm: number;
   pattern: number;
   staffOpen: boolean;
   optionsOpen: boolean;
-  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean; staffNames: boolean; staffFingers: boolean };
+  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean };
   targetDays: Record<string, number>;
 };
 
@@ -35,11 +36,12 @@ const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   followOn: false,
   loopOn: false,
   repeatTopOn: false,
+  countInOn: true,
   metronomeOn: false,
   bpm: 60,
   pattern: 0,
   staffOpen: false,
-  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true, staffNames: true, staffFingers: true },
+  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true },
   targetDays: {},
 };
 
