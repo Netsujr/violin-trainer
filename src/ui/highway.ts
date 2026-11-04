@@ -1,6 +1,6 @@
 import { t } from "../i18n";
 import type { PieceNote, StringName } from "../music/notes";
-import { noteLabels } from "../music/notes";
+import { BAR_BEATS, noteLabels } from "../music/notes";
 import { getSettings } from "../storage";
 import { h } from "./dom";
 import { contentWidth, timelineScale } from "./layout";
@@ -10,7 +10,6 @@ const LANE_HEIGHT = 84;
 const HEIGHT = LANE_HEIGHT * LANES.length;
 const HIT_X = 130;
 const BEAT_WIDTH = 120;
-const BAR_BEATS = 4;
 const TILE_GAP = 8;
 const TILE_HEIGHT = 74;
 const OUTLINE_GAP = 3;
@@ -121,7 +120,7 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
     const first = Math.max(0, Math.ceil(at - HIT_X / BEAT_WIDTH));
     const last = Math.min(starts.at(-1)!, Math.floor(at + (viewWidth - HIT_X) / BEAT_WIDTH));
     for (let beat = first; beat <= last; beat++) {
-      context.fillStyle = notes[0]?.beats && beat % BAR_BEATS === 0 ? BAR_LINE_COLOR : BEAT_LINE_COLOR;
+      context.fillStyle = beat % BAR_BEATS === 0 ? BAR_LINE_COLOR : BEAT_LINE_COLOR;
       context.fillRect(HIT_X + (beat - at) * BEAT_WIDTH, 0, 1, HEIGHT);
     }
   }

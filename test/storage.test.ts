@@ -17,6 +17,29 @@ async function settingsWith(stored: object | null, screen = { width: 1440, heigh
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("saved pieces", () => {
+  const piece = (id: string, title: string) => ({ id, title, source: "imported", notes: [{ pitch: "D4", beats: 1 }] });
+
+  it("updates a piece where it is, leaving the others alone", async () => {
+    await settingsWith(null);
+    const { allPieces, savePiece, updatePiece } = await import("../src/storage");
+    savePiece(piece("a", "A"));
+    savePiece(piece("b", "B"));
+    updatePiece({ ...piece("a", "Renamed"), notes: [{ pitch: "E4", beats: 2 }] });
+    const mine = allPieces().filter((saved) => saved.source === "imported");
+    expect(mine.map((saved) => saved.title)).toEqual(["Renamed", "B"]);
+    expect(mine[0].notes).toEqual([{ pitch: "E4", beats: 2 }]);
+  });
+
+  it("remembers the draft on the staff, and which piece it's editing", async () => {
+    await settingsWith(null);
+    const { loadDraft, saveDraft } = await import("../src/storage");
+    expect(loadDraft()).toEqual({ title: "", notes: [] });
+    saveDraft({ title: "Mine", notes: [{ pitch: "D4", beats: 1 }], editingId: "a" });
+    expect(loadDraft()).toEqual({ title: "Mine", notes: [{ pitch: "D4", beats: 1 }], editingId: "a" });
+  });
+});
+
 describe("settings", () => {
   it("starts with sensible defaults", async () => {
     const { getSettings } = await settingsWith(null);

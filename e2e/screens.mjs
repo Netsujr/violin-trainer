@@ -1,7 +1,7 @@
 // Every screen and the main flows on phone and tablet sizes, by touch, plus small computer windows.
 // This is Chrome emulating those sizes: it checks layout and touch handling, not Safari or a real device's mic.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT } from "./lib.mjs";
+import { open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, typeNotes } from "./lib.mjs";
 
 const SIZES = [
   ["small phone", 320, 568, true],
@@ -183,8 +183,8 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   // A recording, and a long title
   await goNav("Library"); await sleep(200);
   await page.fill('input[placeholder="Title"]', LONG_TITLE);
-  await page.fill("textarea", longPiece);
-  await go('button:text-is("Save piece")'); await sleep(200);
+  await typeNotes(page, longPiece);
+  await go('.type-notes button:text-is("Save piece")'); await sleep(200);
   await auditCheck(page, `${tag} Library with a long title`);
   await page.locator(".piece", { hasText: LONG_TITLE }).locator('button[aria-label="Practice"]').click(); await sleep(400);
   await auditCheck(page, `${tag} Practice, long title`);

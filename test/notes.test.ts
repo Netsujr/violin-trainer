@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { staffStepsFrom } from "../src/music/notes";
+import { barMarks, staffStepsFrom } from "../src/music/notes";
+
+describe("bars", () => {
+  const lengths = (...beats: (number | undefined)[]) => barMarks(beats.map((length) => ({ pitch: "D4", beats: length })));
+
+  it("marks the note that fills a bar", () => {
+    expect(lengths(2, 2, 1).map((mark) => mark.endsBar)).toEqual([false, true, false]);
+    expect(lengths(0.5, 0.5, 1, 2).at(-1)).toEqual({ endsBar: true, crossesBar: false });
+  });
+
+  it("marks a note that runs over the bar line", () => {
+    expect(lengths(3, 2).map((mark) => mark.crossesBar)).toEqual([false, true]);
+    expect(lengths(1.5, 3).map((mark) => mark.crossesBar)).toEqual([false, true]);
+  });
+
+  it("counts a note with no written length as one beat", () => {
+    expect(lengths(undefined, undefined, undefined, undefined).at(-1)!.endsBar).toBe(true);
+  });
+});
 
 describe("placing a played pitch on the staff", () => {
   const D4 = 62;

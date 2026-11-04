@@ -1,6 +1,7 @@
 import { centsText, localNumber, localTitle, t } from "../i18n";
 import { pieceTrends, plannedThisWeek, weekMinutes, type LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording } from "../storage";
+import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
@@ -87,6 +88,8 @@ export function logScreen(): Screen {
     if (!recording) return;
 
     const player = recordingPlayer(entry, recording, urls, async () => {
+      if (!(await confirmAction(t.deleteRecordingConfirm, t.delete))) return;
+
       await deleteRecording(recordingId);
       player.remove();
       showStorage();

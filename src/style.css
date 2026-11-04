@@ -183,6 +183,28 @@ section h3 {
   display: none;
 }
 
+/* The question before something that can't be undone. */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+.confirm > article {
+  --pico-card-sectioning-background-color: var(--pico-card-background-color);
+  max-width: 24rem;
+}
+
+.confirm p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.confirm-yes,
+.confirm-yes:is(:hover, :active, :focus) {
+  --pico-background-color: #b03020;
+  --pico-border-color: #b03020;
+  --pico-color: #fff;
+}
+
 /* Pico keeps a clicked summary in the accent colour. Keep that for keyboard focus only. */
 details > summary:not(:focus-visible) {
   --pico-accordion-active-summary-color: var(--pico-accordion-close-summary-color);
@@ -548,11 +570,13 @@ section > ul > li {
 
 .piece {
   flex-wrap: nowrap;
+  gap: 0;
 }
 
 .piece-name {
   flex: 1;
   min-width: 0;
+  margin-right: 0.5rem;
   overflow-wrap: anywhere;
 }
 
@@ -570,6 +594,23 @@ section > ul > li {
   margin: 0;
 }
 
+/* Each control stays big enough to tap, and only the box and icon drawn inside it are small. */
+.piece .icon-button {
+  width: 1.75rem;
+  height: 1.75rem;
+  background: none;
+  border: none;
+}
+
+.piece .icon-button svg,
+.day-picker .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 1px;
+  border: 1px solid currentColor;
+  border-radius: var(--pico-border-radius);
+}
+
 .day-picker {
   position: relative;
   display: inline-flex;
@@ -577,26 +618,25 @@ section > ul > li {
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  min-width: 2.5rem;
-  height: 2.5rem;
-  padding-inline: 0.5rem;
-  font-size: 0.875rem;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.75rem;
   color: var(--pico-muted-color);
-  border: 1px solid var(--pico-form-element-border-color);
   border-radius: var(--pico-border-radius);
 }
 
 .day-picker.set {
   color: var(--pico-primary);
-  border-color: var(--pico-primary);
 }
 
-.day-picker:focus-within {
+.day-picker:focus-within,
+.beat-picker:focus-within {
   outline: 2px solid var(--pico-primary);
   outline-offset: 1px;
 }
 
-.day-picker select {
+.day-picker select,
+.beat-picker select {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -605,6 +645,136 @@ section > ul > li {
   margin: 0;
   cursor: pointer;
   opacity: 0;
+}
+
+/* The staff for writing a piece: a sheet of joined-up columns, one per note, with each note's controls beneath it. */
+.editor-hint {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+}
+
+/* The paper is on the row rather than each stretch of staff, so a note's flag or sharp can reach over the next one.
+   Its height is the sheet's: SHEET_HEIGHT x SCALE in pieceEditor.ts. */
+.editor-row {
+  display: flex;
+  align-items: flex-start;
+  width: fit-content;
+  margin-bottom: 0.75rem;
+  background: linear-gradient(#f3ead9, #f3ead9) top / 100% 192px no-repeat;
+}
+
+.editor-sheet {
+  position: relative;
+  touch-action: none; /* A finger on the sheet moves notes rather than the page. */
+  user-select: none;
+  cursor: ns-resize;
+}
+
+.editor-sheet svg {
+  display: block;
+  overflow: visible;
+}
+
+.editor-clef {
+  flex: none;
+  cursor: default;
+}
+
+.editor-column {
+  flex: none;
+}
+
+.editor-column.blank .editor-sheet {
+  cursor: pointer;
+}
+
+.editor-column.spill .editor-sheet {
+  cursor: default;
+}
+
+.editor-column.crosses-bar .editor-sheet,
+.editor-column.spill .editor-sheet {
+  background: rgba(224, 82, 63, 0.3);
+}
+
+.editor-name {
+  display: block;
+  width: fit-content;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.125rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #f3ead9; /* Set directly, because a button changes Pico's text colour variable. */
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+button.editor-name {
+  text-decoration: underline dotted var(--pico-muted-color);
+  text-underline-offset: 0.2em;
+}
+
+button.editor-name:is(:hover, :active, :focus) {
+  color: #fff;
+  background: none;
+  box-shadow: none;
+}
+
+/* In a strip of the sheet below the lowest note, so it stays put as the note moves. */
+.editor-delete {
+  position: absolute;
+  bottom: 0.125rem;
+  left: 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  margin: 0;
+  color: #6b3a1e;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.editor-delete:is(:hover, :active, :focus) {
+  background: none;
+  box-shadow: none;
+}
+
+/* Only with a mouse, because on a touch screen the next note's icon slides under the finger and would stay red. */
+@media (hover: hover) {
+  .editor-delete:hover {
+    color: #b03020;
+  }
+}
+
+.editor-delete svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.beat-picker {
+  position: relative;
+  width: fit-content;
+  min-width: 1.75rem;
+  margin-left: 0.125rem;
+  height: 1.5rem;
+  padding-inline: 0.25rem;
+  font-size: 0.8125rem;
+  line-height: calc(1.5rem - 2px);
+  white-space: nowrap;
+  border: 1px solid var(--pico-form-element-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.type-notes {
+  margin-top: 1.5rem;
 }
 
 .add-piece {
@@ -900,6 +1070,28 @@ a[download] {
   .marker {
     min-width: 2.75rem;
     min-height: 2.25rem;
+  }
+
+  .piece .icon-button {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .day-picker {
+    min-width: 2rem;
+    height: 2rem;
+  }
+
+  /* A short name like Ré is too narrow for a finger otherwise. */
+  button.editor-name {
+    min-width: 1.5rem;
+    text-align: left;
+  }
+
+  .piece .icon-button svg,
+  .day-picker .icon {
+    width: 1.125rem;
+    height: 1.125rem;
   }
 
   /* Wide for the finger, and low enough to stay under the clef. */

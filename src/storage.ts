@@ -88,8 +88,16 @@ export const allPieces = () => [...builtInPieces(), ...committedPieces(), ...sav
 
 export const savePiece = (piece: Piece) => write("pieces", [...savedPieces(), piece]);
 
+export const updatePiece = (updated: Piece) =>
+  write("pieces", savedPieces().map((piece) => (piece.id === updated.id ? updated : piece)));
+
 export const deletePiece = (id: string) =>
   write("pieces", savedPieces().filter((piece) => piece.id !== id));
+
+// The piece being written on the staff, so a tab switch or reload doesn't lose it.
+export type PieceDraft = { title: string; notes: PieceNote[]; editingId?: string };
+export const loadDraft = () => read<PieceDraft>("pieceDraft", { title: "", notes: [] });
+export const saveDraft = (draft: PieceDraft) => write("pieceDraft", draft);
 
 export const loadLog = () => read<LogEntry[]>("log", []);
 

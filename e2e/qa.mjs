@@ -2,7 +2,7 @@
 // node e2e/qa.mjs desktop | ipad | phone
 // The iPad and phone runs use WebKit, Safari's engine, with touch at those devices' sizes. That's the closest thing
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
 import { auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, OUT, progress, savedLog, savedSettings, sleep, waitForText } from "./lib.mjs";
 
@@ -278,16 +278,67 @@ const row = page.locator(".piece", { hasText: "Twinkle" });
 await row.locator("select").selectOption("2");
 check("a target day shows beside the calendar", (await row.locator(".day-picker > span:not(.icon)").innerText()) === "Wed");
 await page.fill('input[placeholder="Title"]', "My tune");
+await press(page.locator(".type-notes summary")); await sleep(150);
 await page.fill("textarea", "D4 E4 F#4");
 check("the preview lists the notes", (await page.locator("ol li").count()) === 3);
-await press(button("Save piece")); await sleep(200);
+await press(page.locator(".type-notes").getByRole("button", { name: "Save piece", exact: true })); await sleep(200);
 const mine = page.locator(".piece", { hasText: "My tune" });
 check("a new piece joins the songs", (await page.locator(".library > div").nth(1).locator(".piece", { hasText: "My tune" }).count()) === 1);
 await press(mine.getByRole("button", { name: "Practice", exact: true })); await sleep(400);
 check("the play icon opens it in Practice", (await progress(page)) === "Note 1 of 3", await progress(page));
 await tab("Library");
+const modal = page.locator("dialog[open]");
+const say = async (label) => { await press(modal.getByRole("button", { name: label, exact: true })); await sleep(200); };
 await press(page.locator(".piece", { hasText: "My tune" }).getByRole("button", { name: "Delete", exact: true })); await sleep(200);
+check("deleting asks first, naming the piece", (await modal.innerText()).includes('Delete "My tune"?'));
+await auditCheck(page, "the question before deleting", "dialog[open]");
+await shot("11-question");
+await say("Cancel");
+check("Cancel keeps it", (await page.locator(".piece", { hasText: "My tune" }).count()) === 1);
+await press(page.locator(".piece", { hasText: "My tune" }).getByRole("button", { name: "Delete", exact: true })); await sleep(200);
+await say("Delete");
 check("and it can be deleted", (await page.locator(".piece", { hasText: "My tune" }).count()) === 0);
+
+// Writing one on the staff, editing it, and saving it as a PDF.
+const staffNames = () => page.$$eval(".editor-column button.editor-name", (names) => names.map((name) => name.textContent).join());
+const blankStaff = () => page.locator(".editor-column.blank .editor-sheet").first();
+const staffSave = page.locator("section > .row").last().getByRole("button", { name: "Save piece", exact: true });
+const storedPiece = (title) => page.evaluate((title) => JSON.parse(localStorage.getItem("pieces")).find((piece) => piece.title === title), title);
+await page.fill('input[placeholder="Title"]', "Written here");
+await blankStaff().scrollIntoViewIfNeeded();
+await press(blankStaff(), { position: { x: 20, y: 90 } }); await sleep(250);
+check("a press on the staff places a note, with its name", (await staffNames()) === "Sol", await staffNames());
+await page.locator('.editor-column[data-index="0"] select').selectOption("2"); await sleep(150);
+await press(page.locator('.editor-column[data-index="0"] button.editor-name')); await sleep(150);
+check("the note's name changes its sharp or flat", (await staffNames()) === "Sol♯", await staffNames());
+await auditCheck(page, "Library, writing on the staff");
+await shot("11-staff");
+await staffSave.scrollIntoViewIfNeeded();
+await press(staffSave); await sleep(250);
+const written = await storedPiece("Written here");
+check("it saves with its length and a fingering", written?.notes[0].beats === 2 && written.notes[0].finger !== undefined, JSON.stringify(written));
+check("and the staff is blank again", (await staffNames()) === "");
+await press(page.locator(".piece", { hasText: "Written here" }).getByRole("button", { name: "Edit piece", exact: true })); await sleep(300);
+check("the pencil opens it for editing", (await page.locator("section > h2").last().textContent()) === "Edit piece" && (await staffNames()) === "Sol♯");
+await page.fill('input[placeholder="Title"]', "Rewritten");
+await press(staffSave); await sleep(250);
+check("saving updates it in place", (await storedPiece("Rewritten"))?.id === written.id && (await storedPiece("Written here")) === undefined);
+const rewritten = page.locator(".piece", { hasText: "Rewritten" });
+await auditCheck(page, "Library, with a custom song", ".library");
+await rewritten.scrollIntoViewIfNeeded();
+await shot("11-custom-row");
+const [pdf] = await Promise.all([page.waitForEvent("download"), press(rewritten.getByRole("button", { name: "Download PDF", exact: true }))]);
+const pdfPath = `${OUT}qa-${name}.pdf`;
+await pdf.saveAs(pdfPath);
+check("Download saves a PDF, named after the song", pdf.suggestedFilename() === "Rewritten.pdf" && readFileSync(pdfPath).subarray(0, 5).toString() === "%PDF-", pdf.suggestedFilename());
+await blankStaff().scrollIntoViewIfNeeded();
+await press(blankStaff(), { position: { x: 20, y: 90 } }); await sleep(250);
+await press(page.locator("section > .row").last().getByRole("button", { name: "Clear", exact: true })); await sleep(200);
+check("Clear asks first", (await modal.innerText()).includes("Remove all the notes"));
+await say("Clear");
+check("and then empties the staff", (await staffNames()) === "");
+await press(rewritten.getByRole("button", { name: "Delete", exact: true })); await sleep(200);
+await say("Delete");
 await press(page.locator(".piece", { hasText: "Hot Cross Buns" }).getByRole("button", { name: "Practice", exact: true })); await sleep(400);
 await options();
 await page.locator(".bpm input").fill("120");
@@ -321,7 +372,11 @@ check("Download's file type matches what was recorded", format.includes("mp4") ?
 await auditCheck(page, "Log, with a recording");
 await page.locator("audio").first().scrollIntoViewIfNeeded();
 await shot("12-recording");
-await press(button("Delete recording")); await sleep(300);
+await press(button("Delete recording")); await sleep(200);
+await say("Cancel");
+check("Cancel keeps the recording", (await page.locator("audio").count()) === 1);
+await press(button("Delete recording")); await sleep(200);
+await say("Delete"); await sleep(100);
 check("Delete recording removes only the audio", (await page.locator("audio").count()) === 0 && (await page.locator("section > ul > li").count()) >= 5);
 
 flow("13. Log");

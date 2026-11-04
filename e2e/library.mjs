@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveTyped, typeNotes } from "./lib.mjs";
 
 const profile = OUT + "profile";
 rmSync(profile, { recursive: true, force: true });
@@ -14,16 +14,16 @@ await nav(page, "Library");
 const column = (index) => page.locator(".library > div").nth(index);
 check("scales in the first column, songs in the second", (await column(0).locator("h3").innerText()) === "Scales" && (await column(0).locator(".piece").count()) === 6 && (await column(1).locator("h3").innerText()) === "Songs" && (await column(1).locator(".piece").count()) === 6);
 await page.fill('input[placeholder="Title"]', "Pasted D major");
-await page.fill("textarea", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
+await typeNotes(page, "D4 E4 F#4 G4 | A4 B4 C#5 D5");
 const items = await page.locator("ol li").allInnerTexts();
 console.log("  preview:", items.join(" ; "));
 check("preview shows 8 fingered notes", items.length === 8 && items[2].includes("D string · finger 2") && items[7].includes("A string · finger 3"));
 await page.fill("textarea", "D4 banana");
-check("a bad token blocks saving", await page.locator('button:text-is("Save piece")').isDisabled() && (await page.locator(".warning").first().innerText()).includes("banana"));
+check("a bad token blocks saving", await saveTyped(page).isDisabled() && (await page.locator(".warning").first().innerText()).includes("banana"));
 await page.fill("textarea", "C6 D4");
 check("a note above first position is flagged", (await page.locator(".warning").first().innerText()).includes("outside first position"));
 await page.fill("textarea", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
-await page.click('button:text-is("Save piece")');
+await saveTyped(page).click();
 check("a saved piece joins the songs", (await column(1).locator(".piece").count()) === 7 && (await column(1).locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
 await page.locator(".piece", { hasText: "D major" }).first().locator("select").selectOption("0");
 await page.screenshot({ path: OUT + "library.png" });
@@ -119,6 +119,9 @@ console.log("  " + logText.split("\n").slice(0, 16).join(" | "));
 // Download link and delete
 check("download link has a filename", (await page.locator("a[download]").getAttribute("download")).endsWith(".webm"), await page.locator("a[download]").getAttribute("download"));
 await page.click('button:text-is("Delete recording")');
+await sleep(100);
+check("it asks first", (await page.locator("dialog[open]").innerText()).includes("Delete this recording"));
+await answer(page, "Delete");
 await sleep(200);
 check("delete removes the player", (await page.locator("audio").count()) === 0);
 

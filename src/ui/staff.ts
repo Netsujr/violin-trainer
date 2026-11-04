@@ -1,25 +1,27 @@
 import { Note } from "tonal";
-import { midiOf, noteLabels, staffStepsFrom } from "../music/notes";
-import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice } from "vexflow/bravura";
+import { BAR_BEATS, midiOf, noteLabels, staffStepsFrom } from "../music/notes";
+import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice, type RenderContext } from "vexflow/bravura";
 import { h } from "./dom";
 import type { Section } from "./highway";
 
 type StaffNote = { pitch: string; beats?: number; finger?: string };
-type StaffLabels = { names: boolean; fingers: boolean };
+export type StaffLabels = { names: boolean; fingers: boolean };
+type WriteLabel = (text: string, x: number, y: number, fill: string, fontSize: number) => void;
 
 const TOP = 30;
-const LINE_HEIGHT = 130;
+export const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
-const NOTE_WIDTH = 56;
-// Notes with written lengths are drawn in bars, packed tighter because they hold more notes.
-const BAR_BEATS = 4;
 const BAR_NOTE_WIDTH = 40;
 const MAX_BARS_PER_LINE = 6;
-const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 4: "w" };
-// Rows relative to a stave's y: clear of the highest and lowest first-position notes, as on the printed sheet.
-const FINGER_ROW = 14;
-const NAME_ROW = 126;
+const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 3: "hd", 4: "w" };
+// How far a line's rows of fingers and names sit outside the staff and its notes, measured to the text's baseline.
+const FINGER_GAP = 5;
+const NAME_GAP = 14;
+// The furthest those rows go from a stave's y, which keeps them inside its line and off the next line's labels.
+const HIGHEST_FINGER_ROW = 10;
+const LOWEST_NAME_ROW = 126;
 const NOTEHEAD_CENTER = 6;
+const NOTEHEAD_RADIUS = 5;
 // With labels on, their rows use the space that high notes otherwise get above the staff.
 const LABELLED_TOP = 6;
 const LABELLED_BOTTOM = 8;
@@ -40,11 +42,11 @@ const PLAYED_IN_TUNE_COLOR = "#14914a";
 const NOTE_LEAD = 20;
 const NOTE_TAIL = 40;
 
-function toStaveNote({ pitch, beats = 1 }: StaffNote, showAccidental: boolean) {
+export function toStaveNote({ pitch, beats = 1 }: StaffNote, showAccidental: boolean) {
   const { letter, acc, oct } = Note.get(pitch);
   const note = new StaveNote({ keys: [`${letter.toLowerCase()}${acc}/${oct}`], duration: DURATIONS[beats], autoStem: true });
   if (acc && showAccidental) note.addModifier(new Accidental(acc));
-  if (beats === 1.5) Dot.buildAndAttach([note], { all: true });
+  if (beats === 1.5 || beats === 3) Dot.buildAndAttach([note], { all: true });
   return note;
 }
 
@@ -63,6 +65,10 @@ function beamEighths(bar: StaffNote[], staveNotes: StaveNote[]) {
   return beams;
 }
 
+const beatsOf = (note: StaffNote) => note.beats ?? 1;
+const beatsIn = (notes: StaffNote[]) => notes.reduce((sum, note) => sum + beatsOf(note), 0);
+
+// A note with no written length, like a scale's, counts as one beat.
 function toBars(notes: StaffNote[]) {
   const bars: StaffNote[][] = [[]];
   let beats = 0;
@@ -72,19 +78,12 @@ function toBars(notes: StaffNote[]) {
       beats = 0;
     }
     bars.at(-1)!.push(note);
-    beats += note.beats!;
+    beats += beatsOf(note);
   }
   return bars;
 }
 
-// Lines of bars. Without written lengths, each line is one long "bar" with no barlines.
-function layOut(notes: StaffNote[], room: number, barred: boolean) {
-  if (!barred) {
-    const perLine = Math.floor(room / NOTE_WIDTH);
-    const lineCount = Math.max(1, Math.ceil(notes.length / perLine));
-    return Array.from({ length: lineCount }, (_, line) => [notes.slice(line * perLine, (line + 1) * perLine)]);
-  }
-
+function layOut(notes: StaffNote[], room: number) {
   const lines: StaffNote[][][] = [[]];
   for (const bar of toBars(notes)) {
     const line = lines.at(-1)!;
@@ -95,7 +94,57 @@ function layOut(notes: StaffNote[], room: number, barred: boolean) {
   return lines;
 }
 
-const beatsOf = (note: StaffNote) => note.beats ?? 1;
+// The bars on each line of an open sheet, and the width to space each line's notes in.
+export function openLines(notes: StaffNote[], width: number) {
+  const room = width - CLEF_SPACE;
+  const lines = layOut(notes, room);
+  // Bars can hold different numbers of notes, so the fullest line sets the width of a bar, not the first line.
+  const mostBars = Math.max(...lines.map((line) => line.length));
+  return lines.map((line) => ({ line, formatWidth: ((room - 20) * line.length) / mostBars }));
+}
+
+// Draws a line of bars on the page's SVG or a PDF's canvas, and returns its notes.
+export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[][], formatWidth: number, labels: StaffLabels, writeLabel: WriteLabel) {
+  stave.setContext(context).draw();
+  const lineNotes = line.flat();
+  if (lineNotes.length === 0) return [];
+
+  const drawn: StaveNote[] = [];
+  const beams: Beam[] = [];
+  const tickables = line.flatMap((bar, barIndex) => {
+    // In a bar, an accidental is only written the first time.
+    const written = new Set<string>();
+    const staveNotes = bar.map((note) => {
+      const staveNote = toStaveNote(note, !written.has(note.pitch));
+      written.add(note.pitch);
+      return staveNote;
+    });
+    beams.push(...beamEighths(bar, staveNotes));
+    drawn.push(...staveNotes);
+    return barIndex > 0 ? [new BarNote(), ...staveNotes] : staveNotes;
+  });
+
+  const voice = new Voice({ numBeats: beatsIn(lineNotes), beatValue: 4 }).addTickables(tickables);
+  new Formatter().joinVoices([voice]).format([voice], formatWidth);
+  voice.draw(context, stave);
+  beams.forEach((beam) => beam.setContext(context).draw());
+  // The labels stay as close as this line's notes allow, so they read as part of it and not of the next line.
+  const reaches = drawn.flatMap((note) => {
+    const head = note.getYs()[0];
+    return [head - NOTEHEAD_RADIUS, head + NOTEHEAD_RADIUS, ...(note.hasStem() ? Object.values(note.getStemExtents()) : [])];
+  });
+  const fingerRow = Math.max(stave.getY() + HIGHEST_FINGER_ROW, Math.min(stave.getYForLine(0), ...reaches) - FINGER_GAP);
+  const nameRow = Math.min(stave.getY() + LOWEST_NAME_ROW, Math.max(stave.getYForLine(4), ...reaches) + NAME_GAP);
+  lineNotes.forEach((note, index) => {
+    const x = drawn[index].getAbsoluteX() + NOTEHEAD_CENTER;
+    if (labels.fingers && note.finger) {
+      const color = note.finger.startsWith("L") ? LOW_FINGER_COLOR : FINGER_COLOR;
+      writeLabel(note.finger.replace("L", ""), x, fingerRow, color, 13);
+    }
+    if (labels.names) writeLabel(noteLabels(note.pitch).solfege, x, nameRow, NAME_COLOR, 11);
+  });
+  return drawn;
+}
 
 function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: string, fontSize: number) {
   const element = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -191,14 +240,10 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   function render(notes: StaffNote[]) {
     element.replaceChildren();
     element.classList.toggle("collapsed", collapsed);
-    const room = width - CLEF_SPACE;
-    const barred = notes.some((note) => note.beats);
-    const lines = collapsed ? [barred ? toBars(notes) : [notes]] : layOut(notes, room, barred);
-    const totalBeats = notes.reduce((sum, note) => sum + beatsOf(note), 0);
+    const totalBeats = beatsIn(notes);
+    const lines = collapsed ? [{ line: toBars(notes), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, width);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
     const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : width;
-    // Bars can hold different numbers of notes, so the fullest line sets the width of a bar, not the first line.
-    const mostBars = Math.max(...lines.map((line) => line.length));
     const labelled = labels.names || labels.fingers;
     const top = labelled ? LABELLED_TOP : TOP;
     const height = top + lines.length * LINE_HEIGHT + (labelled ? LABELLED_BOTTOM : 0);
@@ -214,46 +259,13 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     svg.style.height = collapsed ? `${height * scale}px` : "auto";
 
     const allNotes: StaveNote[] = [];
-    lines.forEach((line, lineIndex) => {
+    lines.forEach(({ line, formatWidth }, lineIndex) => {
       const staveX = collapsed ? COLLAPSED_MARGIN : 0;
       const stave = new Stave(staveX, top + lineIndex * LINE_HEIGHT, fullWidth - staveX - 1).addClef("treble");
       if (collapsed) stave.setNoteStartX(COLLAPSED_NOTE_START);
-      stave.setContext(context).draw();
-      const lineNotes = line.flat();
-      if (lineNotes.length === 0) return;
-
-      const firstNote = allNotes.length;
-      const beams: Beam[] = [];
-      const tickables = line.flatMap((bar, barIndex) => {
-        // In a bar, an accidental is only written the first time.
-        const written = new Set<string>();
-        const staveNotes = bar.map((note) => {
-          const staveNote = toStaveNote(note, !barred || !written.has(note.pitch));
-          written.add(note.pitch);
-          return staveNote;
-        });
-        beams.push(...beamEighths(bar, staveNotes));
-        allNotes.push(...staveNotes);
-        return barIndex > 0 ? [new BarNote(), ...staveNotes] : staveNotes;
-      });
-
-      const lineBeats = lineNotes.reduce((sum, note) => sum + beatsOf(note), 0);
-      const voice = new Voice({ numBeats: lineBeats, beatValue: 4 }).addTickables(tickables);
-      const barredWidth = ((room - 20) * line.length) / mostBars;
-      const formatWidth = collapsed ? lineBeats * COLLAPSED_BEAT_WIDTH : barred ? barredWidth : lineNotes.length * NOTE_WIDTH;
-      new Formatter().joinVoices([voice]).format([voice], formatWidth);
-      voice.draw(context, stave);
-      beams.forEach((beam) => beam.setContext(context).draw());
-      const staveY = top + lineIndex * LINE_HEIGHT;
-      for (const _ of lineNotes) noteLines.push(lineIndex);
-      lineNotes.forEach((note, index) => {
-        const x = allNotes[firstNote + index].getAbsoluteX() + NOTEHEAD_CENTER;
-        if (labels.fingers && note.finger) {
-          const color = note.finger.startsWith("L") ? LOW_FINGER_COLOR : FINGER_COLOR;
-          svgText(svg, note.finger.replace("L", ""), x, staveY + FINGER_ROW, color, 13);
-        }
-        if (labels.names) svgText(svg, noteLabels(note.pitch).solfege, x, staveY + NAME_ROW, NAME_COLOR, 11);
-      });
+      const drawn = drawLine(context, stave, line, formatWidth, labels, (...label) => svgText(svg, ...label));
+      allNotes.push(...drawn);
+      for (const _ of drawn) noteLines.push(lineIndex);
     });
 
     noteXs = allNotes.map((note) => note.getAbsoluteX());

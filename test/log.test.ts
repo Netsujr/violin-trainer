@@ -180,4 +180,11 @@ describe("piece trends", () => {
     expect(trends).toHaveLength(1);
     expect(trends[0].sessions.map((session) => session.startedAt)).toEqual(["2026-11-02T10:00:00Z", "2026-11-03T10:00:00Z"]);
   });
+
+  it("keeps a renamed piece's history together, under its latest title", () => {
+    const trends = pieceTrends([entry("2026-11-02T10:00:00Z", 1), { ...entry("2026-11-03T10:00:00Z", 1), pieceTitle: "New name" }]);
+    expect(trends).toHaveLength(1);
+    expect(trends[0].title).toBe("New name");
+    expect(trends[0].sessions).toHaveLength(2);
+  });
 });

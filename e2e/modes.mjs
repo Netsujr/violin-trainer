@@ -161,12 +161,16 @@ await s.close();
   const { page } = c;
   const box_ = () => page.locator('.options label:has-text("count-in") input');
   const showing = () => page.evaluate(() => document.querySelector("section > p").textContent);
-    const watch = () => page.evaluate(() => {
+  // Logs the text as the app changes it. Checking once a frame would see it a frame or two late, depending on how busy the page is.
+  const watch = () => page.evaluate(() => {
     window.seen = [];
+    window.seenObserver?.disconnect();
     const text = document.querySelector("section > p");
     let last = "";
-    const tick = () => { if (text.textContent !== last) { last = text.textContent; window.seen.push({ at: performance.now(), text: last }); } requestAnimationFrame(tick); };
-    tick();
+    const note = () => { if (text.textContent !== last) { last = text.textContent; window.seen.push({ at: performance.now(), text: last }); } };
+    note();
+    window.seenObserver = new MutationObserver(note);
+    window.seenObserver.observe(text, { childList: true, characterData: true, subtree: true });
   });
   await nav(page, "Practice"); await sleep(250);
   check("count-in: on by default, in Options", (await box_().isChecked()) && (await page.locator('.options label:has-text("count-in")').getAttribute("title")).includes("3 beats"));

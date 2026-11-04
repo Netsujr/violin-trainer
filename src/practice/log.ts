@@ -74,7 +74,8 @@ export function plannedThisWeek(pieces: Piece[], targetDays: Record<string, numb
 export function pieceTrends(entries: LogEntry[]) {
   const trends = new Map<string, LogEntry[]>();
   for (const entry of [...entries].sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
-    if (entry.notesHit > 0) trends.set(entry.pieceTitle, [...(trends.get(entry.pieceTitle) ?? []), entry]);
+    if (entry.notesHit > 0) trends.set(entry.pieceId, [...(trends.get(entry.pieceId) ?? []), entry]);
   }
-  return [...trends].map(([title, sessions]) => ({ title, sessions }));
+  // By id, so a renamed piece keeps its history, under its latest title.
+  return [...trends.values()].map((sessions) => ({ title: sessions.at(-1)!.pieceTitle, sessions }));
 }

@@ -1,8 +1,8 @@
 import { t } from "../i18n";
 import { fillFingering, LOWEST_MIDI } from "./fingering";
-import { midiOf, type PieceNote, type StringName } from "./notes";
+import { BEAT_LENGTHS, midiOf, type PieceNote, type StringName } from "./notes";
 
-const TOKEN = /^(do|re|mi|fa|sol|la|si|[a-g])([#b]?)(\d)(?:\/(0|[lh]?[1-4]))?(?:@([gdae]))?$/i;
+const TOKEN = /^(do|re|mi|fa|sol|la|si|[a-g])([#b]?)(\d)(?:\/(0|[lh]?[1-4]))?(?:@([gdae]))?(?::(\d*[.,]?\d+))?$/i;
 const LETTERS: Record<string, string> = { do: "C", re: "D", mi: "E", fa: "F", sol: "G", la: "A", si: "B" };
 
 const plainToken = (token: string) =>
@@ -20,15 +20,22 @@ export function parseQuickText(text: string) {
       continue;
     }
 
-    const [, name, accidental, octave, finger, string] = match;
+    const [, name, accidental, octave, finger, string, beatText] = match;
     const pitch = (LETTERS[name.toLowerCase()] ?? name.toUpperCase()) + accidental + octave;
     if (midiOf(pitch) < LOWEST_MIDI) {
       errors.push(t.tokenBelowOpenG(token));
       continue;
     }
 
+    const beats = beatText ? Number(beatText.replace(",", ".")) : 1;
+    if (!BEAT_LENGTHS.includes(beats)) {
+      errors.push(t.badBeats(token));
+      continue;
+    }
+
     const note = fillFingering({
       pitch,
+      beats,
       ...(string && { string: string.toUpperCase() as StringName }),
       ...(finger && { finger: finger.toUpperCase() }),
     });
