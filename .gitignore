@@ -25,3 +25,6 @@ dist-ssr
 
 # Browser check output
 test-results
+
+# Netlify link
+.netlify
