@@ -126,7 +126,11 @@ export const begin = async (page) => {
   await page.waitForSelector('button:text-is("Stop")');
 };
 export const waitForText = (page, text, timeout = 30000) =>
-  page.waitForFunction((text) => document.querySelector("section > p").textContent.includes(text), text, { timeout });
+  page.waitForFunction((text) => document.querySelector("section > p").textContent.includes(text), text, { timeout }).catch(async (error) => {
+    // A timeout alone doesn't say how far the run got.
+    error.message += ` | waiting for "${text}", showing "${await progress(page).catch(() => "nothing")}"`;
+    throw error;
+  });
 // Practice from a fresh page load, which also ends the last run's synthetic player.
 export const freshPractice = async (page, bpm) => {
   await page.reload();
