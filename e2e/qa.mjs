@@ -383,7 +383,7 @@ check("Delete recording removes only the audio", (await page.locator("audio").co
 
 flow("13. Log");
 const logText = await page.locator("section").innerText();
-check("reads sensibly", ["This week", "Planned", "Trends", "Sessions", "Score: 93%", "D major"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
+check("reads sensibly", ["This week", "Planned", "Trends", "Sessions", "Score: 93%", "D (Ré) major"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
 check("the highlighted piece shows as planned", /[✓○] Twinkle Twinkle Little Star/.test(logText));
 await shot("13-log");
 

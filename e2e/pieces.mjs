@@ -406,7 +406,7 @@ flow("Saving as a PDF");
   }, image);
   await library(page, { pieces });
   const icons = async (text) => t.row(text).first().getByRole("button", { name: "Download PDF", exact: true }).count();
-  check("every song gets a download, and scales don't", (await icons("Hot Cross Buns")) === 1 && (await icons("Mine: a tune")) === 1 && (await icons("D major")) === 0);
+  check("every song gets a download, and scales don't", (await icons("Hot Cross Buns")) === 1 && (await icons("Mine: a tune")) === 1 && (await icons("D (Ré) major")) === 0);
 
   const ode = await fetchPdf("Ode to Joy", "pieces-ode.pdf");
   check("the file is named after the song", ode.name === "Ode to Joy.pdf", ode.name);

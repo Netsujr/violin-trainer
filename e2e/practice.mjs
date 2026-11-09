@@ -83,7 +83,7 @@ wav(OUT + "ended.wav", [note(62, 3)]);
   await pickPiece(s.page, "g-major-2oct");
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
   const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")));
-  check("changing piece ends the session and logs it under the old piece", log.length === 1 && log[0].pieceTitle === "D major" && (await progress(s.page)).endsWith("of 29"), JSON.stringify(log.map((entry) => entry.pieceTitle)));
+  check("changing piece ends the session and logs it under the old piece", log.length === 1 && log[0].pieceTitle === "D (Ré) major" && (await progress(s.page)).endsWith("of 29"), JSON.stringify(log.map((entry) => entry.pieceTitle)));
   await s.close();
 }
 

@@ -107,7 +107,7 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   check("Enter picks the note at the hit line", (await progress(page)) === "Note 3 of 15", await progress(page));
 
   const values = await page.locator(".piece-menu button[value]").evaluateAll((items) => items.map((item) => [item.value, item.textContent]));
-  const twoOctaves = values.find(([, title]) => title === "G major (2 octaves)")[0];
+  const twoOctaves = values.find(([, title]) => title === "G (Sol) major (2 octaves)")[0];
   await pickPiece(page, twoOctaves);
   check("changing piece goes back to note 1", (await progress(page)).startsWith("Note 1 of"), await progress(page));
   const count = Number((await progress(page)).match(/of (\d+)/)[1]);

@@ -31,7 +31,7 @@ check("a note above first position is flagged", (await page.locator(".type-notes
 await page.fill("textarea", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
 await saveTyped(page).click();
 check("a saved piece joins My songs", (await column(2).locator(".piece").count()) === 3 && (await column(2).locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
-await page.locator(".piece", { hasText: "D major" }).first().click();
+await page.locator(".piece", { hasText: "D (Ré) major" }).first().click();
 await page.screenshot({ path: OUT + "library.png" });
 
 // Settings and toggles survive reload
@@ -60,7 +60,7 @@ await page.click("summary");
 // Record a full practice pass
 await nav(page, "Library");
 check("saved piece survives a reload", (await page.locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
-await page.locator(".piece", { hasText: "D major" }).first().locator('button[aria-label="Practice"]').click();
+await page.locator(".piece", { hasText: "D (Ré) major" }).first().locator('button[aria-label="Practice"]').click();
 await page.locator('label:has-text("Record") input').check();
 await start(page);
 const deadline = Date.now() + 30000;
@@ -119,7 +119,7 @@ check("every marker lands on its note", jump.rows.every((r) => r.heard));
 
 // Log screen contents
 const logText = await page.locator("section").innerText();
-check("week view, planned and trend rows show", logText.includes("This week") && logText.includes("✓ D major\n") && logText.includes("D major: "), "");
+check("week view, planned and trend rows show", logText.includes("This week") && logText.includes("✓ D (Ré) major\n") && logText.includes("D (Ré) major: "), "");
 console.log("  " + logText.split("\n").slice(0, 16).join(" | "));
 
 // Download link and delete
@@ -171,7 +171,7 @@ await s.close();
   await page.locator(".piece", { hasText: "Hot Cross Buns" }).click();
   check("and can be cleared", !(await marked()) && (await songsHeading()) === "Classic tunes");
   await openDrawers(page); await sleep(100);
-  check("a drawer opens on the rest", (await page.locator(".piece", { hasText: "Ode to Joy" }).isVisible()) && (await page.locator(".piece", { hasText: "D harmonic minor" }).isVisible()));
+  check("a drawer opens on the rest", (await page.locator(".piece", { hasText: "Ode to Joy" }).isVisible()) && (await page.locator(".piece", { hasText: "D (Ré) harmonic minor" }).isVisible()));
 
   for (const [title, count] of [["Hot Cross Buns", 17], ["Mary Had a Little Lamb", 26], ["Twinkle Twinkle Little Star", 42], ["Lightly Row", 57], ["Frère Jacques", 32], ["Hills and Dales", 47], ["Upstairs, Downstairs", 59], ["Ode to Joy", 62]]) {
     await nav(page, "Library"); await sleep(150);
