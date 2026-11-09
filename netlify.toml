@@ -1,0 +1,8 @@
+# Netlify builds the app from main and publishes Vite's output.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Vite needs Node 20.19 or later.
+[build.environment]
+  NODE_VERSION = "20"
