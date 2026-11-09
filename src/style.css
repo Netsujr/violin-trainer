@@ -140,6 +140,14 @@ header details[open] > summary {
   margin: 0;
 }
 
+.row > .piece-select {
+  --pico-form-element-spacing-vertical: 0.25rem;
+  --pico-form-element-spacing-horizontal: 0.625rem;
+  max-width: 13rem;
+  font-size: 0.875rem;
+  background-position: center right 0.5rem;
+}
+
 .toggles {
   gap: 0.5rem 0.625rem;
   font-size: 0.875rem;
@@ -352,6 +360,13 @@ section > ul > li {
   color: var(--pico-muted-color);
 }
 
+/* With room to spare, everything on Listen is drawn larger, to read from a music stand. */
+@media (min-width: 700px) and (min-height: 700px) {
+  .listen {
+    zoom: 1.35;
+  }
+}
+
 /* Practice: the progress line keeps the run buttons beside it, visible with the options closed. */
 .practice {
   display: grid;
@@ -521,8 +536,8 @@ section > ul > li {
   content: "";
   position: absolute;
   inset-block: 0;
-  left: calc(130px * var(--timeline-scale, 1));
-  width: 2px;
+  left: calc(130px * var(--timeline-scale, 1) - 1px);
+  width: 4px;
   background: #b03020;
   opacity: 0.45;
   pointer-events: none;
@@ -573,11 +588,40 @@ section > ul > li {
   gap: 0;
 }
 
-.piece-name {
+.piece {
+  cursor: pointer;
+}
+
+/* The card's title is the button that marks it, drawn as plain text. */
+.piece .piece-name {
   flex: 1;
   min-width: 0;
-  margin-right: 0.5rem;
+  padding: 0;
+  margin: 0 0.5rem 0 0;
   overflow-wrap: anywhere;
+  color: inherit;
+  text-align: start;
+  background: none;
+  border: none;
+}
+
+/* Marked for practice. */
+.piece.highlighted {
+  background: color-mix(in srgb, var(--pico-primary) 14%, var(--pico-card-background-color));
+  border-color: var(--pico-primary);
+}
+
+.more-pieces > summary {
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+}
+
+.piece-menu .highlighted {
+  color: var(--pico-primary);
+}
+
+.piece-menu .highlighted::before {
+  content: "★ ";
 }
 
 .piece-name strong {
@@ -602,8 +646,7 @@ section > ul > li {
   border: none;
 }
 
-.piece .icon-button svg,
-.day-picker .icon {
+.piece .icon-button svg {
   width: 1.25rem;
   height: 1.25rem;
   padding: 1px;
@@ -611,31 +654,11 @@ section > ul > li {
   border-radius: var(--pico-border-radius);
 }
 
-.day-picker {
-  position: relative;
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  min-width: 1.75rem;
-  height: 1.75rem;
-  font-size: 0.75rem;
-  color: var(--pico-muted-color);
-  border-radius: var(--pico-border-radius);
-}
-
-.day-picker.set {
-  color: var(--pico-primary);
-}
-
-.day-picker:focus-within,
 .beat-picker:focus-within {
   outline: 2px solid var(--pico-primary);
   outline-offset: 1px;
 }
 
-.day-picker select,
 .beat-picker select {
   position: absolute;
   inset: 0;
@@ -1077,19 +1100,13 @@ a[download] {
     height: 2rem;
   }
 
-  .day-picker {
-    min-width: 2rem;
-    height: 2rem;
-  }
-
   /* A short name like Ré is too narrow for a finger otherwise. */
   button.editor-name {
     min-width: 1.5rem;
     text-align: left;
   }
 
-  .piece .icon-button svg,
-  .day-picker .icon {
+  .piece .icon-button svg {
     width: 1.125rem;
     height: 1.125rem;
   }
@@ -1126,8 +1143,8 @@ a[download] {
   }
 }
 
-/* The smallest phones in landscape: the buttons fill the line, so the needle takes its own. */
-@media (max-height: 500px) and (max-width: 600px) {
+/* Small phones in landscape: the buttons fill the line, so the needle takes its own. */
+@media (max-height: 500px) and (max-width: 700px) {
   .practice {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -1155,6 +1172,7 @@ a[download] {
 .fullscreen .tuning,
 .fullscreen .mode-note,
 .fullscreen .patterns,
+.patterns[hidden],
 .fullscreen .section-bar,
 .fullscreen .staff-toggle {
   display: none;
@@ -1199,7 +1217,8 @@ a[download] {
   transform: translate(-50%, -50%);
 }
 
-@media (max-width: 600px) {
+/* Phones, and small ones in landscape: the note counter takes its own row, leaving the buttons the whole width. */
+@media (max-width: 600px), (max-height: 500px) and (max-width: 700px) {
   .fullscreen .bpm {
     min-width: 7rem;
   }
@@ -1218,5 +1237,107 @@ a[download] {
 @media (max-height: 500px) {
   .fullscreen .bpm {
     min-width: 7rem;
+  }
+}
+
+/* The fullscreen count-in: a see-through number over everything. */
+.countdown {
+  display: none;
+}
+
+.fullscreen .countdown:not([hidden]) {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: min(60vh, 60vw);
+  font-weight: 700;
+  color: #fff;
+  background: rgb(0 0 0 / 0.55);
+  pointer-events: none;
+}
+
+/* The piece picker: a button that opens a menu of groups, each with its pieces beside it. */
+.row > .piece-select {
+  width: auto;
+  margin: 0;
+  color: inherit;
+  background-color: var(--pico-form-element-background-color);
+  border-color: var(--pico-form-element-border-color);
+}
+
+.row > .piece-select::after {
+  content: " ▾";
+}
+
+.piece-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0.25rem;
+  overflow: visible;
+  color: var(--pico-color);
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.piece-group {
+  position: relative;
+}
+
+.piece-menu button {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  text-align: start;
+  white-space: nowrap;
+  color: inherit;
+  background: none;
+  border: none;
+}
+
+.piece-group > button::after {
+  content: " ▸";
+  float: right;
+  margin-inline-start: 1rem;
+}
+
+.piece-menu button:hover,
+.piece-menu button:focus-visible,
+.piece-group:hover > button,
+.piece-group:focus-within > button {
+  background: var(--pico-form-element-selected-background-color);
+}
+
+.piece-submenu {
+  position: absolute;
+  top: -0.25rem;
+  left: 100%;
+  display: none;
+  max-height: 70vh;
+  padding: 0.25rem;
+  overflow-y: auto;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.piece-group:hover > .piece-submenu,
+.piece-group:focus-within > .piece-submenu {
+  display: block;
+}
+
+/* No room beside the menu on a phone, so a group's pieces open under it. */
+@media (max-width: 600px) {
+  .piece-submenu {
+    position: static;
+    max-height: 50vh;
+    margin-inline-start: 0.75rem;
+    border: none;
   }
 }

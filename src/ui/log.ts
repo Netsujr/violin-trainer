@@ -100,7 +100,7 @@ export function logScreen(): Screen {
   const week = weekMinutes(entries, today);
   const longestDay = Math.max(1, ...week.map((day) => day.minutes));
   const localPieces = allPieces().map((piece) => ({ ...piece, title: localTitle(piece.id, piece.title) }));
-  const planned = plannedThisWeek(localPieces, getSettings().targetDays, entries, today);
+  const planned = plannedThisWeek(localPieces, getSettings().highlighted, entries, today);
   const trends = pieceTrends(entries);
 
   showStorage();
@@ -120,7 +120,7 @@ export function logScreen(): Screen {
         ),
       ),
       ...(planned.length ? [h("h3", {}, t.planned)] : []),
-      ...planned.map(({ title, day, practised }) => h("p", {}, `${practised ? "✓" : "○"} ${title} (${t.days[day]})`)),
+      ...planned.map(({ title, practised }) => h("p", {}, `${practised ? "✓" : "○"} ${title}`)),
       h("h2", {}, t.trends),
       ...trends.map(({ title, sessions }) =>
         h(

@@ -142,7 +142,8 @@ await page.locator('.options label:has-text("count-in") input').uncheck();
 await freshPractice(page);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
 await page.locator(".bpm input").fill("120");
-await followNotes(page, { midis: D.map((midi) => midi + 2) });
+// The first note in tune starts the lanes. The rest are sharp.
+await followNotes(page, { midis: D.map((midi, index) => (index === 0 ? midi : midi + 2)) });
 await page.click('button:text-is("Start")');
 await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 3 of 15", null, { timeout: 15000 });
 await sleep(150);

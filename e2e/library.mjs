@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveTyped, typeNotes } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveTyped, typeNotes, openDrawers } from "./lib.mjs";
 
 const profile = OUT + "profile";
 rmSync(profile, { recursive: true, force: true });
@@ -12,7 +12,13 @@ const page = s.page;
 // Library: built-ins, parse, preview, save
 await nav(page, "Library");
 const column = (index) => page.locator(".library > div").nth(index);
-check("scales in the first column, songs in the second", (await column(0).locator("h3").innerText()) === "Scales" && (await column(0).locator(".piece").count()) === 6 && (await column(1).locator("h3").innerText()) === "Songs" && (await column(1).locator(".piece").count()) === 6);
+const group = async (index) => ({
+  title: await column(index).locator("h3").innerText(),
+  shown: await column(index).locator(":scope > .piece").count(),
+  drawer: (await column(index).locator(".more-pieces > summary").allInnerTexts()).join(),
+});
+const groups = [await group(0), await group(1), await group(2)];
+check("three groups, three cards each, the rest in a drawer", JSON.stringify(groups) === JSON.stringify([{ title: "Scales", shown: 3, drawer: "Show 14 more" }, { title: "Classic tunes", shown: 3, drawer: "Show 3 more" }, { title: "My songs", shown: 2, drawer: "" }]), JSON.stringify(groups));
 await page.fill('input[placeholder="Title"]', "Pasted D major");
 await typeNotes(page, "D4 E4 F#4 G4 | A4 B4 C#5 D5");
 const items = await page.locator("ol li").allInnerTexts();
@@ -24,8 +30,8 @@ await page.fill("textarea", "C6 D4");
 check("a note above first position is flagged", (await page.locator(".type-notes .warning").first().innerText()).includes("outside first position"));
 await page.fill("textarea", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
 await saveTyped(page).click();
-check("a saved piece joins the songs", (await column(1).locator(".piece").count()) === 7 && (await column(1).locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
-await page.locator(".piece", { hasText: "D major" }).first().locator("select").selectOption("0");
+check("a saved piece joins My songs", (await column(2).locator(".piece").count()) === 3 && (await column(2).locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
+await page.locator(".piece", { hasText: "D major" }).first().click();
 await page.screenshot({ path: OUT + "library.png" });
 
 // Settings and toggles survive reload
@@ -39,7 +45,7 @@ await page.locator('label[title="Fingers"] input').uncheck();
 await page.reload();
 await page.waitForSelector("nav button");
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
-check("settings survive a reload", saved.toleranceCents === 25 && saved.toggles.staff === false && saved.toggles.fingers === false && saved.targetDays["d-major-1oct"] === 0, JSON.stringify(saved));
+check("settings survive a reload", saved.toleranceCents === 25 && saved.toggles.staff === false && saved.toggles.fingers === false && saved.highlighted.includes("d-major-1oct"), JSON.stringify(saved));
 check("the Staff switch hides the staff in Listen", await page.locator(".staff").isHidden());
 await page.locator('label:has-text("Staff") input').check();
 await nav(page, "Practice");
@@ -113,7 +119,7 @@ check("every marker lands on its note", jump.rows.every((r) => r.heard));
 
 // Log screen contents
 const logText = await page.locator("section").innerText();
-check("week view, planned and trend rows show", logText.includes("This week") && logText.includes("✓ D major (Mon)") && logText.includes("D major: "), "");
+check("week view, planned and trend rows show", logText.includes("This week") && logText.includes("✓ D major\n") && logText.includes("D major: "), "");
 console.log("  " + logText.split("\n").slice(0, 16).join(" | "));
 
 // Download link and delete
@@ -146,18 +152,30 @@ await s.close();
   check("the columns sit side by side", left.right <= right.left && Math.abs(left.top - right.top) < 2);
   const row = page.locator(".piece", { hasText: "Twinkle" });
   check("Practice is an icon, named for screen readers", (await row.locator('button[aria-label="Practice"]').innerText()) === "" && (await row.locator('button[aria-label="Practice"] svg').count()) === 1);
-  const picker = row.locator(".day-picker");
-  const shownDay = () => page.locator(".piece", { hasText: "Twinkle" }).locator(".day-picker > span:not(.icon)").innerText();
-  check("no target day shows only the icon", (await shownDay()) === "" && (await picker.locator("svg").count()) === 1);
-  await picker.locator("select").selectOption("2");
-  check("a target day shows beside the icon", (await shownDay()) === "Wed" && (await picker.getAttribute("class")).includes("set"));
+  const marked = () => page.locator(".piece", { hasText: "Twinkle" }).evaluate((card) => card.classList.contains("highlighted"));
+  const songsHeading = () => page.locator(".library h3").nth(1).innerText();
+  const before = await page.locator(".library .piece strong").allInnerTexts();
+  check("nothing is highlighted at first", !(await marked()) && (await songsHeading()) === "Classic tunes");
+  await row.click();
+  check("clicking a card highlights it, and the heading counts it", (await marked()) && (await songsHeading()) === "Classic tunes (1 selected)" && (await row.locator(".piece-name").getAttribute("aria-pressed")) === "true", await songsHeading());
+  check("highlighting leaves the order as it was", (await page.locator(".library .piece strong").allInnerTexts()).join() === before.join());
+  await page.locator(".piece", { hasText: "Hot Cross Buns" }).click();
+  check("there's no limit, and each counts", (await songsHeading()) === "Classic tunes (2 selected)", await songsHeading());
   await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
-  check("it survives a reload", (await shownDay()) === "Wed");
-  await page.locator(".piece", { hasText: "Twinkle" }).locator("select").selectOption("");
-  check("and can be cleared", (await shownDay()) === "");
+  check("highlights survive a reload", (await marked()) && (await songsHeading()) === "Classic tunes (2 selected)");
+  await nav(page, "Practice"); await sleep(200);
+  const starred = await page.locator(".piece-menu button.highlighted").evaluateAll((items) => items.map((item) => item.value));
+  check("Practice's menu marks the same pieces", starred.join() === "hot-cross-buns,twinkle-twinkle", starred.join());
+  await nav(page, "Library"); await sleep(200);
+  await page.locator(".piece", { hasText: "Twinkle" }).click();
+  await page.locator(".piece", { hasText: "Hot Cross Buns" }).click();
+  check("and can be cleared", !(await marked()) && (await songsHeading()) === "Classic tunes");
+  await openDrawers(page); await sleep(100);
+  check("a drawer opens on the rest", (await page.locator(".piece", { hasText: "Ode to Joy" }).isVisible()) && (await page.locator(".piece", { hasText: "D harmonic minor" }).isVisible()));
 
-  for (const [title, count] of [["Hot Cross Buns", 17], ["Mary Had a Little Lamb", 26], ["Twinkle Twinkle Little Star", 42], ["Lightly Row", 57], ["Frère Jacques", 32], ["Ode to Joy", 62]]) {
+  for (const [title, count] of [["Hot Cross Buns", 17], ["Mary Had a Little Lamb", 26], ["Twinkle Twinkle Little Star", 42], ["Lightly Row", 57], ["Frère Jacques", 32], ["Hills and Dales", 47], ["Upstairs, Downstairs", 59], ["Ode to Joy", 62]]) {
     await nav(page, "Library"); await sleep(150);
+    await openDrawers(page);
     await page.locator(".piece", { hasText: title }).locator('button[aria-label="Practice"]').click(); await sleep(300);
     const closed = await page.locator(".staff .vf-stavenote").count();
     await page.click(".staff-toggle"); await sleep(250);
@@ -172,6 +190,7 @@ await s.close();
   const play = async (title, midis, tempo) => {
     await page.reload(); await page.waitForSelector("nav button"); // Ends the last song's synthetic player.
     await nav(page, "Library"); await sleep(150);
+    await openDrawers(page);
     await page.locator(".piece", { hasText: title }).locator('button[aria-label="Practice"]').click(); await sleep(300);
     await page.locator(".bpm input").fill(tempo ? "90" : "120");
     if (tempo) await page.locator('.options label:has-text("Tempo") input').check();
@@ -190,8 +209,9 @@ await s.close();
 
   await page.click('.language button:text-is("PT")'); await sleep(200);
   await page.locator("nav button").nth(2).click(); await sleep(200);
+  await openDrawers(page); await sleep(100);
   const text = await page.locator(".library").innerText();
-  check("pt: columns and song titles are translated", text.includes("Escalas") && text.includes("Músicas") && text.includes("Brilha, Brilha, Estrelinha") && text.includes("Ode à Alegria") && text.includes("Lá maior · cordas Lá e Mi"));
+  check("pt: groups and song titles are translated", text.includes("Escalas") && text.includes("Melodias clássicas") && text.includes("Minhas músicas") && text.includes("Colinas e Vales") && text.includes("Brilha, Brilha, Estrelinha") && text.includes("Ode à Alegria") && text.includes("Lá maior · cordas Lá e Mi"));
   check("songs: no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

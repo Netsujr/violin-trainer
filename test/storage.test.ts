@@ -17,6 +17,36 @@ async function settingsWith(stored: object | null, screen = { width: 1440, heigh
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("count-in", () => {
+  it("defaults to one bar, and moves a count no longer offered up to the next choice", async () => {
+    expect((await settingsWith(null)).getSettings().countInBeats).toBe(4);
+    expect((await settingsWith({ countInBeats: 3 })).getSettings().countInBeats).toBe(4);
+    expect((await settingsWith({ countInBeats: 1 })).getSettings().countInBeats).toBe(2);
+    expect((await settingsWith({ countInBeats: 6 })).getSettings().countInBeats).toBe(6);
+    expect((await settingsWith({ countInBeats: 12 })).getSettings().countInBeats).toBe(10);
+  });
+});
+
+describe("highlighted pieces", () => {
+  it("keeps pieces that had a target day marked", async () => {
+    const { getSettings } = await settingsWith({ targetDays: { "twinkle-twinkle": 2 } });
+    expect(getSettings().highlighted).toEqual(["twinkle-twinkle"]);
+  });
+
+  it("toggles a mark on and off, and groups pieces in their own order", async () => {
+    await settingsWith(null);
+    const { allPieces, isHighlighted, pieceGroups, toggleHighlighted } = await import("../src/storage");
+    const groups = pieceGroups(allPieces());
+    const hills = groups[2][1].find((piece) => piece.id === "hills-and-dales")!;
+    toggleHighlighted(hills);
+    expect(isHighlighted(hills)).toBe(true);
+    expect(pieceGroups(allPieces())[2][1].map((piece) => piece.id)).toEqual(groups[2][1].map((piece) => piece.id));
+    toggleHighlighted(hills);
+    expect(isHighlighted(hills)).toBe(false);
+    expect(groups.map(([key, pieces]) => [key, pieces.length])).toEqual([["scales", 17], ["songs", 6], ["customSongs", 2]]);
+  });
+});
+
 describe("saved pieces", () => {
   const piece = (id: string, title: string) => ({ id, title, source: "imported", notes: [{ pitch: "D4", beats: 1 }] });
 
@@ -77,11 +107,16 @@ describe("settings", () => {
 
 describe("timeline scale", () => {
   async function scaleOn(width: number, height: number) {
-    vi.resetModules();
-    vi.stubGlobal("innerWidth", width);
-    vi.stubGlobal("innerHeight", height);
+    await settingsWith(null, { width, height });
     return (await import("../src/ui/layout")).timelineScale();
   }
+
+  it("bigger staff gives the staff most of the room and shrinks the lanes", async () => {
+    await settingsWith({ staffBig: true });
+    const { staffScale, timelineScale } = await import("../src/ui/layout");
+    expect(staffScale()).toBeGreaterThan(1);
+    expect(timelineScale()).toBeLessThan(1);
+  });
 
   it("keeps full size from tablets up, and shrinks on phones and short screens", async () => {
     expect(await scaleOn(1440, 900)).toBe(1);

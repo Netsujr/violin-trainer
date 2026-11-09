@@ -62,7 +62,7 @@ describe("built-in songs", () => {
   const songs = committedPieces();
 
   it("are in order, easiest first", () => {
-    expect(songs.map((song) => song.id)).toEqual(["hot-cross-buns", "mary-had-a-little-lamb", "twinkle-twinkle", "lightly-row", "frere-jacques", "ode-to-joy"]);
+    expect(songs.map((song) => song.id)).toEqual(["hot-cross-buns", "mary-had-a-little-lamb", "twinkle-twinkle", "lightly-row", "frere-jacques", "ode-to-joy", "hills-and-dales", "upstairs-downstairs"]);
   });
 
   it.each(songs.map((song) => [song.id, song] as const))("%s fills whole 4-beat bars", (_, song) => {

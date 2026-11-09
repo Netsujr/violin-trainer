@@ -1,9 +1,9 @@
 // Tempo mode, rhythm patterns and the metronome.
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, D_MAJOR as D, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, D_MAJOR as D, OUT, pickPiece } from "./lib.mjs";
 
 const REPEAT = [{ id: "r", title: "Repeat", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
-const TWO = [{ id: "two", title: "Two", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
+const TWO = [{ id: "two", title: "Two", source: "built-in", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
 const scroll = (page) => page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);
 
 async function practice(file, seeded, player) {
@@ -91,7 +91,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
 }
 {
   const s = await practice("t-bowed.wav", { settings: { tempoOn: true, bpm: 60 }, pieces: REPEAT });
-  await s.page.locator(".options select").selectOption("r");
+  await pickPiece(s.page, "r");
   await run(s);
   await sleep(3500);
   check("tempo: a fresh bow just before the beat clears a repeated note", (await progress(s.page)) === "All 3 notes done", await progress(s.page));
@@ -99,7 +99,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
 }
 {
   const s = await practice("t-long.wav", { settings: { tempoOn: true, bpm: 60 }, pieces: REPEAT });
-  await s.page.locator(".options select").selectOption("r");
+  await pickPiece(s.page, "r");
   await run(s);
   await sleep(3000);
   check("tempo: one long bow doesn't clear a repeated note", (await progress(s.page)) === "Note 2 of 3", await progress(s.page));
@@ -194,7 +194,7 @@ for (const [label, count, pattern, ms, expected] of [
 }
 {
   const s = await practice("t-two.wav", { settings: { tempoOn: true, bpm: 60, pattern: 1 }, pieces: TWO });
-  await s.page.locator(".options select").selectOption("two");
+  await pickPiece(s.page, "two");
   await run(s);
   await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 12000 });
   const stats = await s.page.locator(".stats").innerText();

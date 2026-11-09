@@ -1,6 +1,6 @@
 // Selecting a section with click, then Shift+click, on the lanes or the staff: what it shows, and what plays.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT } from "./lib.mjs";
+import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece } from "./lib.mjs";
 
 const BEAT = 120, HIT_X = 130, LANE = 84;
 wav(OUT + "section-silent.wav", [rest(3)]);
@@ -159,7 +159,7 @@ const clef = await page.locator(".staff .vf-clef").first().boundingBox();
 await page.mouse.click(clef.x + 5, clef.y + clef.height / 2); await sleep(300);
 check("clicking the clef does nothing", (await progress(page)) === "Note 11 of 15", await progress(page));
 
-await page.locator(".options select").selectOption("g-major-2oct"); await sleep(300);
+await pickPiece(page, "g-major-2oct"); await sleep(300);
 const rows = await page.locator(".staff .vf-stave").count();
 await clickStaffNote(3);
 await clickStaffNote(26, true);
@@ -169,7 +169,7 @@ check("with its highlight on each line", wrapped === rows, `${wrapped} of ${rows
 await page.screenshot({ path: OUT + "section-wrapped.png", fullPage: true });
 
 // Changing the piece
-await page.locator(".options select").selectOption("d-major-1oct"); await sleep(300);
+await pickPiece(page, "d-major-1oct"); await sleep(300);
 check("changing the piece clears it", (await bands()) === 0 && !(await line()).includes("Section"), await line());
 await page.locator(".staff-toggle").click(); await sleep(300);
 await clickTile(0); await clickTile(1, true);

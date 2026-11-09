@@ -271,19 +271,21 @@ flow("11. Library");
 await tab("Library");
 const columns = await page.locator(".library > div").evaluateAll((list) => list.map((column) => Math.round(column.getBoundingClientRect().left)));
 check(`scales and songs ${isPhone ? "stack" : "sit side by side"}`, (columns[0] === columns[1]) === isPhone, JSON.stringify(columns));
-check("six scales and six songs", (await page.locator(".library > div").nth(0).locator(".piece").count()) === 6 && (await page.locator(".library > div").nth(1).locator(".piece").count()) === 6);
+const shownCards = await page.locator(".library > div").evaluateAll((groups) => groups.map((group) => group.querySelectorAll(":scope > .piece").length));
+const drawers = await page.locator(".library .more-pieces > summary").allInnerTexts();
+check("three groups, three cards each, the rest in drawers", shownCards.join() === "3,3,2" && drawers.join() === "Show 14 more,Show 3 more", `${shownCards.join()} | ${drawers.join()}`);
 await auditCheck(page, "Library");
 await shot("11-library");
 const row = page.locator(".piece", { hasText: "Twinkle" });
-await row.locator("select").selectOption("2");
-check("a target day shows beside the calendar", (await row.locator(".day-picker > span:not(.icon)").innerText()) === "Wed");
+await press(row.locator(".piece-name"));
+check("tapping a card highlights it, and its group counts it", (await row.evaluate((card) => card.classList.contains("highlighted"))) && (await page.locator(".library h3").nth(1).innerText()) === "Classic tunes (1 selected)", await page.locator(".library h3").nth(1).innerText());
 await page.fill('input[placeholder="Title"]', "My tune");
 await press(page.locator(".type-notes summary")); await sleep(150);
 await page.fill("textarea", "D4 E4 F#4");
 check("the preview lists the notes", (await page.locator("ol li").count()) === 3);
 await press(page.locator(".type-notes").getByRole("button", { name: "Save piece", exact: true })); await sleep(200);
 const mine = page.locator(".piece", { hasText: "My tune" });
-check("a new piece joins the songs", (await page.locator(".library > div").nth(1).locator(".piece", { hasText: "My tune" }).count()) === 1);
+check("a new piece joins My songs", (await page.locator(".library > div").nth(2).locator(".piece", { hasText: "My tune" }).count()) === 1);
 await press(mine.getByRole("button", { name: "Practice", exact: true })); await sleep(400);
 check("the play icon opens it in Practice", (await progress(page)) === "Note 1 of 3", await progress(page));
 await tab("Library");
@@ -382,7 +384,7 @@ check("Delete recording removes only the audio", (await page.locator("audio").co
 flow("13. Log");
 const logText = await page.locator("section").innerText();
 check("reads sensibly", ["This week", "Planned", "Trends", "Sessions", "Score: 93%", "D major"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
-check("the planned piece shows", logText.includes("Twinkle Twinkle Little Star (Wed)"));
+check("the highlighted piece shows as planned", /[✓○] Twinkle Twinkle Little Star/.test(logText));
 await shot("13-log");
 
 flow("14. Settings");
@@ -412,7 +414,7 @@ await press(button("EN")); await sleep(300);
 flow("16. Coming back later");
 await page.reload(); await page.waitForSelector("nav button");
 const saved = await savedSettings(page);
-check("settings survive a reload", saved.bpm > 0 && saved.targetDays["twinkle-twinkle"] === 2 && saved.language === "en", JSON.stringify({ bpm: saved.bpm, days: saved.targetDays }));
+check("settings survive a reload", saved.bpm > 0 && saved.highlighted.includes("twinkle-twinkle") && saved.language === "en", JSON.stringify({ bpm: saved.bpm, highlighted: saved.highlighted }));
 check("the log survives too", (await savedLog(page)).length >= 5);
 
 if (touch) {

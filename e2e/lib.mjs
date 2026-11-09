@@ -102,6 +102,12 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
   }, { midis, delayMs, delays });
 export const near = (values, expected, tolerance = 60) => values.length > 0 && values.every((value, index) => Math.abs(value - (expected[index % expected.length])) <= tolerance);
 export const progress = (page) => page.locator("section > p").first().innerText();
+// Menu items only show on hover, so this clicks the piece's item directly, as a tap would.
+export const pickPiece = (page, id) => page.locator(`.piece-menu button[value="${id}"]`).evaluate((item) => item.click());
+// The piece Practice has open, by the menu button's label.
+export const pickedPiece = (page) => page.locator(".piece-select").innerText();
+// Library shows a few pieces per group, with the rest in drawers. Tests that need every card open them all.
+export const openDrawers = (page) => page.locator(".more-pieces:not([open]) > summary").evaluateAll((summaries) => summaries.forEach((summary) => summary.click()));
 export const nav = (page, name) => page.click(`nav button:text-is("${name}")`);
 export const start = (page) => page.click('button:text-is("Start")');
 export const stop = (page) => page.click('button:text-is("Stop")');

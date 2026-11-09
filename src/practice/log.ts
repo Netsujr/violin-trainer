@@ -60,13 +60,12 @@ export function weekMinutes(entries: LogEntry[], today: Date) {
   }));
 }
 
-export function plannedThisWeek(pieces: Piece[], targetDays: Record<string, number>, entries: LogEntry[], today: Date) {
+export function plannedThisWeek(pieces: Piece[], highlighted: string[], entries: LogEntry[], today: Date) {
   const week = daysOfWeek(today);
   return pieces
-    .filter((piece) => targetDays[piece.id] !== undefined)
+    .filter((piece) => highlighted.includes(piece.id))
     .map((piece) => ({
       title: piece.title,
-      day: targetDays[piece.id],
       practised: entries.some((entry) => entry.pieceId === piece.id && week.some((day) => sameDay(entry, day))),
     }));
 }

@@ -138,7 +138,7 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
       context.fillText(t.strings[lane], 12, index * LANE_HEIGHT + LANE_HEIGHT / 2 + 6);
     });
     context.fillStyle = HIT_LINE_COLOR;
-    context.fillRect(HIT_X - 1, 0, 2, HEIGHT);
+    context.fillRect(HIT_X - 2, 0, 4, HEIGHT);
   }
 
   function drawTile(note: PieceNote, x: number, result?: boolean) {

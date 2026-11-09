@@ -2,13 +2,15 @@ import { localTitle, t } from "../i18n";
 import { fillFingering } from "../music/fingering";
 import { parseQuickText } from "../music/parse";
 import { barMarks, BEAT_LABELS, noteLabels } from "../music/notes";
-import { allPieces, deletePiece, getSettings, isScale, loadDraft, saveDraft, savePiece, saveSettings, updatePiece } from "../storage";
+import { allPieces, deletePiece, getSettings, isHighlighted, isScale, loadDraft, pieceGroups, saveDraft, savePiece, toggleHighlighted, updatePiece } from "../storage";
 import type { Piece } from "../music/notes";
 import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
 import { createPieceEditor } from "./pieceEditor";
 import { downloadSheet } from "./sheetPdf";
-import { CALENDAR_ICON, DOWNLOAD_ICON, PENCIL_ICON, PLAY_ICON, TRASH_ICON } from "./toggles";
+import { DOWNLOAD_ICON, PENCIL_ICON, PLAY_ICON, TRASH_ICON } from "./toggles";
+
+const SHOWN_PIECES = 3;
 
 const editableNote = (note: Piece["notes"][number]) => ({ ...note, beats: note.beats ?? 1 });
 
@@ -47,43 +49,22 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
     previewView,
   );
 
-  // The select is clear and sits over the icon, so tapping the icon opens the native list.
-  function targetDayPicker(pieceId: string) {
-    const day = h("span");
-    const showDay = () => {
-      const index = settings.targetDays[pieceId];
-      day.textContent = t.days[index] ?? "";
-      picker.classList.toggle("set", index !== undefined);
-    };
-    const select = h(
-      "select",
-      {
-        title: t.targetDay,
-        ariaLabel: t.targetDay,
-        onchange() {
-          if (select.value === "") delete settings.targetDays[pieceId];
-          else settings.targetDays[pieceId] = Number(select.value);
-          saveSettings();
-          showDay();
-        },
-      },
-      h("option", { value: "", textContent: t.noTargetDay }),
-      ...t.days.map((day, index) =>
-        h("option", { value: String(index), selected: settings.targetDays[pieceId] === index, textContent: day }),
-      ),
-    );
-    const picker = h("div", { className: "day-picker" }, h("span", { className: "icon", innerHTML: CALENDAR_ICON }), day, select);
-    showDay();
-    return picker;
-  }
-
+  // Clicking a card, anywhere but its buttons, marks it for practice or clears the mark.
   const pieceRow = (piece: Piece) =>
     h(
       "div",
-      { className: "row piece" },
+      {
+        className: `row piece${isHighlighted(piece) ? " highlighted" : ""}`,
+        title: t.markForPractice,
+        onclick(event) {
+          if ((event.target as Element).closest(".icon-button")) return;
+          toggleHighlighted(piece);
+          renderList();
+        },
+      },
       h(
-        "div",
-        { className: "piece-name" },
+        "button",
+        { type: "button", className: "piece-name", ariaPressed: String(isHighlighted(piece)) },
         h("strong", {}, localTitle(piece.id, piece.title)),
         h("span", {}, t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length)),
       ),
@@ -94,7 +75,6 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
         ariaLabel: t.screens.Practice,
         onclick: () => goPractice(piece.id),
       }),
-      targetDayPicker(piece.id),
       ...(isScale(piece)
         ? []
         : [
@@ -127,11 +107,28 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
         : []),
     );
 
+  // Each group shows its first few, with the rest in a drawer that stays open across changes.
+  const openDrawers = new Set<string>();
   function renderList() {
-    const pieces = allPieces();
     list.replaceChildren(
-      h("div", {}, h("h3", {}, t.scales), ...pieces.filter(isScale).map(pieceRow)),
-      h("div", {}, h("h3", {}, t.songs), ...pieces.filter((piece) => !isScale(piece)).map(pieceRow)),
+      ...pieceGroups(allPieces())
+        .filter(([, group]) => group.length > 0)
+        .map(([key, group]) => {
+          const rest = group.slice(SHOWN_PIECES);
+          const selected = group.filter(isHighlighted).length;
+          const drawer = h(
+            "details",
+            {
+              className: "more-pieces",
+              open: openDrawers.has(key),
+              ontoggle: () => (drawer.open ? openDrawers.add(key) : openDrawers.delete(key)),
+            },
+            h("summary", {}, t.showMore(rest.length)),
+            ...rest.map(pieceRow),
+          );
+          const heading = selected ? `${t[key]} (${t.selectedCount(selected)})` : t[key];
+          return h("div", {}, h("h3", {}, heading), ...group.slice(0, SHOWN_PIECES).map(pieceRow), ...(rest.length ? [drawer] : []));
+        }),
     );
   }
 

@@ -1,7 +1,7 @@
 // Every screen and the main flows on phone and tablet sizes, by touch, plus small computer windows.
 // This is Chrome emulating those sizes: it checks layout and touch handling, not Safari or a real device's mic.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, typeNotes } from "./lib.mjs";
+import { open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, typeNotes, openDrawers } from "./lib.mjs";
 
 const SIZES = [
   ["small phone", 320, 568, true],
@@ -195,6 +195,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await goNav("Library"); await sleep(200);
   const columns = await page.locator(".library > div").evaluateAll((columns) => columns.map((column) => Math.round(column.getBoundingClientRect().left)));
   check(`${tag}: scales and songs ${width >= 716 ? "side by side" : "stacked"}`, (columns[0] !== columns[1]) === width >= 716, JSON.stringify(columns));
+  await openDrawers(page); await sleep(100);
   await page.locator(".piece", { hasText: "Ode to Joy" }).locator('button[aria-label="Practice"]').click(); await sleep(300);
   await go(".staff-toggle"); await sleep(250);
   const song = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), notes = [...document.querySelectorAll(".staff .vf-stavenote")].map((n) => n.getBoundingClientRect()); return { notes: notes.length, outside: notes.filter((n) => n.right > panel.right + 1 || n.left < panel.left - 1).length }; });

@@ -43,8 +43,10 @@ export function createMetronome() {
       }
     },
     // leadBeats is how many clicks come before the first note, which is the one that gets the accent.
-    reset(leadBeats = 0) {
-      nextClick = lastClick = null;
+    // firstClickAt, if given, is when the first click is due, instead of a short delay from the next tick.
+    reset(leadBeats = 0, firstClickAt: number | null = null) {
+      nextClick = firstClickAt;
+      lastClick = null;
       count = (BEATS_PER_BAR - (leadBeats % BEATS_PER_BAR)) % BEATS_PER_BAR;
     },
     nearestBeat(time: number, bpm: number) {

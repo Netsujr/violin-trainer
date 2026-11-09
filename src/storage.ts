@@ -16,16 +16,21 @@ export type Settings = {
   loopOn: boolean;
   repeatTopOn: boolean;
   countInOn: boolean;
+  countInBeats: number;
   metronomeOn: boolean;
   bpm: number;
   pattern: number;
   staffOpen: boolean;
+  staffBig: boolean;
   optionsOpen: boolean;
   toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean };
-  targetDays: Record<string, number>;
+  // Pieces marked for practice, in no particular order.
+  highlighted: string[];
 };
 
 export type Recording = { blob: Blob; markers: { pitch: string; seconds: number }[] };
+
+export const COUNT_IN_CHOICES = [2, 4, 6, 8, 10];
 
 const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   toleranceCents: 40,
@@ -36,12 +41,14 @@ const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   loopOn: false,
   repeatTopOn: false,
   countInOn: true,
+  countInBeats: 4,
   metronomeOn: false,
   bpm: 60,
   pattern: 0,
   staffOpen: false,
+  staffBig: false,
   toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true },
-  targetDays: {},
+  highlighted: [],
 };
 
 const read = <T>(key: string, fallback: T): T => {
@@ -63,6 +70,10 @@ export function getSettings() {
       ...stored,
       // Merged separately, so a switch added later still gets its default on settings saved before it existed.
       toggles: { ...DEFAULT_SETTINGS.toggles, ...stored.toggles },
+      // A count-in saved before the choices changed moves up to the next one offered.
+      countInBeats: COUNT_IN_CHOICES.find((beats) => beats >= (stored.countInBeats ?? DEFAULT_SETTINGS.countInBeats)) ?? COUNT_IN_CHOICES.at(-1)!,
+      // Pieces given a target day before highlighting replaced it stay marked.
+      highlighted: stored.highlighted ?? Object.keys((stored as { targetDays?: object }).targetDays ?? {}),
     };
   }
   return settings;
@@ -75,6 +86,22 @@ const withWayDown = (notes: PieceNote[]) => [...notes, ...notes.slice(0, -1).rev
 const fingered = (piece: Piece): Piece => ({ ...piece, notes: piece.notes.map(fillFingering) });
 
 export const isScale = (piece: Piece) => piece.source === "built-in";
+
+export const isHighlighted = (piece: Piece) => getSettings().highlighted.includes(piece.id);
+
+export function toggleHighlighted(piece: Piece) {
+  const settings = getSettings();
+  settings.highlighted = isHighlighted(piece) ? settings.highlighted.filter((id) => id !== piece.id) : [...settings.highlighted, piece.id];
+  saveSettings();
+}
+
+// Scales, the songs that come with the app, and songs added later or imported.
+export const pieceGroups = (pieces: Piece[]) =>
+  [
+    ["scales", pieces.filter(isScale)],
+    ["songs", pieces.filter((piece) => piece.source === "song")],
+    ["customSongs", pieces.filter((piece) => !isScale(piece) && piece.source !== "song")],
+  ] as const;
 
 export const builtInPieces = () =>
   (scales as Piece[]).map((scale) => fingered({ ...scale, notes: withWayDown(scale.notes) }));

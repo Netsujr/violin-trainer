@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { wav, rest } from "./wav.mjs";
-import { answer, auditCheck, canvasHasColor, check, nav, open, OUT, progress, saveTyped, seed, sleep, typeNotes } from "./lib.mjs";
+import { answer, auditCheck, canvasHasColor, check, nav, open, openDrawers, OUT, pickPiece, progress, saveTyped, seed, sleep, typeNotes } from "./lib.mjs";
 
 const WAV = OUT + "pieces-silent.wav";
 wav(WAV, [rest(3)]);
@@ -22,6 +22,7 @@ async function library(page, { pieces = [], draft = { title: "", notes: [] }, se
   await seed(page, { settings, pieces });
   await nav(page, "Library");
   await sleep(200);
+  await openDrawers(page);
 }
 
 function tools(page, press = (locator) => locator.click()) {
@@ -243,6 +244,7 @@ flow("The question before anything is lost");
   await answer(page, "Delete");
   check("Delete removes only that song", (await t.stored()).map((piece) => piece.id).join() === "other,long" && (await t.row("My tune").count()) === 0);
   await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
+  await openDrawers(page);
   check("for good", (await t.row("My tune").count()) === 0);
 
   await library(page, { pieces, draft: { title: "", notes: [note("D4", 1)] } });
@@ -271,12 +273,15 @@ flow("The question before anything is lost");
   check("Delete removes the recording", (await page.locator("audio").count()) === 0 && !(await hasTake()));
 
   await nav(page, "Library"); await sleep(200);
+  await openDrawers(page);
   await page.getByRole("button", { name: "PT", exact: true }).click(); await sleep(200);
+  await openDrawers(page); // Changing language builds the Library again, with its drawers closed.
   await t.row("Other tune").getByRole("button", { name: "Excluir", exact: true }).click(); await t.modal.waitFor();
   const question = await t.modal.innerText();
   check("the question comes in Portuguese too", question.includes('Excluir "Other tune"?') && question.includes("Cancelar"), question.replaceAll("\n", " | "));
   await answer(page, "Cancelar");
   await page.getByRole("button", { name: "EN", exact: true }).click(); await sleep(200);
+  await openDrawers(page);
   check("the browser's own popups aren't used anywhere", popups === 0, `${popups}`);
   notProblems(s);
   await s.close();
@@ -290,10 +295,10 @@ flow("Editing a saved song");
   const mine = custom("mine", "My tune", [note("D4", 2, { string: "D", finger: "0" }), note("A4", 1, { string: "D", finger: "4" }), note("B4", 1, { string: "A", finger: "1" })]);
   const other = custom("other", "Other tune", [{ pitch: "D4", string: "D", finger: "0" }]);
   const pieces = [mine, other];
-  const settings = { targetDays: { mine: 2 } };
+  const settings = { highlighted: ["mine"] };
   const savedMine = async () => (await t.stored()).find((piece) => piece.id === "mine");
   await library(page, { pieces, settings });
-  const buttonsOn = (text) => t.row(text).first().evaluate((row) => [...row.querySelectorAll("button")].map((button) => button.getAttribute("aria-label")).join());
+  const buttonsOn = (text) => t.row(text).first().evaluate((row) => [...row.querySelectorAll("button.icon-button")].map((button) => button.getAttribute("aria-label")).join());
   check("custom songs get the pencil, beside the trash", (await buttonsOn("My tune")) === "Practice,Download PDF,Edit piece,Delete", await buttonsOn("My tune"));
   check("built-in songs don't", !(await buttonsOn("Ode to Joy")).includes("Edit") && !(await buttonsOn("Ode to Joy")).includes("Delete"));
 
@@ -318,15 +323,17 @@ flow("Editing a saved song");
   check("a note left alone keeps a hand-set finger", changed.notes[1].finger === "4" && changed.notes[1].string === "D", JSON.stringify(changed.notes[1]));
   check("a note given a new pitch gets a fresh fingering", changed.notes[2].pitch === "B#4" && changed.notes[2].finger !== "1" && changed.notes[2].finger !== undefined, JSON.stringify(changed.notes[2]));
   check("the editor goes back to adding", (await t.heading()) === "Add piece" && (await t.names()) === "" && (await page.locator(".type-notes").isVisible()));
-  check("the target day stays with the song", (await t.row("My better tune").locator(".day-picker select").inputValue()) === "2");
+  check("the highlight stays with the song", await t.row("My better tune").evaluate((card) => card.classList.contains("highlighted")));
 
   await t.row("My better tune").getByRole("button", { name: "Practice", exact: true }).click(); await sleep(300);
-  check("Practice gets the changes", (await progress(page)) === "Note 1 of 3" && (await page.locator(".options select").evaluate((select) => select.selectedOptions[0].textContent)) === "My better tune", await progress(page));
+  check("Practice gets the changes", (await progress(page)) === "Note 1 of 3" && (await page.locator(".piece-select").innerText()) === "My better tune", await progress(page));
   await nav(page, "Library"); await sleep(200);
+  await openDrawers(page);
 
   await t.pencil("My better tune").click(); await sleep(150);
   await t.title.fill("After a reload");
   await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
+  await openDrawers(page);
   check("a reload stays in the edit", (await t.heading()) === "Edit piece" && (await t.title.inputValue()) === "After a reload");
   await t.save.click(); await sleep(150);
   check("so saving doesn't make a copy", (await t.stored()).length === 2 && (await savedMine()).title === "After a reload", JSON.stringify((await t.stored()).map((piece) => piece.title)));
@@ -357,6 +364,7 @@ flow("Editing a saved song");
   await answer(page, "Delete");
   check("deleting the song being edited clears the editor", (await t.heading()) === "Add piece" && (await t.names()) === "" && (await t.stored()).length === 1);
   await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
+  await openDrawers(page);
   check("and a reload doesn't bring the edit back", (await t.heading()) === "Add piece");
   notProblems(s);
   await s.close();
@@ -459,18 +467,18 @@ flow("The sheet in Practice: bars, and labels that stay with their line");
   ];
   await seed(page, { settings: { staffOpen: true, optionsOpen: true }, pieces: [custom("leaps", "Low then leaps", lowThenLeaps)] });
   await nav(page, "Practice"); await sleep(300);
-  const select = page.locator(".options select");
-  const titles = (await select.locator("option").allTextContents()).filter((title) => title !== "Low then leaps");
+  const choices = await page.locator(".piece-menu button[value]").evaluateAll((items) => items.map((item) => [item.value, item.textContent]));
+  const titles = choices.filter(([, title]) => title !== "Low then leaps");
   const total = { labels: 0, onNotes: 0, onLabels: 0 };
-  for (const title of titles) {
-    await select.selectOption({ label: title }); await sleep(200);
+  for (const [id, title] of titles) {
+    await pickPiece(page, id); await sleep(200);
     const found = await collisions();
     for (const key of Object.keys(total)) total[key] += found[key];
     if (found.onNotes || found.onLabels) console.log(`  ${title}:`, found);
   }
   check(`no finger or name touches a note on any of the ${titles.length} scales and songs`, total.labels > 500 && total.onNotes === 0, JSON.stringify(total));
   check("or another label", total.onLabels === 0);
-  await select.selectOption({ label: "Low then leaps" }); await sleep(200);
+  await pickPiece(page, "leaps"); await sleep(200);
   const leaps = await collisions();
   check("a low line above a line of leaps doesn't run labels together", leaps.labels > 0 && leaps.onLabels === 0, JSON.stringify(leaps));
   notProblems(s);
@@ -480,15 +488,15 @@ flow("The sheet in Practice: bars, and labels that stay with their line");
 flow("The buttons on a row");
 const rowSizes = async (page, t, label, drawn, tap) => {
   const pieces = [custom("mine", "My tune", [note("D4", 1, { finger: "0" })])];
-  await library(page, { pieces, settings: { targetDays: { mine: 2 } } });
-  const sizes = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".icon-button, .day-picker")].map((control) => {
-    const box = control.getBoundingClientRect(), shown = (control.querySelector(".icon") ?? control.querySelector("svg")).getBoundingClientRect();
+  await library(page, { pieces, settings: { highlighted: ["mine"] } });
+  const sizes = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".icon-button")].map((control) => {
+    const box = control.getBoundingClientRect(), shown = control.querySelector("svg").getBoundingClientRect();
     return { shown: `${shown.width}x${shown.height}`, tall: box.height, wide: box.width };
   }));
-  check(`${label}: five controls`, sizes.length === 5);
+  check(`${label}: four controls`, sizes.length === 4);
   check(`${label}: drawn at ${drawn} px`, sizes.every(({ shown }) => shown === `${drawn}x${drawn}`), sizes.map(({ shown }) => shown).join());
   check(`${label}: tapped at ${tap} px`, sizes.every(({ tall, wide }) => tall === tap && wide >= tap), sizes.map(({ wide, tall }) => `${wide}x${tall}`).join());
-  const answers = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".icon-button, .day-picker")].every((control) => {
+  const answers = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".icon-button")].every((control) => {
     control.scrollIntoView({ block: "center" });
     const box = control.getBoundingClientRect();
     return [[box.left + 4, box.top + 4], [box.right - 4, box.top + 4], [box.left + 4, box.bottom - 4], [box.right - 4, box.bottom - 4]].every(([x, y]) => control.contains(document.elementFromPoint(x, y)));
@@ -540,6 +548,7 @@ for (const [label, width, height] of [["iPhone size", 393, 852], ["Small phone",
 
   await t.save.scrollIntoViewIfNeeded();
   await t.save.tap(); await sleep(150);
+  await openDrawers(page); // A fourth song of your own goes in a new drawer.
   check(`${label}: it saves`, (await t.stored()).length === 2);
   await t.trash("By touch").tap(); await t.modal.waitFor();
   await auditCheck(page, `${label}: the question`, "dialog[open]");

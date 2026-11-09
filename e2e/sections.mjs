@@ -1,7 +1,7 @@
 // The Options panel, the section bars, the staff's labels and its two modes, and the needle's zones.
 import { readFileSync, writeFileSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, sleep, check, seed, progress, OUT } from "./lib.mjs";
+import { open, nav, start, sleep, check, seed, progress, OUT, pickPiece } from "./lib.mjs";
 
 wav(OUT + "s-silent.wav", [rest(3)]);
 const detuned = (cents) => 440 * 2 ** (cents / 1200);
@@ -37,7 +37,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   check("options: off stays clickable", await label.locator("input").isEnabled());
   await page.click(".options > summary");
   await sleep(200);
-  check("options: closes, leaving the run buttons", (await page.locator(".options select").isHidden()) && (await page.locator('button:text-is("Start")').isVisible()) && (await page.locator("section > p").isVisible()));
+  check("options: closes, leaving the run buttons", (await page.locator(".piece-select").first().isHidden()) && (await page.locator('button:text-is("Start")').isVisible()) && (await page.locator("section > p").isVisible()));
   await page.reload();
   await page.waitForSelector("nav button");
   await nav(page, "Practice");
@@ -82,7 +82,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   check("staff: letter names and the grid are only for the lanes", (await sheet()) === before);
   await lane("Letter names (A G D)").check();
   await lane("Grid").check();
-  await page.locator(".options select").selectOption("c-major-1oct");
+  await pickPiece(page, "c-major-1oct");
   await sleep(150);
   const low = await page.locator(".staff > svg > text").evaluateAll((texts) => texts.filter((text) => text.getAttribute("fill") === "#b03020").map((text) => text.textContent).join());
   check("staff: low fingers are red, with a plain number", low.length > 0 && !low.includes("L"), low);
@@ -90,7 +90,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   check("staff: labels stay inside the sheet", inside);
 
   // Staff modes, with the current note on the playhead
-  await page.locator(".options select").selectOption("d-major-1oct");
+  await pickPiece(page, "d-major-1oct");
   await sleep(150);
   const headOffset = () => page.evaluate(() => {
     const panel = document.querySelector(".staff-panel").getBoundingClientRect();
@@ -115,7 +115,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await sleep(200);
   check("staff: the arrow opens the full sheet", (await page.locator(".staff.collapsed").count()) === 0 && (await page.locator(".staff-toggle").getAttribute("aria-expanded")) === "true");
   check("staff: the full sheet doesn't scroll", await page.locator(".staff").evaluate((staff) => staff.scrollLeft === 0 && staff.scrollWidth <= staff.clientWidth + 1));
-  await page.locator(".options select").selectOption("g-major-2oct");
+  await pickPiece(page, "g-major-2oct");
   await sleep(150);
   check("staff: a long piece wraps", (await page.locator(".staff .vf-stave").count()) >= 2);
   await page.reload();

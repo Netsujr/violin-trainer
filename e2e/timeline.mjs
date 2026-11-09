@@ -1,5 +1,5 @@
 import { wav, note } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, pickPiece } from "./lib.mjs";
 
 const LANES = ["E", "A", "D", "G"];
 const HIT_X = 130, SPACING = 120, LANE_HEIGHT = 84;
@@ -22,7 +22,7 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   const s = await open(OUT + "silent.wav");
   const page = s.page;
   await nav(page, "Practice");
-  await page.locator("select").selectOption("d-major-1oct");
+  await pickPiece(page, "d-major-1oct");
   check("a new screen starts at note 1", (await progress(page)) === "Note 1 of 15", await progress(page));
 
   const before = await page.locator("canvas").evaluate((c) => c.toDataURL());
@@ -106,9 +106,9 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await page.keyboard.press("Enter");
   check("Enter picks the note at the hit line", (await progress(page)) === "Note 3 of 15", await progress(page));
 
-  const values = await page.locator("select option").evaluateAll((options) => options.map((o) => [o.value, o.textContent]));
-  const twoOctaves = values.find(([, title]) => title === "G major")[0];
-  await page.locator("select").selectOption(twoOctaves);
+  const values = await page.locator(".piece-menu button[value]").evaluateAll((items) => items.map((item) => [item.value, item.textContent]));
+  const twoOctaves = values.find(([, title]) => title === "G major (2 octaves)")[0];
+  await pickPiece(page, twoOctaves);
   check("changing piece goes back to note 1", (await progress(page)).startsWith("Note 1 of"), await progress(page));
   const count = Number((await progress(page)).match(/of (\d+)/)[1]);
   const closed = await page.locator(".staff").evaluate((el) => ({ staves: el.querySelectorAll(".vf-stave").length, notes: el.querySelectorAll(".vf-stavenote").length, scrolls: el.scrollWidth > el.clientWidth }));

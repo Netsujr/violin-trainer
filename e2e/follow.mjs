@@ -1,4 +1,4 @@
-// "Don't wait": the lanes keep moving at the BPM, each note is judged as it passes, and a run ends with a score.
+// "Don't wait": the lanes start on the first note played in tune, then keep moving at the BPM, each note is judged as it passes, and a run ends with a score.
 import { wav, rest } from "./wav.mjs";
 import { open, nav, stop, sleep, check, followNotes, near, progress, begin, waitForText, freshPractice, savedLog, savedSettings, canvasHasColor, D_MAJOR as D, OUT } from "./lib.mjs";
 
@@ -22,7 +22,7 @@ const color = () => dontWait().evaluate((button) => getComputedStyle(button).col
 const plainColor = await page.locator('button[aria-label="Fullscreen"]').evaluate((button) => getComputedStyle(button).color);
 check("off by default, looking like the buttons beside it", (await waiting()) && (await savedSettings(page)).followOn === false && (await color()) === plainColor, await color());
 const { x: followX, width: followWidth } = await dontWait().boundingBox();
-check("an icon, right next to Fullscreen", (await dontWait().innerText()) === "" && Math.abs((await page.locator('button[aria-label="Fullscreen"]').boundingBox()).x - (followX + followWidth)) < 16);
+check("an icon, with the run buttons", (await dontWait().innerText()) === "" && Math.abs((await page.locator('button[aria-label="Bigger staff, smaller lanes"]').boundingBox()).x - (followX + followWidth)) < 16);
 check("gone from Options", (await page.locator('.options :text("Don\'t wait")').count()) === 0);
 const hint = await dontWait().getAttribute("title");
 check("explains itself", hint?.includes("score"), hint);
@@ -30,37 +30,44 @@ await dontWait().click(); await sleep(300);
 check("turns green when on", (await color()) === "rgb(76, 208, 125)", await color());
 check("saved, and Tempo no longer applies", (await savedSettings(page)).followOn === true && (await page.locator('.options label:has-text("Tempo") input').isDisabled()));
 
-// Silence: the lanes go anyway
+// Silence: the lanes wait on the first note, with no count-in
 await freshPractice(page, 120);
 check("it stays on after a reload", !(await waiting()));
+await watch();
+await begin(page);
+await sleep(2000);
+const held = await frames();
+check("in silence the lanes wait on the first note", held.every((frame) => frame.left === 0 && frame.text === "Note 1 of 15"), held.at(-1).text);
+await stop(page); await sleep(200);
+
+// The first note, then silence: the lanes go on at the BPM
+await freshPractice(page, 120);
+await followNotes(page, { midis: [62], delays: { 2: 60000 } });
 await watch();
 await begin(page);
 await waitForText(page, "All", 60000);
 await sleep(150);
 const run = await frames();
-const started = run.find((frame) => frame.text.startsWith("Starts in"));
-const counts = [...new Set(run.map((frame) => frame.text).filter((text) => text.startsWith("Starts in")))];
-check("counts in three beats", counts.join() === "Starts in 3…,Starts in 2…,Starts in 1…", counts.join());
+check("never counts in", !run.some((frame) => frame.text.startsWith("Starts in")));
 const moving = run.filter((frame, index) => index > 0 && frame.left > run[index - 1].left);
-check("the lanes hold still during the count-in", run.filter((frame) => frame.text.startsWith("Starts in")).every((frame) => frame.left === 0));
 const seconds = (moving.at(-1).at - moving[0].at) / 1000;
 const speed = (moving.at(-1).left - moving[0].left) / seconds;
-check("then move at the BPM, with nothing played", Math.abs(speed - 2 * BEAT_PX) < 8, `${Math.round(speed)} px/s`);
+check("once it's heard, the lanes move at the BPM, with nothing more played", Math.abs(speed - 2 * BEAT_PX) < 8, `${Math.round(speed)} px/s`);
 const steps = moving.slice(1).map((frame, index) => frame.left - moving[index].left);
 check("smoothly", Math.max(...steps) < 12, `largest step ${Math.max(...steps)}`);
-const total = (run.find((frame) => frame.text.startsWith("All")).at - started.at) / 1000;
-check("a run lasts delay + count-in + every beat", Math.abs(total - (0.5 + 1.5 + 7.5)) < 0.4, `${total.toFixed(2)} s`);
+// The first note's hold time has passed by the time they move, and the last note clears once the mic has had time to hear it.
+const total = (run.find((frame) => frame.text.startsWith("All")).at - moving[0].at) / 1000;
+check("a run lasts every beat from the first note on", Math.abs(total - (7.5 - 0.2 + 0.07)) < 0.3, `${total.toFixed(2)} s`);
 const changes = run.filter((frame, index) => index > 0 && frame.text !== run[index - 1].text && frame.text.startsWith("Note"));
 const gaps = changes.slice(1).map((frame, index) => Math.round(frame.at - changes[index].at));
-// Note 1 shows on its beat, and the rest once the mic has had time to hear the note before, 70 ms later.
-check("one note per beat", Math.abs(gaps[0] - 570) < 40 && near(gaps.slice(1), [500], 40), gaps.join(" "));
+check("one note per beat", near(gaps, [500], 40), gaps.join(" "));
 check("the lanes stop at the end", Math.abs(run.at(-1).left - 15 * BEAT_PX) < 2, String(run.at(-1).left));
 const silent = await page.locator(".stats").innerText();
-check("silence scores 0%, all missed", silent.includes("Score: 0%") && silent.includes("0 hit, 15 missed") && !silent.includes("Slowest"), silent.replaceAll("\n", " / "));
+check("the first note alone scores 7%, the rest missed", silent.includes("Score: 7%") && silent.includes("1 hit, 14 missed") && !silent.includes("Slowest"), silent.replaceAll("\n", " / "));
 await page.screenshot({ path: OUT + "follow-silent.png" });
 await stop(page); await sleep(200);
 const entry = (await savedLog(page)).at(-1);
-check("logged with its score, and not as a timed pass", entry.score === 0 && entry.passes === 0 && entry.averagePassSeconds === null && entry.notesSkipped === 15 && entry.slowest.length === 0, JSON.stringify({ score: entry.score, passes: entry.passes }));
+check("logged with its score, and not as a timed pass", entry.score === 7 && entry.passes === 0 && entry.averagePassSeconds === null && entry.notesSkipped === 14, JSON.stringify({ score: entry.score, passes: entry.passes }));
 
 // Playing along
 await freshPractice(page, 120);
@@ -71,7 +78,7 @@ check("playing every note scores 100%", perfect.includes("Score: 100%") && perfe
 check("the finished notes fill pale green", await canvasHasColor(page, 201, 237, 212));
 check("with no green border left on them", !(await canvasHasColor(page, 76, 208, 125)));
 await page.click('button:text-is("Play again")'); await sleep(150);
-check("Play again clears the score and counts in again", (await page.locator(".stats").innerText()) === "" && (await progress(page)).startsWith("Starts in"), await progress(page));
+check("Play again clears the score and waits for the first note again", (await page.locator(".stats").innerText()) === "" && (await progress(page)) === "Note 1 of 15", await progress(page));
 await waitForText(page, "All", 60000); await sleep(150);
 check("and scores the new run", (await page.locator(".stats").innerText()).includes("15 hit, 0 missed"));
 await stop(page); await sleep(200);
@@ -100,6 +107,7 @@ await stop(page); await sleep(200);
 
 // Changing things mid-run
 await freshPractice(page, 120);
+await followNotes(page, { midis: [62], delays: { 2: 60000 } });
 await begin(page);
 await page.waitForFunction(() => /^Note [2-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 8000 });
 const box = await page.locator("canvas").boundingBox();
@@ -115,6 +123,7 @@ const before = (await savedLog(page)).length;
 await dontWait().click(); await sleep(300);
 check("switching it off ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await savedLog(page)).length === before + 1 && !(await page.locator('.options label:has-text("Tempo") input').isDisabled()));
 check("back to waiting, on the first note", (await progress(page)) === "Note 1 of 15", await progress(page));
+await freshPractice(page, 120); // Ends the synthetic player, which would play the first note again.
 await begin(page); await sleep(3200); // Past the count-in.
 check("waiting again: nothing moves on its own", (await progress(page)) === "Note 1 of 15", await progress(page));
 await stop(page); await sleep(200);
@@ -126,17 +135,16 @@ await tile(2); await sleep(600);
 check("a clicked note is still where a run starts", (await progress(page)) === "Note 3 of 15", await progress(page));
 await followNotes(page, { midis: D });
 await begin(page);
-await sleep(150);
-check("the count-in is for that note", (await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) === 2 * BEAT_PX && (await progress(page)).startsWith("Starts in"), await progress(page));
+await sleep(100);
+check("the lanes start from that note", Math.abs((await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) - 2 * BEAT_PX) < BEAT_PX / 2 && (await progress(page)) === "Note 3 of 15", await progress(page));
 await waitForText(page, "All", 60000); await sleep(150);
 const partial = await page.locator(".stats").innerText();
 check("only the notes from there are scored", partial.includes("13 hit, 0 missed") && partial.includes("100%"), partial.replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 
-// The metronome counts in the first note
-await page.reload(); await page.waitForSelector("nav button");
-await nav(page, "Practice"); await sleep(250);
-await page.locator(".bpm input").fill("120");
+// The metronome waits for the first note, then joins on the beat
+await freshPractice(page, 120);
+await followNotes(page, { midis: D });
 await page.locator('.options label:has-text("Metronome") input').check();
 await page.evaluate(() => {
   window.clicks = [];
@@ -153,9 +161,11 @@ await stop(page); await sleep(200);
 const clicks = (await page.evaluate(() => window.clicks)).filter((click) => click.hz >= 2500);
 const clickRun = await frames();
 const firstMove = clickRun.find((frame, index) => index > 0 && frame.left > clickRun[index - 1].left);
-const fourth = clicks[3];
-check("three clicks count in, and the fourth lands on the first note", clicks.length >= 5 && Math.abs(firstMove.at - fourth.at) < 40, `${Math.round(firstMove.at - fourth.at)} ms apart`);
-check("the first note's click is accented", fourth.hz === 3200 && clicks[0].hz === 2500);
+// The lanes start a hold time into beat 0, so the first click is beat 1, and beat 4 starts the next bar.
+const leftAt = (time) => clickRun.reduce((best, frame) => (Math.abs(frame.at - time) < Math.abs(best.at - time) ? frame : best)).left;
+check("no clicks before the lanes start", clicks.length >= 5 && clicks[0].at > firstMove.at, `${Math.round(clicks[0].at - firstMove.at)} ms`);
+check("then each lands on a beat", clicks.slice(0, 5).every((click, index) => Math.abs(leftAt(click.at) - (index + 1) * BEAT_PX) < 15), clicks.slice(0, 5).map((click) => Math.round(leftAt(click.at))).join(" "));
+check("a bar's first beat is accented", clicks[3].hz === 3200 && clicks[0].hz === 2500);
 await page.locator('.options label:has-text("Metronome") input').uncheck();
 
 // A recording's markers land on the notes
@@ -177,7 +187,7 @@ const times = await page.evaluate(async () => {
 });
 const markerGaps = times.slice(1).map((time, index) => Math.round((time - times[index]) * 1000));
 check("markers sit a beat apart", near(markerGaps, [500], 60), markerGaps.join(" "));
-check("the first marker is after the count-in", times[0] > 1.8 && times[0] < 2.3, String(times[0]));
+check("the first marker comes with the first note, with no count-in before it", times[0] > -0.1 && times[0] < 0.6, String(times[0]));
 
 // Fullscreen
 await freshPractice(page, 120);

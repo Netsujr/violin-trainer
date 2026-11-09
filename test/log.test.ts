@@ -158,18 +158,18 @@ describe("week view", () => {
     expect(weekMinutes([], sunday)[0].day.getDate()).toBe(2);
   });
 
-  it("shows which planned pieces were practised this week", () => {
+  it("shows which highlighted pieces were practised this week", () => {
     const other = { ...piece, id: "other", title: "Other" };
     const unplanned = { ...piece, id: "unplanned", title: "Unplanned" };
-    const planned = plannedThisWeek([piece, other, unplanned], { p: 0, other: 2 }, [entry(new Date(2026, 10, 3).toISOString(), 1)], wednesday);
+    const planned = plannedThisWeek([piece, other, unplanned], ["p", "other"], [entry(new Date(2026, 10, 3).toISOString(), 1)], wednesday);
     expect(planned).toEqual([
-      { title: "P", day: 0, practised: true },
-      { title: "Other", day: 2, practised: false },
+      { title: "P", practised: true },
+      { title: "Other", practised: false },
     ]);
   });
 
   it("does not count last week's practice as this week's", () => {
-    const planned = plannedThisWeek([piece], { p: 0 }, [entry(new Date(2026, 9, 26).toISOString(), 1)], wednesday);
+    const planned = plannedThisWeek([piece], ["p"], [entry(new Date(2026, 9, 26).toISOString(), 1)], wednesday);
     expect(planned[0].practised).toBe(false);
   });
 });

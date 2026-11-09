@@ -1,9 +1,17 @@
+import { getSettings } from "../storage";
+
 const MAX_CONTENT_WIDTH = 960;
 const PAGE_PADDING = 16;
 const PHONE_WIDTH = 600;
+// Up to this wide, a phone in landscape gives the note counter its own row too, as in style.css.
+const SMALL_LANDSCAPE_WIDTH = 700;
 const SHORT_HEIGHT = 500;
 // Fullscreen fills the height with the timeline and a one-line staff, in the same units they're drawn in.
-const TIMELINE_AND_STAFF_HEIGHT = 336 + 160;
+const TIMELINE_HEIGHT = 336;
+const STAFF_HEIGHT = 160;
+// "Bigger staff" swaps which of the two gets most of the room.
+const BIG_STAFF_SHARE = 1.6;
+const SMALL_TIMELINE_SHARE = 0.5;
 const FULLSCREEN_CONTROLS_HEIGHT = 96;
 // On a narrow screen the note counter takes its own row above the buttons.
 const FULLSCREEN_COUNTER_ROW_HEIGHT = 30;
@@ -17,13 +25,20 @@ export const setFullscreenLayout = (value: boolean) => (fullscreen = value);
 export const contentWidth = () =>
   Math.min(fullscreen ? Infinity : MAX_CONTENT_WIDTH, document.documentElement.clientWidth - PAGE_PADDING * 2);
 
+const timelineShare = () => (getSettings().staffBig ? SMALL_TIMELINE_SHARE : 1);
+const staffShare = () => (getSettings().staffBig ? BIG_STAFF_SHARE : 1);
+
 // The size the timeline and staff are drawn at. They keep readable text and show fewer beats, rather than shrinking to fit.
-export const timelineScale = () => {
+const baseScale = () => {
   if (fullscreen) {
-    const controls = FULLSCREEN_CONTROLS_HEIGHT + (innerWidth < PHONE_WIDTH ? FULLSCREEN_COUNTER_ROW_HEIGHT : 0);
-    return Math.min((innerHeight - controls) / TIMELINE_AND_STAFF_HEIGHT, contentWidth() / FULLSCREEN_MIN_VIEW_WIDTH);
+    const counterRow = innerWidth < PHONE_WIDTH || (innerHeight <= SHORT_HEIGHT && innerWidth <= SMALL_LANDSCAPE_WIDTH);
+    const controls = FULLSCREEN_CONTROLS_HEIGHT + (counterRow ? FULLSCREEN_COUNTER_ROW_HEIGHT : 0);
+    const height = TIMELINE_HEIGHT * timelineShare() + STAFF_HEIGHT * staffShare();
+    return Math.min((innerHeight - controls) / height, contentWidth() / FULLSCREEN_MIN_VIEW_WIDTH / Math.max(timelineShare(), staffShare()));
   }
   return innerHeight < SHORT_HEIGHT ? 0.6 : innerWidth < PHONE_WIDTH ? 0.75 : 1;
 };
+export const timelineScale = () => baseScale() * timelineShare();
+export const staffScale = () => baseScale() * staffShare();
 
 export const isSmallScreen = () => innerWidth < PHONE_WIDTH || innerHeight < SHORT_HEIGHT;
