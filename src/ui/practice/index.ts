@@ -57,8 +57,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const tone = createReferenceTone(() => (controls.session?.finished ? undefined : piece.notes[currentIndex()]));
   const track = createBackingTrack({ aligning: aligning ?? null, stopRun: () => controls.stop(), onChange: () => toolbar.showModes() });
   const following = createFollowing({ metronome, highway, staff, showReading: tuning.show, isMuted: tone.isMuted, endIndex, track, moveOn });
-  const showProgress = (value: number) => (holdProgress = value);
-  const waiting = createWaitingRun({ judge, glide, staff, showReading: tuning.show, isMuted: tone.isMuted, endIndex, holdMs, showProgress, moveOn });
+  const waiting = createWaitingRun({ judge, glide, staff, showReading: tuning.show, isMuted: tone.isMuted, endIndex, holdMs, showProgress: (value) => (holdProgress = value), moveOn });
 
   function pickNote(index: number, extend: boolean) {
     if (extend) section = { first: Math.min(sectionAnchor, index), last: Math.max(sectionAnchor, index) };
@@ -76,6 +75,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     section = null;
     sectionAnchor = 0;
     highway.showSection(null);
+    board.showScore(null);
     toolbar.showModes();
     track.load(basePiece.id);
     stats.replaceChildren();
@@ -97,13 +97,10 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     highway.draw(piece.notes, index, holdProgress);
   }
 
-  const playAgainButton = () =>
-    h("button", { textContent: t.playAgain, onclick: () => (controls.session ? beginRun(startIndex) : controls.startButton.click()) });
-
   function showStats(session: Session) {
     const results = following.results;
     const card = !track.listening ? playedAlongCard() : results ? scoreCard(results) : statsCard(session, { section, pattern: piece.pattern, startIndex });
-    stats.replaceChildren(...card, playAgainButton());
+    stats.replaceChildren(...card, h("button", { textContent: t.playAgain, onclick: () => (controls.session ? beginRun(startIndex) : controls.startButton.click()) }));
   }
 
   function startFrom(index: number) {
@@ -121,6 +118,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     loopCount = 1;
     lastScore = null;
     stats.replaceChildren();
+    board.showScore(null);
     renderNotes();
   }
 
@@ -157,6 +155,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
 
   function moveOn(session: Session, previousMidi?: number) {
     holdProgress = 0;
+    // The score so far, kept once the run ends. A play-along with nothing heard has none.
+    if (following.active) board.showScore(track.listening ? following.score : null);
     if (session.finished) {
       tuning.clear();
       if (settings.loopOn) loopAgain(session, previousMidi);

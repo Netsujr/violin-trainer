@@ -102,6 +102,8 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
   }, { midis, delayMs, delays });
 export const near = (values, expected, tolerance = 60) => values.length > 0 && values.every((value, index) => Math.abs(value - (expected[index % expected.length])) <= tolerance);
 export const progress = (page) => page.locator("section > p").first().innerText();
+// The run's score, on the bar above the lanes.
+export const laneScore = (page) => page.locator(".lane-score").innerText();
 // Menu items only show on hover, so this clicks the piece's item directly, as a tap would.
 export const pickPiece = (page, id) => page.locator(`.piece-menu button[value="${id}"]`).evaluate((item) => item.click());
 // The piece Practice has open, by the menu button's label.

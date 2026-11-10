@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, OUT, progress, savedLog, savedSettings, sleep, waitForText } from "./lib.mjs";
+import { auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, sleep, waitForText } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -197,7 +197,7 @@ await shot("7-dont-wait");
 await waitForText(page, "All 15 notes done");
 await sleep(200);
 const score = await page.locator(".stats").innerText();
-check("ends with a score: 14 of 15 is 93%", score.includes("Score: 93%") && score.includes("14 hit, 1 missed"), score.replaceAll("\n", " / "));
+check("ends with a score: 14 of 15 is 93%", (await laneScore(page)) === "Score: 93%" && score.includes("14 hit, 1 missed"), score.replaceAll("\n", " / "));
 await stopRun();
 check("the score goes in the log", (await savedLog(page)).at(-1).score === 93);
 await press(button("Don't wait")); await sleep(100);

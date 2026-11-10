@@ -1,7 +1,7 @@
 // Backing tracks: added from a Library card with their beat found, lined up in Align by dragging the waveform under the
 // lanes and by hand, then switched on in Practice to play along, with the mic optional.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, sleep, check, progress, followNotes, savedLog, answer, OUT } from "./lib.mjs";
+import { open, nav, sleep, check, progress, laneScore, followNotes, savedLog, answer, OUT } from "./lib.mjs";
 
 const BEAT_PX = 120;
 const SILENT = OUT + "track-silent.wav";
@@ -102,7 +102,7 @@ await page.click('button:text-is("Start")');
 await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
 await sleep(200);
 const stats = await page.locator(".stats").innerText();
-check("with the mic on, playing along is scored", stats.includes("Score: 100%") && stats.includes("17 hit, 0 missed"), stats.replaceAll("\n", " / "));
+check("with the mic on, playing along is scored", (await laneScore(page)) === "Score: 100%" && stats.includes("17 hit, 0 missed"), stats.replaceAll("\n", " / "));
 await page.click('button:text-is("Stop")'); await sleep(300);
 check("and logged", (await savedLog(page)).length === 1);
 

@@ -31,9 +31,12 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
     },
   });
   const panel = h("div", { className: "staff-panel" }, staff.element, toggle);
+  // The run's score, on the left of the bar above the lanes.
+  const score = h("span", { className: "lane-score" });
   const toolbar = h(
     "div",
     { className: "section-bar" },
+    score,
     createIconToggle("fingers", render),
     createIconToggle("noteNames", render),
     createIconToggle("letterNames", render),
@@ -69,6 +72,9 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
     staff,
     highway,
     fit,
+    showScore(percent: number | null) {
+      score.textContent = percent === null ? "" : t.score(percent);
+    },
     timeline: h("div", { className: "timeline-section" }, toolbar, highway.element),
     sheet: h("div", { className: "staff-section" }, panel),
     leave: () => removeEventListener("resize", fit),

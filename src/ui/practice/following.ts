@@ -67,9 +67,9 @@ export function createFollowing({ metronome, highway, staff, showReading, isMute
     get results() {
       return state?.results ?? null;
     },
-    // The share of judged notes hit, as a percentage.
+    // The share of judged notes hit, as a percentage, once any are judged.
     get score() {
-      if (!state) return null;
+      if (!state || state.results.size === 0) return null;
       const judged = [...state.results.values()];
       return scorePercent(judged.filter(Boolean).length, judged.length);
     },
