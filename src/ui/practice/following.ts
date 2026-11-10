@@ -2,11 +2,13 @@ import type { createMetronome } from "../../audio/metronome";
 import type { PieceNote } from "../../music/notes";
 import { createFollow } from "../../practice/follow";
 import { centsToTarget } from "../../practice/judge";
+import { scorePercent } from "../../practice/log";
 import type { Session } from "../../practice/session";
 import { getSettings } from "../../storage";
 import type { createHighway } from "../highway";
 import type { createStaff } from "../staff";
-import { beatMs, MIC_DELAY_MS } from "./timing";
+import type { createBackingTrack } from "./backingTrack";
+import { beatMs as settingsBeatMs, MIC_DELAY_MS } from "./timing";
 
 type Deps = {
   metronome: ReturnType<typeof createMetronome>;
@@ -15,14 +17,17 @@ type Deps = {
   showReading: (cents: number | null, frequency: number | null) => void;
   isMuted: (now: number) => boolean;
   endIndex: () => number;
+  // With it on, the lanes follow the recording instead of their own clock.
+  track: ReturnType<typeof createBackingTrack>;
   // Called after each note is judged, hit or missed.
   moveOn: (session: Session) => void;
 };
 
 // "Don't wait": the lanes hold on the first note until it's played in tune, then keep moving at the BPM,
 // judging each note as it passes.
-export function createFollowing({ metronome, highway, staff, showReading, isMuted, endIndex, moveOn }: Deps) {
+export function createFollowing({ metronome, highway, staff, showReading, isMuted, endIndex, track, moveOn }: Deps) {
   const settings = getSettings();
+  const beatMs = () => (track.active ? track.beatMs() : settingsBeatMs());
   // The clock the lanes move to, in beats. Until the first note is played in tune, waiting holds when it came in tune.
   let state: {
     tracker: ReturnType<typeof createFollow>;
@@ -62,11 +67,19 @@ export function createFollowing({ metronome, highway, staff, showReading, isMute
     get results() {
       return state?.results ?? null;
     },
+    // The share of judged notes hit, as a percentage.
+    get score() {
+      if (!state) return null;
+      const judged = [...state.results.values()];
+      return scorePercent(judged.filter(Boolean).length, judged.length);
+    },
     start(notes: PieceNote[], index: number) {
       const tracker = createFollow(notes, index, () => settings.toleranceCents, endIndex());
-      state = { tracker, beat: tracker.startBeat, at: performance.now(), results: new Map(), waiting: { inTuneSince: null } };
+      // A recording sets off by itself, so there's no waiting for the first note.
+      const waiting = track.active ? null : { inTuneSince: null };
+      state = { tracker, beat: tracker.startBeat, at: performance.now(), results: new Map(), waiting };
       metronome.reset();
-      highway.showResults(state.results);
+      highway.showResults(track.listening ? state.results : null);
       highway.jumpTo(index);
     },
     stop() {
@@ -80,9 +93,10 @@ export function createFollowing({ metronome, highway, staff, showReading, isMute
         waitForFirstNote(session, frequency, now);
         return null;
       }
-      const stepBeats = (now - current.at) / beatMs();
+      const trackBeat = track.active ? track.beat(now) : null;
+      const stepBeats = trackBeat === null ? (now - current.at) / beatMs() : Math.max(0, trackBeat - current.beat);
       current.at = now;
-      current.beat += stepBeats;
+      current.beat = trackBeat ?? current.beat + stepBeats;
       const heard = isMuted(now) ? null : frequency;
       // What the mic hears now was played a moment ago.
       const micBeat = current.beat - MIC_DELAY_MS / beatMs();

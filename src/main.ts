@@ -23,17 +23,18 @@ let navButtons: HTMLButtonElement[] = [];
 let currentName: ScreenName = "Listen";
 let current: Screen | undefined;
 
-function build(name: ScreenName, pieceId?: string) {
+function build(name: ScreenName, pieceId?: string, aligning = false) {
   if (name === "Listen") return listenScreen();
-  if (name === "Practice") return practiceScreen(pieceId);
-  if (name === "Library") return libraryScreen((id) => show("Practice", id));
+  if (name === "Practice") return practiceScreen(pieceId, aligning ? () => show("Library") : undefined);
+  if (name === "Library") return libraryScreen((id) => show("Practice", id), (id) => show("Practice", id, true));
   return logScreen();
 }
 
-async function show(name: ScreenName, pieceId?: string) {
+// aligning opens Practice to line up the piece's backing track.
+async function show(name: ScreenName, pieceId?: string, aligning = false) {
   await current?.leave();
   currentName = name;
-  current = build(name, pieceId);
+  current = build(name, pieceId, aligning);
   main.replaceChildren(current.element);
   navButtons.forEach((button, index) => (button.ariaCurrent = SCREEN_NAMES[index] === name ? "page" : null));
 }

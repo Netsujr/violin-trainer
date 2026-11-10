@@ -1341,3 +1341,58 @@ a[download] {
     border: none;
   }
 }
+
+/* Lining up a backing track: its controls in place of Options, and the waveform under the lanes. */
+.track-align-panel .row {
+  gap: 0.5rem 0.75rem;
+  margin-block: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.track-align-panel input[type="number"],
+.track-align-panel select {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  padding-block: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.track-align-panel input[type="number"] {
+  width: 6rem;
+}
+
+.track-align-panel button {
+  width: auto;
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.track-align-title {
+  margin-bottom: 0.25rem;
+}
+
+.track-status {
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+}
+
+/* Dragged sideways to line the recording up, so a touch moves it rather than the page. */
+.waveform {
+  display: block;
+  margin-top: 0.25rem;
+  cursor: grab;
+  touch-action: none;
+  background: #1c1813;
+  border-radius: var(--pico-border-radius);
+}
+
+.waveform:active {
+  cursor: grabbing;
+}
+
+.options .track:not(:empty) {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}

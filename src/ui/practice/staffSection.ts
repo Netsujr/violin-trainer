@@ -9,12 +9,16 @@ import { createIconToggle } from "../toggles";
 const STAFF_SIDE_PADDING = 16;
 
 // The lanes with their display toggles, and the staff under them with its open/close button, sized to the screen.
-// pickNote is a click on a note. render draws the notes again after a change of size or display.
-export function createStaffSection(pickNote: (index: number, extend: boolean) => void, render: () => void) {
+// pickNote is a click on a note. render draws the notes again after a change of size or display. onMove is the lanes
+// moving, with the beat at the hit line.
+export function createStaffSection(pickNote: (index: number, extend: boolean) => void, render: () => void, onMove: (beat: number) => void) {
   const settings = getSettings();
   const staffWidth = () => (contentWidth() - STAFF_SIDE_PADDING) / staffScale();
   const staff = createStaff(staffWidth(), !settings.staffOpen, staffScale(), pickNote);
-  const highway = createHighway(pickNote, staff.follow);
+  const highway = createHighway(pickNote, (beat) => {
+    staff.follow(beat);
+    onMove(beat);
+  });
   const toggle = h("button", {
     className: "staff-toggle",
     textContent: "▾",

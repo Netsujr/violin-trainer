@@ -1,4 +1,4 @@
-import { del, get, set } from "idb-keyval";
+import { del, get, getMany, keys, set } from "idb-keyval";
 import scales from "./content/scales.json";
 import { fillFingering } from "./music/fingering";
 import type { Language } from "./i18n";
@@ -135,3 +135,17 @@ export const saveRecording = (id: string, recording: Recording) => set(id, recor
 export const getRecording = (id: string) => get<Recording>(id);
 
 export const deleteRecording = (id: string) => del(id);
+
+// A recording to play along with, linked to a piece: its tempo, where the piece's first note falls in it (in seconds),
+// whether a run uses it, how fast it plays, and whether the mic listens and scores meanwhile.
+export type Track = { name: string; blob: Blob; bpm: number; offset: number; on: boolean; speed: number; listen: boolean };
+export const TRACK_SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1];
+const trackKey = (pieceId: string) => `track:${pieceId}`;
+export const getTrack = (pieceId: string) => get<Track>(trackKey(pieceId));
+export const saveTrack = (pieceId: string, track: Track) => set(trackKey(pieceId), track);
+export const deleteTrack = (pieceId: string) => del(trackKey(pieceId));
+export async function listTracks() {
+  const ids = (await keys()).map(String).filter((key) => key.startsWith("track:"));
+  const tracks = await getMany<Track>(ids);
+  return ids.map((key, index) => ({ pieceId: key.slice("track:".length), track: tracks[index]! }));
+}

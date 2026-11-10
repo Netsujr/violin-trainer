@@ -11,6 +11,9 @@ export function scoreCard(results: Map<number, boolean>) {
   return [h("p", { className: "score" }, t.score(scorePercent(hit, results.size))), h("p", {}, t.hitMissed(hit, results.size - hit))];
 }
 
+// The card after playing along with a backing track, with nothing heard.
+export const playedAlongCard = () => [h("p", {}, t.playedAlong)];
+
 // The card after a run that waited for each note: how long it took, how in tune it was, and the slowest notes.
 export function statsCard(session: Session, run: { section: Section | null; pattern?: number; startIndex: number }) {
   const entry = buildEntry(session, performance.now());

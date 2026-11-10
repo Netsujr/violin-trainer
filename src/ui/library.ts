@@ -6,6 +6,7 @@ import { allPieces, deletePiece, getSettings, isHighlighted, isScale, loadDraft,
 import type { Piece } from "../music/notes";
 import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
+import { createCardTracks } from "./libraryTracks";
 import { createPieceEditor } from "./pieceEditor";
 import { downloadSheet } from "./sheetPdf";
 import { DOWNLOAD_ICON, PENCIL_ICON, PLAY_ICON, TRASH_ICON } from "./toggles";
@@ -14,7 +15,7 @@ const SHOWN_PIECES = 3;
 
 const editableNote = (note: Piece["notes"][number]) => ({ ...note, beats: note.beats ?? 1 });
 
-export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
+export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (pieceId: string) => void): Screen {
   const settings = getSettings();
   const list = h("div", { className: "library" });
   const draft = loadDraft();
@@ -49,6 +50,9 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
     previewView,
   );
 
+  const tracks = createCardTracks(goAlign, () => renderList());
+  const subtitle = (piece: Piece) => t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length);
+
   // Clicking a card, anywhere but its buttons, marks it for practice or clears the mark.
   const pieceRow = (piece: Piece) =>
     h(
@@ -66,7 +70,7 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
         "button",
         { type: "button", className: "piece-name", ariaPressed: String(isHighlighted(piece)) },
         h("strong", {}, localTitle(piece.id, piece.title)),
-        h("span", {}, t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length)),
+        h("span", {}, tracks.name(piece.id) ? `${subtitle(piece)} · ♪ ${tracks.name(piece.id)}` : subtitle(piece)),
       ),
       h("button", {
         className: "outline icon-button",
@@ -105,6 +109,7 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
             }),
           ]
         : []),
+      ...tracks.buttons(piece),
     );
 
   // Each group shows its first few, with the rest in a drawer that stays open across changes.
@@ -216,7 +221,9 @@ export function libraryScreen(goPractice: (pieceId: string) => void): Screen {
       "section",
       {},
       h("h2", {}, t.screens.Library),
+      tracks.message,
       list,
+      tracks.file,
       heading,
       h("div", { className: "add-piece" }, title),
       editor.element,

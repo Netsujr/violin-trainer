@@ -4,6 +4,7 @@ import { getSettings, isScale } from "../../storage";
 import { h } from "../dom";
 import type { Section } from "../highway";
 import type { createRunControls } from "../runControls";
+import type { createBackingTrack } from "./backingTrack";
 import { DONT_WAIT_ICON, LOOP_ICON, STAFF_ICON } from "../toggles";
 import { createFullscreen } from "./fullscreen";
 import { createBpmControl, createCountInPicker, createOptionsPanel, createPatternRow, modeButton, optionSwitch } from "./options";
@@ -17,6 +18,7 @@ type Deps = {
   piece: () => Piece;
   section: () => Section | null;
   board: ReturnType<typeof createStaffSection>;
+  track: ReturnType<typeof createBackingTrack>;
   referenceButton: HTMLElement;
   onPick: (piece: Piece) => void;
   loadPiece: () => void;
@@ -27,7 +29,7 @@ type Deps = {
 
 // Everything that sets how a run goes: the Options panel, the mode buttons beside Start with the line saying
 // what's on, fullscreen, and the rhythm patterns.
-export function createPracticeControls({ run, pieces, piece, section, board, referenceButton, onPick, loadPiece, render, resetBeat, clearStats }: Deps) {
+export function createPracticeControls({ run, pieces, piece, section, board, track, referenceButton, onPick, loadPiece, render, resetBeat, clearStats }: Deps) {
   const settings = getSettings();
   const stopRun = () => run.stop();
 
@@ -44,6 +46,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, ref
   const optionsPanel = createOptionsPanel(
     h("div", { className: "row toggles" }, tempoSwitch.label, metronomeSwitch.label, countInSwitch.label, countInPicker),
     optionsBpmRow,
+    track.toggle,
   );
 
   const modeNote = h("div", { className: "mode-note" });
@@ -54,7 +57,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, ref
     patternRow.hidden = !scale;
     modeNote.textContent = [
       ...(current ? [t.sectionInfo(current.first + 1, current.last + 1)] : []),
-      settings.followOn ? t.keepsMoving : t.waitsForNotes,
+      track.active ? t.withTrack : settings.followOn ? t.keepsMoving : t.waitsForNotes,
       settings.loopOn ? t.loopsUntilStop : t.playsOnce,
       ...(scale ? [settings.repeatTopOn ? t.topTwice : t.topOnce] : []),
     ].join(" · ");

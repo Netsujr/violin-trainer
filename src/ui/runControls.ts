@@ -6,6 +6,8 @@ import { h } from "./dom";
 export function createRunControls(options: {
   piece: () => Piece;
   onReading: (frequency: number | null, now: number) => void;
+  // Whether the mic listens. Off is a play-along that's neither heard nor logged.
+  listen?: () => boolean;
   onStart?: () => void;
   onStop?: () => void;
 }) {
@@ -26,7 +28,7 @@ export function createRunControls(options: {
     button.disabled = true;
     message.textContent = "";
     try {
-      const started = await startRun(options.piece(), record.checked, options.onReading);
+      const started = await startRun(options.piece(), record.checked, options.onReading, options.listen?.() ?? true);
       if (left) {
         await started.stop();
         return;

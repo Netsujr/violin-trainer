@@ -299,7 +299,7 @@ flow("Editing a saved song");
   const savedMine = async () => (await t.stored()).find((piece) => piece.id === "mine");
   await library(page, { pieces, settings });
   const buttonsOn = (text) => t.row(text).first().evaluate((row) => [...row.querySelectorAll("button.icon-button")].map((button) => button.getAttribute("aria-label")).join());
-  check("custom songs get the pencil, beside the trash", (await buttonsOn("My tune")) === "Practice,Download PDF,Edit piece,Delete", await buttonsOn("My tune"));
+  check("custom songs get the pencil, beside the trash", (await buttonsOn("My tune")) === "Practice,Download PDF,Edit piece,Delete,Add a backing track", await buttonsOn("My tune"));
   check("built-in songs don't", !(await buttonsOn("Ode to Joy")).includes("Edit") && !(await buttonsOn("Ode to Joy")).includes("Delete"));
 
   await t.pencil("My tune").click(); await sleep(150);
@@ -493,7 +493,7 @@ const rowSizes = async (page, t, label, drawn, tap) => {
     const box = control.getBoundingClientRect(), shown = control.querySelector("svg").getBoundingClientRect();
     return { shown: `${shown.width}x${shown.height}`, tall: box.height, wide: box.width };
   }));
-  check(`${label}: four controls`, sizes.length === 4);
+  check(`${label}: five controls`, sizes.length === 5);
   check(`${label}: drawn at ${drawn} px`, sizes.every(({ shown }) => shown === `${drawn}x${drawn}`), sizes.map(({ shown }) => shown).join());
   check(`${label}: tapped at ${tap} px`, sizes.every(({ tall, wide }) => tall === tap && wide >= tap), sizes.map(({ wide, tall }) => `${wide}x${tall}`).join());
   const answers = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".icon-button")].every((control) => {
