@@ -1222,9 +1222,10 @@ a[download] {
 }
 
 /* The results sit over the lanes, because there's no room left for them on the page. */
+/* Anchored to the bottom, so however tall the screen it never covers the controls at the top. */
 .fullscreen .stats:not(:empty) {
   position: fixed;
-  top: 50%;
+  bottom: 1rem;
   left: 50%;
   z-index: 10;
   display: flex;
@@ -1233,12 +1234,12 @@ a[download] {
   justify-content: center;
   gap: 1rem;
   width: 75vw;
-  height: 75vh;
+  height: min(75vh, calc(100vh - 8rem));
   margin: 0;
   padding: 2rem;
   text-align: center;
   box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
 }
 
 /* Sized to the screen, so the result reads from across the room. */
@@ -1715,16 +1716,29 @@ a[download] {
   background-position: center right 0.375rem;
 }
 
-/* Record, beside Start: the size of the icon buttons in that row. */
+/* Record, beside Start: a square the size of the icon buttons in that row. */
 .actions .box-toggle {
-  min-width: 2.5rem;
+  width: 2.5rem;
+  min-width: 0;
   height: 2.5rem;
+  padding: 0;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 600px), (max-height: 500px) {
   .actions .box-toggle {
-    min-width: 2.25rem;
+    width: 2.25rem;
     height: 2.25rem;
+  }
+}
+
+/* Small phones in landscape: a little less room round the buttons, so the row still fits on one line. */
+@media (max-height: 500px) and (max-width: 700px) {
+  .practice > .actions {
+    gap: 0.25rem;
+  }
+
+  .practice > .actions > button:not(.icon-button, .box-toggle) {
+    padding-inline: 0.5rem;
   }
 }
 
@@ -1760,4 +1774,15 @@ a[download] {
 .staff-only .practice .staff-panel .staff {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
+}
+
+/* On the narrowest phones the bar wraps, and a long piece name wraps too, rather than pushing off the edge. */
+.section-bar {
+  flex-wrap: wrap;
+}
+
+.section-bar .piece-select {
+  max-width: 100%;
+  text-align: start;
+  white-space: normal;
 }

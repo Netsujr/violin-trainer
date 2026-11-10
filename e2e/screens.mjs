@@ -1,7 +1,7 @@
 // Every screen and the main flows on phone and tablet sizes, by touch, plus small computer windows.
 // This is Chrome emulating those sizes: it checks layout and touch handling, not Safari or a real device's mic.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, typeNotes, openDrawers } from "./lib.mjs";
+import { laneScore, open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, typeNotes, openDrawers } from "./lib.mjs";
 
 const SIZES = [
   ["small phone", 320, 568, true],
@@ -135,10 +135,10 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
   try {
     await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
-    check(`${tag}: a whole scale plays through`, (await page.locator(".stats").innerText()).includes("15 hit"), (await page.locator(".stats").innerText()).replaceAll("\n", " / "));
+    check(`${tag}: a whole scale plays through`, (await laneScore(page)).includes("15 hit"), await laneScore(page));
   } catch { check(`${tag}: a whole scale plays through`, false, await progress(page)); }
   await auditCheck(page, `${tag} finished`);
-  await go('button:text-is("Stop")'); await sleep(200);
+  await page.waitForSelector('button:text-is("Start"):not([disabled])'); // A finished run ends by itself.
 
   // Tempo with the metronome, and a pattern
   await openOptions();
@@ -204,15 +204,13 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await go(".staff-toggle"); await sleep(200);
   await goNav("Library"); await sleep(200);
   await page.locator(".piece", { hasText: LONG_TITLE }).locator('button[aria-label="Practice"]').click(); await sleep(300);
-  await openOptions();
-  await page.locator('.options label:has-text("Record")').click();
-  await closeOptions();
+  await go('.actions button[aria-label="Record"]');
   await followNotes(page, { midis: Array(10).fill([62, 64, 66, 67]).flat(), delayMs: 30 });
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
   await page.waitForFunction(() => /^Note [4-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 15000 });
   await go('button:text-is("Stop")'); await page.waitForSelector('button:text-is("Start"):not([disabled])');
-  await goNav("Log"); await page.waitForSelector("audio"); await sleep(500);
-  await auditCheck(page, `${tag} Log with a recording`);
+  await goNav("Calendar"); await page.waitForSelector("audio"); await sleep(500);
+  await auditCheck(page, `${tag} Calendar with a recording`);
   const audio = await page.locator("audio").boundingBox();
   check(`${tag}: the player fits`, audio.x >= 0 && audio.x + audio.width <= width + 1, JSON.stringify(audio));
   await goNav("Practice"); await sleep(250);

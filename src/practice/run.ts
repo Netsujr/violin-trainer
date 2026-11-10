@@ -27,8 +27,9 @@ export async function startRun(
     async stop() {
       // ponytail: closing the tab mid-recording loses the audio, the log entry stays. Flush chunks to IndexedDB if that bites.
       const recordingId = recorder ? crypto.randomUUID() : undefined;
-      // A run with nothing played isn't worth a line in the Calendar.
-      const played = session.hits.length > 0 || session.missed > 0;
+      // A run of a piece with nothing played isn't worth a line in the Calendar. Free play has no notes to play, so its
+      // time always counts.
+      const played = session.hits.length > 0 || session.missed > 0 || piece.notes.length === 0;
       if (played || recorder) appendLog(buildEntry(session, performance.now(), recordingId));
       const recorded = recorder?.stop();
       mic.stop();

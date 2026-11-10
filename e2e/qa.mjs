@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, sleep, waitForText } from "./lib.mjs";
+import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, sleep, waitForText } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -33,7 +33,8 @@ const press = (locator, options) => (touch ? locator.tap(options) : locator.clic
 const tab = async (text) => { await press(button(text)); await sleep(300); };
 const showing = () => page.locator("section > p").first().textContent();
 const startRun = async () => { await press(button("Start")); await button("Stop").waitFor(); };
-const stopRun = async () => { await press(button("Stop")); await button("Start").waitFor(); await sleep(150); };
+// A finished run ends by itself, so Stop may be gone already, or go as it's pressed.
+const stopRun = async () => { if (await button("Stop").count()) await press(button("Stop"), { timeout: 1500 }).catch(() => {}); await page.locator('button:text-is("Start"):not([disabled])').first().waitFor(); await sleep(150); };
 const options = async () => { if (!(await page.locator(".options").evaluate((panel) => panel.open))) { await press(page.locator(".options > summary")); await sleep(350); } };
 const setOption = async (label, on) => { await options(); const box = page.locator(`.options label:has-text("${label}") input`); if ((await box.isChecked()) !== on) await press(box); await sleep(100); };
 // Practice at a speed, through Options, which starts closed on a phone.
@@ -135,11 +136,12 @@ check("counts in first", (await showing()).startsWith("Starts in"), await showin
 await shot("4-count-in");
 await waitForText(page, "All 15 notes done");
 await sleep(200);
-const stats = await page.locator(".stats").innerText();
-check("finishes every note, with results", stats.includes("Pass 1 done") && stats.includes("15 hit"), stats.replaceAll("\n", " / "));
+const stats = await laneScore(page);
+check("finishes every note, with results on the lanes' bar", stats.includes("Pass 1 done") && stats.includes("15 hit"), stats);
 await shot("4-done");
-await press(button("Play again")); await sleep(300);
-check("Play again counts in again", (await showing()).startsWith("Starts in"), await showing());
+await stopRun();
+await press(button("Start")); await sleep(300);
+check("Start counts in again", (await showing()).startsWith("Starts in"), await showing());
 await stopRun();
 check("Stop goes back to the start, logged", (await progress(page)) === "Note 1 of 15" && (await savedLog(page)).at(-1).passes === 1, await progress(page));
 
@@ -173,7 +175,7 @@ await startRun();
 await waitForText(page, "All 15 notes done", 60000);
 await sleep(200);
 const clicks = (await sounds()).filter((sound) => sound.hz >= 2500);
-check("the run finishes on the beat", (await page.locator(".stats").innerText()).includes("15 hit"));
+check("the run finishes on the beat", (await laneScore(page)).includes("15 hit"), await laneScore(page));
 check("the metronome clicks, audio running", clicks.length >= 10 && clicks.every((click) => click.state === "running") && clicks.some((click) => click.hz === 3200), `${clicks.length} clicks, ${clicks.at(-1)?.state}`);
 await stopRun();
 await setOption("Tempo", false);
@@ -196,7 +198,7 @@ await page.locator(".highway").scrollIntoViewIfNeeded();
 await shot("7-dont-wait");
 await waitForText(page, "All 15 notes done");
 await sleep(200);
-const score = await page.locator(".stats").innerText();
+const score = await laneScore(page);
 check("ends with a score: 14 of 15 is 93%", (await laneScore(page)) === "Score: 93% · 14 hit, 1 missed" && score.includes("14 hit, 1 missed"), score.replaceAll("\n", " / "));
 await stopRun();
 check("the score goes in the log", (await savedLog(page)).at(-1).score === 93);
@@ -348,17 +350,17 @@ await setOption("count-in", false);
 await followNotes(page, { midis: [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62], delayMs: 100 });
 await startRun();
 await waitForText(page, "All 17 notes done", 60000);
-check("a song plays through, with its repeated notes", (await page.locator(".stats").innerText()).includes("17 hit"));
+check("a song plays through, with its repeated notes", (await laneScore(page)).includes("17 hit"), await laneScore(page));
 await stopRun();
 
 flow("12. Recording");
 await freshPractice(page);
-await setOption("Record", true);
+await setRecord(page, true);
 await followNotes(page, { midis: D, delayMs: 120 });
 await startRun();
 await waitForText(page, "All 15 notes done", 60000);
 await stopRun();
-await tab("Log");
+await tab("Calendar");
 await page.waitForSelector("audio", { timeout: 10000 });
 await sleep(800);
 const audio = page.locator("audio").first();
@@ -371,7 +373,7 @@ check("a marker jumps there", seeked > 1, String(seeked));
 const format = await page.evaluate(async () => (await (await fetch(document.querySelector("audio").src)).blob()).type);
 const link = await page.locator("a[download]").first().getAttribute("download");
 check("Download's file type matches what was recorded", format.includes("mp4") ? link.endsWith(".m4a") : link.endsWith(".webm"), `${format} > ${link}`);
-await auditCheck(page, "Log, with a recording");
+await auditCheck(page, "Calendar, with a recording");
 await page.locator("audio").first().scrollIntoViewIfNeeded();
 await shot("12-recording");
 await press(button("Delete recording")); await sleep(200);
@@ -379,13 +381,12 @@ await say("Cancel");
 check("Cancel keeps the recording", (await page.locator("audio").count()) === 1);
 await press(button("Delete recording")); await sleep(200);
 await say("Delete"); await sleep(100);
-check("Delete recording removes only the audio", (await page.locator("audio").count()) === 0 && (await page.locator("section > ul > li").count()) >= 5);
+check("Delete recording removes only the audio", (await page.locator("audio").count()) === 0 && (await page.locator(".day-details li").count()) >= 5);
 
-flow("13. Log");
+flow("13. Calendar");
 const logText = await page.locator("section").innerText();
-check("reads sensibly", ["This week", "Planned", "Trends", "Sessions", "Score: 93%", "D (Ré) major"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
-check("the highlighted piece shows as planned", /[✓○] Twinkle Twinkle Little Star/.test(logText));
-await shot("13-log");
+check("reads sensibly", ["min practised", "Score: 93%", "D (Ré) major", "Plan"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
+await shot("13-calendar");
 
 flow("14. Settings");
 await press(page.locator("header summary")); await sleep(250);
@@ -402,7 +403,7 @@ check("tapping elsewhere closes it", await page.locator(".settings-panel").isHid
 flow("15. Portuguese");
 await press(button("PT")); await sleep(300);
 check("the app switches over", (await page.title()) === "Treinador de Notas para Violino" && (await button("Praticar").count()) === 1);
-for (const screen of ["Ouvir", "Praticar", "Biblioteca", "Registro"]) {
+for (const screen of ["Ouvir", "Praticar", "Biblioteca", "Calendário"]) {
   await tab(screen);
   await auditCheck(page, `pt ${screen}`);
 }

@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, progress, freshPractice, canvasHasColor, D_MAJOR, OUT, pickPiece } from "./lib.mjs";
+import { begin, laneScore, open, nav, start, stop, sleep, check, progress, freshPractice, canvasHasColor, D_MAJOR, OUT, pickPiece } from "./lib.mjs";
 
 const indexOf = (text) => Number(text.match(/Note (\d+) of/)?.[1] ?? 99);
 
@@ -24,17 +24,19 @@ wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), 
   }
   const nums = steps.filter((x) => x.startsWith("Note")).map(indexOf);
   check("D major clears all 15, one step at a time", steps.at(-1) === "All 15 notes done" && nums.every((n, i) => i === 0 || n === nums[i - 1] + 1), steps.at(-1) + " | " + nums.join(","));
-  const stats = await s.page.locator(".stats").innerText();
-  console.log("  stats:", stats.replaceAll("\n", " / "));
-  check("stats show 15 hits", stats.includes("15 hit"));
+  const stats = await laneScore(s.page);
+  console.log("  result:", stats);
+  check("the lanes' bar shows 15 hits", stats.includes("15 hit"), stats);
+  await s.page.waitForSelector('button:text-is("Start"):not([disabled])', { timeout: 3000 }).catch(() => {});
+  check("the run ends by itself, offering Start again", (await s.page.locator('button:text-is("Start")').count()) === 1 && (await progress(s.page)) === "All 15 notes done");
   await s.page.screenshot({ path: OUT + "practice-done.png" });
-  await s.page.click('button:text-is("Play again")');
-  check("Play again restarts", (await progress(s.page)).startsWith("Note 1 of"), await progress(s.page));
-  await stop(s.page);
   await sleep(100);
   const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")));
   console.log("  log:", JSON.stringify(log[0]));
-  check("log entry written", log.length === 1 && log[0].passes === 1 && log[0].notesHit === 15 && log[0].slowest.length === 3);
+  check("log entry written as it finished", log.length === 1 && log[0].passes === 1 && log[0].notesHit === 15 && log[0].slowest.length === 3);
+  await begin(s.page);
+  check("Start goes again", (await progress(s.page)).startsWith("Note 1 of") && (await laneScore(s.page)) === "", await progress(s.page));
+  await stop(s.page);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
@@ -50,14 +52,13 @@ wav(OUT + "ended.wav", [note(62, 3)]);
   await pickPiece(s.page, "one");
   await start(s.page);
   await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 8000 });
-  await stop(s.page);
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
-  await s.page.click('button:text-is("Play again")');
+  await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
-  check("Play again after Stop starts a new run", (await s.page.locator(".stats").innerText()) === "");
+  check("Start after a finished run starts a new one", (await laneScore(s.page)) === "");
   await stop(s.page);
   await sleep(150);
-  check("that made a second log entry", (await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")).length)) === 2);
+  check("a run stopped before anything was played isn't logged", (await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")).length)) === 1);
   await s.close();
 }
 {

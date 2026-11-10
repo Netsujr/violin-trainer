@@ -4,6 +4,9 @@ import { startRun, type Run } from "../practice/run";
 import { h } from "./dom";
 import { boxToggle, RECORD_ICON } from "./toggles";
 
+// A finished run ends this long after its last note counts, so a recording keeps the end of that note.
+const FINISH_TAIL_MS = 1000;
+
 export function createRunControls(options: {
   piece: () => Piece;
   onReading: (frequency: number | null, now: number) => void;
@@ -68,6 +71,11 @@ export function createRunControls(options: {
     recordToggle: record,
     message,
     stop,
+    // Ends the run shortly, unless by then it's been stopped, another started, or it has carried on (stillDone false).
+    finish(stillDone: () => boolean) {
+      const finishing = run;
+      setTimeout(() => run === finishing && stillDone() && stop(), FINISH_TAIL_MS);
+    },
     leave() {
       left = true;
       return stop();

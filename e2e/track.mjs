@@ -44,7 +44,7 @@ await (await chooser).setFiles(CLICKS);
 await page.waitForSelector(".track-align-panel .track-align-title", { timeout: 15000 });
 check("choosing a file finds its beat and opens it to line up", (await page.locator(".track-align-title").innerText()).startsWith("Aligning track-clicks-100.wav") && (await field("BPM").inputValue()) === "100" && (await field("First note at (s)").inputValue()) === "2");
 check("with the track's controls in place of Options, and the waveform under the lanes", (await page.locator(".options").count()) === 0 && (await page.locator(".waveform").isVisible()) && (await progress(page)) === "Note 1 of 17");
-check("full speed, and the mic off, to start", (await page.locator(".track-align-panel select").inputValue()) === "1" && !(await page.locator(".track-align-panel label", { hasText: "Listen to my notes" }).locator("input").isChecked()));
+check("at full speed to start", (await page.locator(".track-align-panel .speed input").inputValue()) === "100" && (await page.locator(".track-align-panel .speed output").innerText()) === "Speed 100%");
 
 // Lining it up
 const strip = await page.locator(".waveform").boundingBox();
@@ -62,7 +62,7 @@ const moved = await lanes();
 check("typing a first note moves the lanes straight away", Math.abs(moved.left - (await expected(moved))) < 12, `${Math.round(moved.left)} for ${Math.round(await expected(moved))}`);
 await page.locator('.track-align-panel button[aria-label="Earlier"]').click();
 check("the nudges move it a little", (await field("First note at (s)").inputValue()) === "2.48", await field("First note at (s)").inputValue());
-await page.locator(".track-align-panel select").selectOption("0.5"); await sleep(1200);
+await page.locator(".track-align-panel .speed input").fill("50"); await sleep(1200);
 const slowFrom = await lanes(); await sleep(1000); const slowTo = await lanes();
 check("half speed keeps its pitch, and the lanes slow with it", (await page.evaluate(() => window.trackAudio.playbackRate === 0.5 && window.trackAudio.preservesPitch)) && Math.abs(slowTo.left - slowFrom.left - (100 / 60) * BEAT_PX * 0.5) < 15, `${Math.round(slowTo.left - slowFrom.left)} px/s`);
 await alignPanel("First note is now").click();
@@ -73,36 +73,36 @@ check("Stop pauses it, and nothing is logged", (await page.evaluate(() => window
 await alignPanel("Detect again").click();
 await page.waitForFunction(() => document.querySelector(".track-align-panel .track-status")?.textContent.startsWith("Found"), null, { timeout: 15000 });
 check("Detect again puts back what it found", (await field("First note at (s)").inputValue()) === "2" && (await field("BPM").inputValue()) === "100");
-await page.locator(".track-align-panel select").selectOption("1");
+await page.locator(".track-align-panel .speed input").fill("100");
 await alignPanel("Done").click(); await sleep(300);
 check("Done goes back to Library", (await page.locator("main h2").first().innerText()) === "Library");
 check("where the card names its track, with buttons to line it up and remove it", (await card().innerText()).includes("♪ track-clicks-100.wav") && (await cardButtons()) === "Practice,Download PDF,Align backing track,Remove backing track", await cardButtons());
 
 // Playing along in Practice
 await card().locator('button[aria-label="Practice"]').click(); await sleep(500);
-check("Practice offers only a switch for it, on", (await page.locator(".options .track").innerText()).trim() === "Play along with track-clicks-100.wav" && (await page.locator(".options .track input").isChecked()) && (await page.locator(".waveform").count()) === 0);
+const playAlong = () => page.locator('.section-bar .box-toggle[title^="Play along with"]');
+const ear = () => page.locator('.section-bar .box-toggle[aria-label="Listen to my notes"]');
+check("Practice puts its switches on the lanes' bar: playing along on, the mic off", (await playAlong().isVisible()) && (await playAlong().getAttribute("aria-pressed")) === "true" && (await ear().getAttribute("aria-pressed")) === "false" && (await page.locator(".waveform").count()) === 0);
+check("and its speed stands in for the BPM", (await page.locator(".options .speed").isVisible()) && !(await page.locator(".options .bpm").isVisible()) && (await page.locator(".options .speed output").innerText()) === "Speed 100%");
 check("the line says so", (await page.locator(".mode-note").innerText()).startsWith("Plays along with the track"), await page.locator(".mode-note").innerText());
 await page.click('button:text-is("Start")'); await sleep(3500);
 check("Start plays along, with the lanes moving", (await lanes()).left > 0 && !(await page.evaluate(() => window.trackAudio.paused)));
 await page.click('button:text-is("Stop")'); await sleep(300);
-await page.locator(".options .track input").uncheck(); await sleep(150);
-check("switched off, the piece waits for each note again", (await page.locator(".mode-note").innerText()).startsWith("Waits for each note"));
-await page.locator(".options .track input").check(); await sleep(150);
+await playAlong().click(); await sleep(150);
+check("switched off, the piece waits for each note again, with the BPM back", (await page.locator(".mode-note").innerText()).startsWith("Waits for each note") && (await page.locator(".options .bpm").isVisible()));
+await playAlong().click(); await sleep(150);
 await page.locator(".piece-menu button[value='a-major-1oct']").evaluate((item) => item.click()); await sleep(400);
-check("a piece with no track has no switch", (await page.locator(".options .track").innerText()) === "");
+check("a piece with no track has no switches for one", !(await playAlong().isVisible()) && !(await ear().isVisible()));
 
 // Listening too: scored like "Don't wait", in step with the recording
 await nav(page, "Library"); await sleep(250);
-await card().locator('button[aria-label="Align backing track"]').click(); await sleep(500);
-await page.locator(".track-align-panel label", { hasText: "Listen to my notes" }).locator("input").check(); await sleep(100);
-await alignPanel("Done").click(); await sleep(300);
 await card().locator('button[aria-label="Practice"]').click(); await sleep(500);
+await ear().click(); await sleep(100);
 await followNotes(page, { midis: [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62] });
 await page.click('button:text-is("Start")');
 await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
 await sleep(200);
-const stats = await page.locator(".stats").innerText();
-check("with the mic on, playing along is scored", (await laneScore(page)) === "Score: 100% · 17 hit, 0 missed" && stats.includes("17 hit, 0 missed"), stats.replaceAll("\n", " / "));
+check("with the mic on, playing along is scored", (await laneScore(page)) === "Score: 100% · 17 hit, 0 missed", await laneScore(page));
 await page.click('button:text-is("Stop")'); await sleep(300);
 check("and logged", (await savedLog(page)).length === 1);
 

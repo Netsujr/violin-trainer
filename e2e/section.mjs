@@ -6,7 +6,8 @@ const BEAT = 120, HIT_X = 130, LANE = 84;
 wav(OUT + "section-silent.wav", [rest(3)]);
 const s = await open(OUT + "section-silent.wav");
 const { page } = s;
-const stats = () => page.locator(".stats").innerText();
+// The run's result, on the lanes' bar.
+const stats = () => page.locator(".lane-score").innerText();
 const line = () => page.locator(".mode-note").innerText();
 const bands = () => page.locator(".staff .section-band").count();
 const scrollLeft = () => page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);
@@ -59,11 +60,12 @@ check("Start plays only the section, and stops at its end", (await stats()).incl
 check("the view stays on the section's last note", Math.abs((await scrollLeft()) - 4 * BEAT) <= 1, String(await scrollLeft()));
 const onStaff = await page.locator(".staff .vf-stavenote").evaluateAll((notes) => notes.findIndex((note) => note.classList.contains("current")));
 check("and so does the staff", onStaff === 4, String(onStaff));
-await page.click('button:text-is("Play again")'); await sleep(150);
-check("Play again repeats the section", (await progress(page)) === "Note 3 of 15" && (await stats()) === "", await progress(page));
+await page.waitForSelector('button:text-is("Start"):not([disabled])');
+await begin(page); await sleep(150);
+check("Start repeats the section", (await progress(page)) === "Note 3 of 15" && (await stats()) === "", await progress(page));
 await waitForText(page, "All 3 notes done");
-await stop(page); await sleep(250);
-check("Stop keeps the section", (await progress(page)) === "Note 3 of 15" && (await bands()) === 3, await progress(page));
+await page.waitForSelector('button:text-is("Start"):not([disabled])');
+check("ending by itself keeps the section", (await progress(page)) === "All 3 notes done" && (await bands()) === 3, await progress(page));
 let entry = (await savedLog(page)).at(-1);
 check("a section isn't logged as a pass", entry.passes === 0 && entry.averagePassSeconds === null && entry.notesHit >= 3, JSON.stringify({ passes: entry.passes, hit: entry.notesHit }));
 

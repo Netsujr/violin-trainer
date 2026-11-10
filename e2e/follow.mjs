@@ -1,6 +1,6 @@
 // "Don't wait": the lanes start on the first note played in tune, then keep moving at the BPM, each note is judged as it passes, and a run ends with a score.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, near, progress, laneScore, begin, waitForText, freshPractice, savedLog, savedSettings, canvasHasColor, D_MAJOR as D, OUT } from "./lib.mjs";
+import { setRecord, open, nav, stop, sleep, check, followNotes, near, progress, laneScore, begin, waitForText, freshPractice, savedLog, savedSettings, canvasHasColor, D_MAJOR as D, OUT } from "./lib.mjs";
 
 const BUNS = [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62];
 const BEAT_PX = 120;
@@ -22,7 +22,7 @@ const color = () => dontWait().evaluate((button) => getComputedStyle(button).col
 const plainColor = await page.locator('button[aria-label="Fullscreen"]').evaluate((button) => getComputedStyle(button).color);
 check("off by default, looking like the buttons beside it", (await waiting()) && (await savedSettings(page)).followOn === false && (await color()) === plainColor, await color());
 const { x: followX, width: followWidth } = await dontWait().boundingBox();
-check("an icon, with the run buttons", (await dontWait().innerText()) === "" && Math.abs((await page.locator('button[aria-label="Bigger staff, smaller lanes"]').boundingBox()).x - (followX + followWidth)) < 16);
+check("an icon, with the run buttons", (await dontWait().innerText()) === "" && Math.abs((await page.locator('button[aria-label="Lanes and staff"]').boundingBox()).x - (followX + followWidth)) < 16);
 check("gone from Options", (await page.locator('.options :text("Don\'t wait")').count()) === 0);
 const hint = await dontWait().getAttribute("title");
 check("explains itself", hint?.includes("score"), hint);
@@ -62,7 +62,7 @@ const changes = run.filter((frame, index) => index > 0 && frame.text !== run[ind
 const gaps = changes.slice(1).map((frame, index) => Math.round(frame.at - changes[index].at));
 check("one note per beat", near(gaps, [500], 40), gaps.join(" "));
 check("the lanes stop at the end", Math.abs(run.at(-1).left - 15 * BEAT_PX) < 2, String(run.at(-1).left));
-const silent = await page.locator(".stats").innerText();
+const silent = await laneScore(page);
 check("the first note alone scores 7%, the rest missed", (await laneScore(page)) === "Score: 7% · 1 hit, 14 missed" && silent.includes("1 hit, 14 missed") && !silent.includes("Slowest"), silent.replaceAll("\n", " / "));
 await page.screenshot({ path: OUT + "follow-silent.png" });
 await stop(page); await sleep(200);
@@ -73,17 +73,19 @@ check("logged with its score, and not as a timed pass", entry.score === 7 && ent
 await freshPractice(page, 120);
 await followNotes(page, { midis: D });
 await begin(page); await waitForText(page, "All", 60000); await sleep(150);
-const perfect = await page.locator(".stats").innerText();
+const perfect = await laneScore(page);
 check("playing every note scores 100%", (await laneScore(page)) === "Score: 100% · 15 hit, 0 missed" && perfect.includes("15 hit, 0 missed"), perfect.replaceAll("\n", " / "));
 check("the finished notes fill pale green", await canvasHasColor(page, 201, 237, 212));
 check("with no green border left on them", !(await canvasHasColor(page, 76, 208, 125)));
-await page.click('button:text-is("Play again")'); await sleep(150);
-check("Play again clears the score and waits for the first note again", (await page.locator(".stats").innerText()) === "" && (await laneScore(page)) === "" && (await progress(page)) === "Note 1 of 15", await progress(page));
+await page.waitForSelector('button:text-is("Start"):not([disabled])');
+check("the run ends by itself, keeping its score and fills", (await laneScore(page)).startsWith("Score: 100%") && (await canvasHasColor(page, 201, 237, 212)));
+await begin(page); await sleep(150);
+check("Start clears the score and waits for the first note again", (await laneScore(page)) === "" && (await progress(page)) === "Note 1 of 15", await progress(page));
 await waitForText(page, "All", 60000); await sleep(150);
-check("and scores the new run", (await page.locator(".stats").innerText()).includes("15 hit, 0 missed"));
-await stop(page); await sleep(200);
-const twice = (await savedLog(page)).at(-1);
-check("the log adds up both runs", twice.score === 100 && twice.notesHit === 30, JSON.stringify({ hit: twice.notesHit }));
+check("and scores the new run", (await laneScore(page)).includes("15 hit, 0 missed"), await laneScore(page));
+await stop(page); await sleep(1200);
+const runs = (await savedLog(page)).slice(-2);
+check("each run is logged on its own", runs.length === 2 && runs.every((run) => run.score === 100 && run.notesHit === 15), JSON.stringify(runs.map((run) => run.notesHit)));
 
 await freshPractice(page, 120);
 await followNotes(page, { midis: D.map((midi, index) => (index === 2 ? midi + 2 : midi)), delays: { 6: 60000 } });
@@ -93,7 +95,7 @@ await sleep(100);
 check("a miss fills pale red as it passes", await canvasHasColor(page, 246, 207, 200));
 check("the score sits on the lanes' bar, kept up as notes pass", /^Score: \d+% · \d+ hit, [1-9]\d* missed$/.test(await laneScore(page)), await laneScore(page));
 await waitForText(page, "All", 60000); await sleep(150);
-const someMissed = await page.locator(".stats").innerText();
+const someMissed = await laneScore(page);
 check("a wrong note and a silent one are missed: 13 of 15 is 87%", (await laneScore(page)) === "Score: 87% · 13 hit, 2 missed" && someMissed.includes("13 hit, 2 missed"), someMissed.replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 
@@ -102,7 +104,7 @@ await nav(page, "Library"); await sleep(150);
 await page.locator(".piece", { hasText: "Hot Cross Buns" }).locator('button[aria-label="Practice"]').click(); await sleep(300);
 await followNotes(page, { midis: BUNS });
 await begin(page); await waitForText(page, "All", 60000); await sleep(150);
-const buns = await page.locator(".stats").innerText();
+const buns = await laneScore(page);
 check("a song counts its repeated eighths with no break in the sound", (await laneScore(page)) === "Score: 100% · 17 hit, 0 missed" && buns.includes("17 hit, 0 missed"), buns.replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 
@@ -139,7 +141,7 @@ await begin(page);
 await sleep(100);
 check("the lanes start from that note", Math.abs((await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) - 2 * BEAT_PX) < BEAT_PX / 2 && (await progress(page)) === "Note 3 of 15", await progress(page));
 await waitForText(page, "All", 60000); await sleep(150);
-const partial = await page.locator(".stats").innerText();
+const partial = await laneScore(page);
 check("only the notes from there are scored", partial.includes("13 hit, 0 missed") && (await laneScore(page)) === "Score: 100% · 13 hit, 0 missed", partial.replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 
@@ -171,16 +173,16 @@ await page.locator('.options label:has-text("Metronome") input').uncheck();
 
 // A recording's markers land on the notes
 await freshPractice(page, 120);
-await page.locator('.options label:has-text("Record") input').check();
+await setRecord(page, true);
 await followNotes(page, { midis: D });
 await begin(page); await waitForText(page, "All", 60000);
 await stop(page);
 await page.waitForSelector('button:text-is("Start"):not([disabled])');
-await nav(page, "Log"); await page.waitForSelector("audio"); await sleep(400);
+await nav(page, "Calendar"); await page.waitForSelector("audio"); await sleep(400);
 const markers = await page.locator("button.marker").count();
 check("a recording gets its 15 markers", markers === 15, String(markers));
-const row = await page.locator("section > ul > li").first().innerText();
-check("the Log shows the score, not passes and slowest notes", row.includes("Score: 100%") && row.includes("15 hit, 0 missed") && !row.includes("slowest") && !row.includes("pass"), row.replaceAll("\n", " ").slice(0, 130));
+const row = await page.locator(".day-details li:has(audio)").innerText();
+check("the Calendar shows the score, not passes and slowest notes", row.includes("Score: 100%") && row.includes("15 hit, 0 missed") && !row.includes("slowest") && !row.includes("pass"), row.replaceAll("\n", " ").slice(0, 130));
 const times = await page.evaluate(async () => {
   const { getRecording, loadLog } = await import("/src/storage.ts");
   const entry = loadLog().at(-1);

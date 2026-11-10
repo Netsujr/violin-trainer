@@ -261,7 +261,7 @@ flow("The question before anything is lost");
     await storage.saveRecording("take", { blob: new Blob(["sound"], { type: "audio/webm" }), markers: [] });
     storage.appendLog({ id: "entry", startedAt: new Date().toISOString(), pieceId: "other", pieceTitle: "Other tune", minutes: 1, passes: 1, notesHit: 3, notesSkipped: 0, averageCents: 5, averagePassSeconds: 10, slowest: [], recordingId: "take" });
   });
-  await nav(page, "Log");
+  await nav(page, "Calendar"); // Today's recordings are under today, which it opens on.
   await page.locator("audio").waitFor({ state: "attached" });
   const hasTake = () => page.evaluate(async () => (await (await import("/src/storage.ts")).getRecording("take")) !== undefined);
   await page.click('button:text-is("Delete recording")'); await t.modal.waitFor();

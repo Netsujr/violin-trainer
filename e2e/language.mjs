@@ -42,7 +42,7 @@ await sleep(100);
 
 await page.locator("nav button").nth(0).click();
 await sleep(150);
-await page.locator(".listen .row button").first().click();
+await page.locator('.listen button:text-is("Iniciar")').click();
 await page.waitForSelector('button:text-is("Parar")');
 await sleep(800);
 const big = await page.locator(".big-note").innerText();

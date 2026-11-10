@@ -1,7 +1,7 @@
 // Each user flow on a computer, from start to finish, as a person would do it.
 import { chromium } from "playwright-core";
 import { wav, note, rest } from "./wav.mjs";
-import { nav, start, stop, sleep, check, skipCountIn, trackNotes, progress, D_MAJOR as D, OUT, answer, saveTyped, typeNotes } from "./lib.mjs";
+import { laneScore, setRecord, begin, nav, start, stop, sleep, check, skipCountIn, trackNotes, progress, D_MAJOR as D, OUT, answer, saveTyped, typeNotes } from "./lib.mjs";
 wav(OUT + "q-scale.wav", [...D.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);
 wav(OUT + "q-a4.wav", [note(69, 5)]);
 wav(OUT + "q-silent.wav", [rest(3)]);
@@ -28,9 +28,9 @@ flow("1. First visit");
   check("opens on Listen, in English, nothing started", (await s.page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await s.page.locator(".big-note").innerText()) === "Press Start and play");
   check("no recording, no log yet", (await log(s.page)).length === 0);
   await s.page.screenshot({ path: OUT + "1-listen.png" });
-  for (const name of ["Practice", "Library", "Log"]) { await nav(s.page, name); await sleep(250); await s.page.screenshot({ path: `${OUT}1-${name}.png` }); }
+  for (const name of ["Practice", "Library", "Calendar"]) { await nav(s.page, name); await sleep(250); await s.page.screenshot({ path: `${OUT}1-${name}.png` }); }
   const empty = await s.page.locator("section").innerText();
-  check("an empty Log reads sensibly", empty.includes("This week") && !empty.includes("undefined") && !empty.includes("NaN"), empty.replaceAll("\n", " | ").slice(0, 160));
+  check("an empty Calendar reads sensibly", empty.includes("Nothing practised this day.") && !empty.includes("undefined") && !empty.includes("NaN"), empty.replaceAll("\n", " | ").slice(0, 160));
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
@@ -96,17 +96,17 @@ flow("4. Practice: a whole scale, again, and stop");
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")');
   await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 25000 });
   await sleep(300);
-  const stats = await s.page.locator(".stats").innerText();
-  check("finishes with useful stats", stats.includes("Pass 1 done") && stats.includes("15 hit"), stats.replaceAll("\n", " / "));
+  const stats = await laneScore(s.page);
+  check("finishes with useful stats", stats.includes("Pass 1 done") && stats.includes("15 hit"), stats);
   await s.page.screenshot({ path: OUT + "4-done.png", fullPage: true });
-  await s.page.click('button:text-is("Play again")'); await sleep(900);
-  check("Play again goes back to the start, stats cleared, view back", (await s.page.locator(".stats").innerText()) === "" && (await s.page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) < 240);
-  await sleep(10500);
-  const again = await s.page.locator(".stats").innerText();
-  check("a second pass counts", again.includes("Pass 2 done"), again.replaceAll("\n", " / "));
-  await stop(s.page); await sleep(200);
-  const entry = (await log(s.page)).at(-1);
-  check("one log entry with two passes", entry.passes === 2 && entry.notesHit === 30 && entry.averagePassSeconds > 5, JSON.stringify({ passes: entry.passes, hit: entry.notesHit, per: entry.averagePassSeconds }));
+  await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
+  await begin(s.page); await sleep(900);
+  check("Start goes back to the start, stats cleared, view back", (await laneScore(s.page)) === "" && (await s.page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) < 240);
+  await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 25000 });
+  check("a second run counts", (await laneScore(s.page)).includes("15 hit"), await laneScore(s.page));
+  await stop(s.page); await sleep(1200);
+  const runs = (await log(s.page)).slice(-2);
+  check("each run is logged on its own", runs.length === 2 && runs.every((run) => run.passes === 1 && run.notesHit === 15 && run.averagePassSeconds > 5), JSON.stringify(runs.map((run) => [run.passes, run.notesHit])));
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
@@ -126,9 +126,9 @@ flow("6. Moving between screens during a session");
 {
   const s = await open("q-a4.wav");
   await nav(s.page, "Practice"); await sleep(200);
-  await s.page.locator('.options label:has-text("Record") input').check();
+  await setRecord(s.page, true);
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")'); await sleep(1500);
-  await nav(s.page, "Log"); await sleep(600);
+  await nav(s.page, "Calendar"); await sleep(600);
   const entries = await log(s.page);
   check("leaving logs the session and keeps the recording", entries.length === 1 && (await s.page.locator("audio").count()) === 1);
   await nav(s.page, "Practice"); await sleep(250);
@@ -178,33 +178,33 @@ flow("7. Library: adding a piece, through to practising it");
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")'); await sleep(1200);
   check("playing it works: the first A clears, the repeat waits for a fresh bow", (await progress(s.page)) === "Note 2 of 3", await progress(s.page));
   await stop(s.page); await sleep(150);
-  await nav(s.page, "Log"); await sleep(250);
-  const text = await s.page.locator("section").innerText();
-  check("Log lists it under Planned and Sessions", text.includes("✓ My tune") && text.includes("My tune"), text.replaceAll("\n", " | ").slice(0, 130));
+  await nav(s.page, "Calendar"); await sleep(250);
+  const text = await s.page.locator(".day-details").innerText();
+  check("today's Calendar lists it", text.includes("My tune"), text.replaceAll("\n", " | ").slice(0, 130));
   await nav(s.page, "Library"); await sleep(200);
   await s.page.locator(".piece", { hasText: "My tune" }).locator('button[aria-label="Delete"]').click(); await sleep(100);
   await answer(s.page, "Delete");
   check("Delete removes it", (await s.page.locator(".piece", { hasText: "My tune" }).count()) === 0);
-  await nav(s.page, "Log"); await sleep(250);
-  const after = await s.page.locator("section").innerText();
-  check("its history stays in the Log, and it leaves Planned", after.includes("My tune") && !after.includes("✓ My tune"));
+  await nav(s.page, "Calendar"); await sleep(250);
+  const after = await s.page.locator(".day-details").innerText();
+  check("its history stays in the Calendar", after.includes("My tune"));
   await nav(s.page, "Practice"); await sleep(250);
   check("Practice no longer offers it", (await s.page.locator(".piece-menu button", { hasText: "My tune" }).count()) === 0);
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-flow("8. Log: recordings");
+flow("8. Calendar: recordings");
 {
   const s = await open("q-scale.wav");
   await nav(s.page, "Practice"); await sleep(200);
-  await s.page.locator('.options label:has-text("Record") input').check();
+  await setRecord(s.page, true);
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")');
-  check("Record locks during a session", await s.page.locator('.options label:has-text("Record") input').isDisabled());
+  check("Record locks during a session", await s.page.locator('.actions button[aria-label="Record"]').isDisabled());
   await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 25000 });
   await stop(s.page);
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
-  await nav(s.page, "Log"); await s.page.waitForSelector("audio"); await sleep(800);
+  await nav(s.page, "Calendar"); await s.page.waitForSelector("audio"); await sleep(800);
   await s.page.screenshot({ path: OUT + "8-log.png", fullPage: true });
   const audio = s.page.locator("audio");
   check("the player knows its length", await audio.evaluate((a) => Number.isFinite(a.duration) && a.duration > 5));
@@ -219,8 +219,8 @@ flow("8. Log: recordings");
   check("storage is shown", /Storage used: \d+\.\d MB/.test(storage), storage);
   await s.page.click('button:text-is("Delete recording")'); await sleep(100);
   await answer(s.page, "Delete"); await sleep(150);
-  check("Delete recording removes only the audio", (await s.page.locator("audio").count()) === 0 && (await s.page.locator("section > ul > li").count()) === 1);
-  await s.page.reload(); await s.page.waitForSelector("nav button"); await nav(s.page, "Log"); await sleep(400);
+  check("Delete recording removes only the audio", (await s.page.locator("audio").count()) === 0 && (await s.page.locator(".day-details li").count()) === 1);
+  await s.page.reload(); await s.page.waitForSelector("nav button"); await nav(s.page, "Calendar"); await sleep(400);
   check("still gone after a reload", (await s.page.locator("audio").count()) === 0);
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -252,7 +252,7 @@ flow("10. Layout on common computer screens");
 for (const viewport of [{ width: 1024, height: 768 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }, { width: 2560, height: 1440 }]) {
   const s = await open("q-silent.wav", { viewport });
   const out = [];
-  for (const name of ["Listen", "Practice", "Library", "Log"]) {
+  for (const name of ["Listen", "Practice", "Library", "Calendar"]) {
     await nav(s.page, name); await sleep(200);
     out.push(await s.page.evaluate(() => document.documentElement.scrollWidth - innerWidth));
   }

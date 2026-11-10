@@ -9,7 +9,7 @@ wav(OUT + "s-green.wav", [{ hz: detuned(8), seconds: 4, wave: "sine" }]);
 wav(OUT + "s-yellow.wav", [{ hz: detuned(30), seconds: 4, wave: "sine" }]);
 wav(OUT + "s-out.wav", [{ hz: detuned(46), seconds: 4, wave: "sine" }]);
 
-const titles = (page, section) => page.locator(`${section} .section-bar label`).evaluateAll((labels) => labels.map((label) => label.title));
+const titles = (page, section) => page.locator(`${section} .section-bar .box-toggle:not([hidden])`).evaluateAll((buttons) => buttons.map((button) => button.title));
 const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toDataURL());
 
 {
@@ -22,10 +22,11 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   const options = page.locator(".options");
   check("options: open by default on a computer", await options.evaluate((panel) => panel.open));
   const text = await options.innerText();
-  check("options: holds Tempo, Metronome, Record and BPM", ["Tempo", "Metronome", "Record", "BPM"].every((word) => text.includes(word)), text.replaceAll("\n", " ").slice(0, 60));
+  check("options: holds Tempo, Metronome, the count-in and BPM", ["Tempo", "Metronome", "count-in", "BPM"].every((word) => text.includes(word)) && !text.includes("Record"), text.replaceAll("\n", " ").slice(0, 80));
   check("options: the display switches moved out", !["Fingers", "Note names", "Grid"].some((word) => text.includes(word)));
   const rowOf = (selector) => page.locator(selector).evaluate((element) => Math.round(element.getBoundingClientRect().top + element.getBoundingClientRect().height / 2));
-  check("options: BPM sits beside Record", Math.abs((await rowOf(".bpm")) - (await rowOf('.options label:has-text("Record")'))) < 4);
+  const record = await page.locator('.actions button[aria-label="Record"]').boundingBox(), startButton = await page.locator('button:text-is("Start")').boundingBox();
+  check("record sits just left of Start", record.x + record.width <= startButton.x && Math.abs((await rowOf('.actions button[aria-label="Record"]')) - (await rowOf('button:text-is("Start")'))) < 4);
   check("options: the BPM slider is wide", (await page.locator(".bpm input").boundingBox()).width > 400);
   check("run buttons are outside the panel", (await page.locator('.options button:text-is("Start")').count()) === 0);
   const label = page.locator('.options label:has-text("Tempo")');
@@ -37,7 +38,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   check("options: off stays clickable", await label.locator("input").isEnabled());
   await page.click(".options > summary");
   await sleep(200);
-  check("options: closes, leaving the run buttons", (await page.locator(".piece-select").first().isHidden()) && (await page.locator('button:text-is("Start")').isVisible()) && (await page.locator("section > p").isVisible()));
+  check("options: closes, leaving the run buttons", (await page.locator(".bpm").isHidden()) && (await page.locator(".piece-select").isVisible()) && (await page.locator('button:text-is("Start")').isVisible()) && (await page.locator("section > p").isVisible()));
   await page.reload();
   await page.waitForSelector("nav button");
   await nav(page, "Practice");
@@ -46,20 +47,22 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await page.click(".options > summary");
 
   // Bars
-  check("bars: timeline order", (await titles(page, ".timeline-section")).join() === "Fingers,Note names (Do Ré Mi),Letter names (A G D),Grid", (await titles(page, ".timeline-section")).join());
+  check("bars: timeline order", (await titles(page, ".timeline-section")).join() === "Fingers,Note names (Do Ré Mi),Letter names (A G D)", (await titles(page, ".timeline-section")).join());
+  check("bars: the piece picker on the left, and no grid switch, the grid always drawn", (await page.locator(".section-bar > *").first().getAttribute("class")) === "piece-select" && (await page.locator('.box-toggle[title="Grid"]').count()) === 0);
   check("bars: only the lanes have a header", (await page.locator(".section-bar").count()) === 1 && (await page.locator(".staff-section label").count()) === 0);
-  check("bars: icons instead of names", (await page.locator(".section-bar").first().innerText()).replace(/\s/g, "") === "DoA", await page.locator(".section-bar").first().innerText());
+  const toggleText = await page.locator(".section-bar .box-toggle:not([hidden])").evaluateAll((buttons) => buttons.map((button) => button.textContent).join(""));
+  check("bars: icons in boxes instead of names", toggleText === "DoA" && (await page.locator(".section-bar input[type=checkbox]").count()) === 0, toggleText);
   const below = (selector) => page.evaluate((selector) => { const section = document.querySelector(selector); return section.querySelector(".section-bar").getBoundingClientRect().bottom <= section.querySelector("canvas, .staff").getBoundingClientRect().top + 0.5; }, selector);
   check("bars: nothing sits on the lanes", await below(".timeline-section"));
   const arrow = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), button = document.querySelector(".staff-toggle").getBoundingClientRect(); return { left: Math.round(button.left - panel.left), bottom: Math.round(panel.bottom - button.bottom) }; });
   check("staff: the arrow sits at its bottom left", arrow.left >= 0 && arrow.left < 16 && arrow.bottom >= 0 && arrow.bottom < 16, JSON.stringify(arrow));
-  for (const key of ["Fingers", "Note names (Do Ré Mi)", "Letter names (A G D)", "Grid"]) {
-    const input = page.locator(`.timeline-section label[title="${key}"] input`);
+  for (const key of ["Fingers", "Note names (Do Ré Mi)", "Letter names (A G D)"]) {
+    const toggle = page.locator(`.timeline-section .box-toggle[title="${key}"]`);
     const before = await picture(page);
-    await input.uncheck();
+    await toggle.click();
     await sleep(60);
-    check(`bars: ${key} changes the timeline`, (await picture(page)) !== before);
-    await input.check();
+    check(`bars: ${key} changes the timeline, and lights off`, (await picture(page)) !== before && (await toggle.getAttribute("aria-pressed")) === "false");
+    await toggle.click();
     await sleep(60);
     check(`bars: ${key} comes back`, (await picture(page)) === before);
   }
@@ -67,7 +70,8 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   // Staff labels
   const labels = () => page.locator(".staff > svg > text").evaluateAll((texts) => texts.map((text) => text.textContent).join(" "));
   check("staff: fingers and names show by default", (await labels()).startsWith("0 Ré 1 Mi 2 Fa♯ 3 Sol"), await labels());
-  const lane = (name) => page.locator(`.timeline-section label[title="${name}"] input`);
+  // Each starts on, so every press here turns it off or back on.
+  const lane = (name) => ({ uncheck: () => page.locator(`.timeline-section .box-toggle[title="${name}"]`).click(), check: () => page.locator(`.timeline-section .box-toggle[title="${name}"]`).click() });
   await lane("Note names (Do Ré Mi)").uncheck();
   check("staff: the lanes' names switch hides its names too", (await labels()) === "0 1 2 3 0 1 2 3 2 1 0 3 2 1 0", await labels());
   await lane("Fingers").uncheck();
@@ -78,10 +82,8 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   const sheet = () => page.locator(".staff svg").evaluate((svg) => svg.outerHTML);
   const before = await sheet();
   await lane("Letter names (A G D)").uncheck();
-  await lane("Grid").uncheck();
-  check("staff: letter names and the grid are only for the lanes", (await sheet()) === before);
+  check("staff: letter names are only for the lanes", (await sheet()) === before);
   await lane("Letter names (A G D)").check();
-  await lane("Grid").check();
   await pickPiece(page, "c-major-1oct");
   await sleep(150);
   const low = await page.locator(".staff > svg > text").evaluateAll((texts) => texts.filter((text) => text.getAttribute("fill") === "#b03020").map((text) => text.textContent).join());

@@ -221,9 +221,11 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const x = ((event.clientX - box.left) * sheet.width) / box.width;
     const y = ((event.clientY - box.top) * sheet.height) / box.height;
     const line = Math.max(0, Math.min(noteLines.at(-1) ?? 0, Math.floor((y - sheet.top) / LINE_HEIGHT)));
-    const noteIndex = noteXs.findLastIndex((noteX, index) => noteLines[index] === line && noteX - NOTE_LEAD <= x);
-    const isLastOnLine = noteLines[noteIndex + 1] !== line;
-    return isLastOnLine && x > noteXs[noteIndex] + NOTE_TAIL ? -1 : noteIndex;
+    // The nearest note on that line, so closely packed notes are each easy to hit, but nothing before the first or past the last.
+    const onLine = noteXs.flatMap((_, index) => (noteLines[index] === line ? [index] : []));
+    if (onLine.length === 0 || x < noteXs[onLine[0]] - NOTE_LEAD || x > noteXs[onLine.at(-1)!] + NOTE_TAIL) return -1;
+    const distance = (index: number) => Math.abs(noteXs[index] + NOTEHEAD_CENTER - x);
+    return onLine.reduce((nearest, index) => (distance(index) < distance(nearest) ? index : nearest));
   }
 
   // A band behind each selected note, line by line, so a section can wrap across the sheet.

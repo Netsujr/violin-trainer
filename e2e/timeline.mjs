@@ -1,5 +1,5 @@
 import { wav, note } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, pickPiece } from "./lib.mjs";
+import { laneScore, begin, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, pickPiece } from "./lib.mjs";
 
 const LANES = ["E", "A", "D", "G"];
 const HIT_X = 130, SPACING = 120, LANE_HEIGHT = 84;
@@ -65,10 +65,11 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await followNotes(finishing.page, { midis: D_MAJOR });
   await start(finishing.page);
   await finishing.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 8000 });
+  await finishing.page.waitForSelector('button:text-is("Start"):not([disabled])');
   await finishing.page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 0));
   await sleep(150);
   await clickTile(finishing.page, 3, "D");
-  check("clicking a note after finishing carries on from it", (await progress(finishing.page)) === "Note 4 of 15" && (await finishing.page.locator(".stats").innerText()) === "" && (await finishing.page.locator('button:text-is("Stop")').count()) === 1, await progress(finishing.page));
+  check("clicking a note after a run has ended picks where the next starts", (await progress(finishing.page)) === "Note 4 of 15" && (await laneScore(finishing.page)) === "" && (await finishing.page.locator('button:text-is("Start")').count()) === 1, await progress(finishing.page));
   await finishing.close();
   check("Start plays from the picked note, and it can be hit", (await progress(page)) === "Note 7 of 15", await progress(page));
 
@@ -82,16 +83,17 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await start(page);
   await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 8000 });
   check("a partial run finishes", (await progress(page)) === "All 15 notes done", await progress(page));
-  const stats = await page.locator(".stats").innerText();
-  check("stats call it a partial run", stats.includes("Note 15 to the end done in") && stats.includes("1 hit"), stats.replaceAll("\n", " / "));
-  await page.click('button:text-is("Play again")');
-  check("Play again returns to the picked note", (await progress(page)) === "Note 15 of 15", await progress(page));
-  await stop(page);
-  await sleep(100);
-  check("Stop keeps the picked note", (await progress(page)) === "Note 15 of 15", await progress(page));
+  const stats = await laneScore(page);
+  check("the lanes' bar calls it a partial run", stats.includes("Note 15 to the end done in") && stats.includes("1 hit"), stats);
+  await page.waitForSelector('button:text-is("Start"):not([disabled])');
   const log = await page.evaluate(() => JSON.parse(localStorage.getItem("log")));
   const partial = log.at(-1);
   check("a partial run isn't logged as a pass", log.length === 2 && partial.passes === 0 && partial.averagePassSeconds === null && partial.notesHit >= 1 && partial.notesSkipped === 0, JSON.stringify(partial));
+  await begin(page);
+  check("Start goes again from the picked note", (await progress(page)) === "Note 15 of 15", await progress(page));
+  await stop(page);
+  await sleep(100);
+  check("Stop keeps the picked note", (await progress(page)) === "Note 15 of 15", await progress(page));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

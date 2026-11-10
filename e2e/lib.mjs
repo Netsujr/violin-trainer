@@ -102,7 +102,13 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
   }, { midis, delayMs, delays });
 export const near = (values, expected, tolerance = 60) => values.length > 0 && values.every((value, index) => Math.abs(value - (expected[index % expected.length])) <= tolerance);
 export const progress = (page) => page.locator("section > p").first().innerText();
-// The run's score, on the bar above the lanes.
+// Arms recording for the next run, or disarms it, with the record button by Start.
+export async function setRecord(page, on) {
+  const button = page.locator('button[aria-label="Record"]').first();
+  if ((await button.getAttribute("aria-pressed")) !== String(on)) await button.click();
+}
+export const recordArmed = async (page) => (await page.locator('button[aria-label="Record"]').first().getAttribute("aria-pressed")) === "true";
+// The run's result, on the bar above the lanes: its score, or the summary of a run that waited for each note.
 export const laneScore = (page) => page.locator(".lane-score").innerText();
 // Menu items only show on hover, so this clicks the piece's item directly, as a tap would.
 export const pickPiece = (page, id) => page.locator(`.piece-menu button[value="${id}"]`).evaluate((item) => item.click());
@@ -141,7 +147,13 @@ export const waitForText = (page, text, timeout = 30000) =>
     throw error;
   });
 // Practice from a fresh page load, which also ends the last run's synthetic player.
+// It opens on the first piece: Practice would otherwise reopen the one practised last.
 export const freshPractice = async (page, bpm) => {
+  await page.evaluate(() => {
+    const settings = JSON.parse(localStorage.getItem("settings") ?? "{}");
+    delete settings.lastPieceId;
+    localStorage.setItem("settings", JSON.stringify(settings));
+  });
   await page.reload();
   await page.waitForSelector("nav button");
   await nav(page, "Practice");

@@ -1,6 +1,6 @@
 // Loop, repeating a scale's top note, the steady reference tone, and the line that says which of them is on.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece } from "./lib.mjs";
 
 const D_TOP_TWICE = [62, 64, 66, 67, 69, 71, 73, 74, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "modes-silent.wav", [rest(3)]);
@@ -17,7 +17,7 @@ const GREEN = "rgb(76, 208, 125)";
 await nav(page, "Practice"); await sleep(250);
 check("there's no Skip", (await page.locator('button:text-is("Skip")').count()) === 0);
 const order = await page.locator(".actions button").evaluateAll((buttons) => buttons.map((button) => button.ariaLabel ?? button.textContent));
-check("the buttons sit together, ending with Fullscreen", order.join() === "Start,Play reference,Loop,Repeat the top note,Don't wait,Bigger staff, smaller lanes,Fullscreen", order.join());
+check("the buttons sit together, Record first and Fullscreen last", order.join() === "Record,Start,Play reference,Loop,Repeat the top note,Don't wait,Lanes and staff,Fullscreen", order.join());
 check("all off to begin with", !(await pressed(loop())) && !(await pressed(top())) && !(await pressed(dontWait())));
 check("the line beneath describes that", (await note_()) === "Waits for each note · Plays once · Top note once", await note_());
 const below = await page.evaluate(() => document.querySelector(".mode-note").getBoundingClientRect().top >= document.querySelector(".actions").getBoundingClientRect().bottom - 1);
@@ -34,7 +34,7 @@ await freshPractice(page);
 check("it stays on after a reload", (await pressed(top())) && (await progress(page)) === "Note 1 of 16");
 await followNotes(page, { midis: D_TOP_TWICE, delayMs: 150 });
 await begin(page); await waitForText(page, "All 16 notes done"); await sleep(150);
-check("it plays through, with the top note twice", (await page.locator(".stats").innerText()).includes("16 hit"), (await page.locator(".stats").innerText()).replaceAll("\n", " / "));
+check("it plays through, with the top note twice", (await laneScore(page)).includes("16 hit"), await laneScore(page));
 await stop(page); await sleep(200);
 await pickPiece(page, "g-major-2oct"); await sleep(250);
 check("a longer scale repeats its own top note", (await progress(page)) === "Note 1 of 30", await progress(page));
@@ -85,7 +85,7 @@ check("it loops back to the picked note", (await progress(page)).startsWith("Not
 await loop().click(); await sleep(100);
 check("switching off mid-run doesn't stop the run", (await page.locator('button:text-is("Stop")').count()) === 1);
 await waitForText(page, "All 15 notes done"); await sleep(150);
-check("it finishes that time round, with results", (await page.locator(".stats").innerText()).includes("done"));
+check("it finishes that time round, with results", (await laneScore(page)).includes("done"), await laneScore(page));
 await stop(page); await sleep(200);
 
 // Loop with Don't wait
@@ -133,7 +133,7 @@ await page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84); await sleep(15
 check("it moves with the current note, without restarting", (await tone()).hz === 330 && !(await tone()).stopped && (await tone()).count === 2, JSON.stringify(await tone()));
 await pickPiece(page, "a-major-1oct"); await sleep(150);
 check("and with the piece", (await tone()).hz === 440, JSON.stringify(await tone()));
-await nav(page, "Log"); await sleep(150);
+await nav(page, "Calendar"); await sleep(150);
 check("leaving Practice stops it", (await tone()).stopped);
 await nav(page, "Practice"); await sleep(200);
 check("and it reads as off on return", (await page.locator('button:text-is("Play reference")').count()) === 1);

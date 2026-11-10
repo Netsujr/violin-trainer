@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveTyped, typeNotes, openDrawers } from "./lib.mjs";
+import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveTyped, typeNotes, openDrawers } from "./lib.mjs";
 
 const profile = OUT + "profile";
 rmSync(profile, { recursive: true, force: true });
@@ -41,7 +41,8 @@ await page.click("summary");
 await nav(page, "Listen");
 await page.locator('label:has-text("Staff") input').uncheck();
 await nav(page, "Practice");
-await page.locator('label[title="Fingers"] input').uncheck();
+const fingers = () => page.locator('.section-bar .box-toggle[aria-label="Fingers"]');
+await fingers().click();
 await page.reload();
 await page.waitForSelector("nav button");
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
@@ -51,8 +52,8 @@ await page.locator('label:has-text("Staff") input').check();
 await nav(page, "Practice");
 await sleep(100);
 await page.screenshot({ path: OUT + "practice-toggled.png" });
-check("a saved bar switch comes back off", !(await page.locator('label[title="Fingers"] input').isChecked()));
-await page.locator('label[title="Fingers"] input').check();
+check("a saved bar switch comes back off", (await fingers().getAttribute("aria-pressed")) === "false");
+await fingers().click();
 await page.click("summary");
 await page.locator('label.setting:has-text("Tolerance") input').fill("40");
 await page.click("summary");
@@ -61,19 +62,19 @@ await page.click("summary");
 await nav(page, "Library");
 check("saved piece survives a reload", (await page.locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
 await page.locator(".piece", { hasText: "D (Ré) major" }).first().locator('button[aria-label="Practice"]').click();
-await page.locator('label:has-text("Record") input').check();
+await setRecord(page, true);
 await start(page);
 const deadline = Date.now() + 30000;
 while (Date.now() < deadline && !(await page.locator("section > p").first().innerText()).startsWith("All")) await sleep(50);
 check("recorded pass clears", (await page.locator("section > p").first().innerText()).startsWith("All 15"));
 await sleep(500);
-await nav(page, "Log");
+await nav(page, "Calendar");
 await page.waitForSelector("audio");
 await sleep(300);
 check("recording ready straight after leaving Practice", (await page.locator("audio").count()) === 1);
 await page.reload();
 await page.waitForSelector("nav button");
-await nav(page, "Log");
+await nav(page, "Calendar");
 await page.waitForSelector("audio");
 await sleep(800);
 check("recording survives a reload", (await page.locator("audio").count()) === 1);
@@ -117,10 +118,9 @@ console.log("  decoded seconds", jump.decodedSeconds, "size bytes", jump.size);
 console.log("  ", jump.rows.map((r) => `${r.want}@${r.seekTo}:${r.heard ? "ok" : "MISS"}`).join("  "));
 check("every marker lands on its note", jump.rows.every((r) => r.heard));
 
-// Log screen contents
-const logText = await page.locator("section").innerText();
-check("week view, planned and trend rows show", logText.includes("This week") && logText.includes("✓ D (Ré) major\n") && logText.includes("D (Ré) major: "), "");
-console.log("  " + logText.split("\n").slice(0, 16).join(" | "));
+// The Calendar: today's minutes on its tile, and what was practised
+const dayText = await page.locator(".day-details").innerText();
+check("today's tile shows the minutes, and the day lists the piece", (await page.locator(".calendar-day.today .calendar-minutes").innerText()).endsWith("′") && dayText.includes("D (Ré) major") && dayText.includes("min practised"), dayText.replaceAll("\n", " | ").slice(0, 160));
 
 // Download link and delete
 check("download link has a filename", (await page.locator("a[download]").getAttribute("download")).endsWith(".webm"), await page.locator("a[download]").getAttribute("download"));
@@ -197,7 +197,7 @@ await s.close();
     await followNotes(page, { midis, delayMs: 150 });
     await start(page); await page.waitForSelector('button:text-is("Stop")');
     await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 60000 }).catch(() => {});
-    const result = await page.locator(".stats").innerText();
+    const result = await laneScore(page);
     await stop(page); await sleep(200);
     return result;
   };

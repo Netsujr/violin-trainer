@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
+import { setRecord, open, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
@@ -94,13 +94,13 @@ wav(OUT + "silence.wav", [rest(4)]);
 // Recording from Listen
 {
   const s = await open(OUT + "a440.wav");
-  await s.page.locator('label:has-text("Record") input').check();
+  await setRecord(s.page, true);
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1500);
-  await nav(s.page, "Log");
+  await nav(s.page, "Calendar");
   await s.page.waitForSelector("audio");
-  check("Listen can record too", (await s.page.locator("audio").count()) === 1);
+  check("Listen can record too, kept in today's Calendar", (await s.page.locator(".day-details audio").count()) === 1);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

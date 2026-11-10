@@ -156,7 +156,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       else {
         doneAt = shownIndex();
         results.show(session, { results: following.results, listening: track.listening, section, pattern: piece.pattern, startIndex });
-        controls.stop();
+        controls.finish(() => doneAt !== null);
       }
     }
     // Fast bow changes are too short to detect, so inside a pattern the beat and hold time separate repeated notes.
