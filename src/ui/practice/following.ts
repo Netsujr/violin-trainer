@@ -82,9 +82,10 @@ export function createFollowing({ metronome, highway, staff, showReading, isMute
       highway.showResults(track.listening ? state.results : null);
       highway.jumpTo(index);
     },
-    stop() {
+    // A finished run leaves its notes filled in as hit or missed, until the next.
+    stop(keepResults = false) {
       state = null;
-      highway.showResults(null);
+      if (!keepResults) highway.showResults(null);
     },
     // Moves the lanes on to now, judging any note they've passed. Returns the current note's progress, while they're moving.
     read(session: Session, frequency: number | null, now: number) {

@@ -115,7 +115,7 @@ export function listenScreen(): Screen {
       "section",
       { className: "listen" },
       createToggles(renderNote),
-      h("div", { className: "row" }, controls.startButton, controls.recordLabel, controls.message),
+      h("div", { className: "row" }, controls.recordToggle, controls.startButton, controls.message),
       big,
       position,
       needle.element,

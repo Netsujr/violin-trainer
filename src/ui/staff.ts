@@ -12,7 +12,10 @@ const TOP = 30;
 export const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
 const BAR_NOTE_WIDTH = 40;
-const MAX_BARS_PER_LINE = 6;
+// An open sheet always has four bars to a line, however wide the page.
+const BARS_PER_LINE = 4;
+// A sheet fitted to the screen is never drawn smaller than this.
+const MIN_FITTED_SCALE = 1;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 3: "hd", 4: "w" };
 // How far a line's rows of fingers and names sit outside the staff and its notes, measured to the text's baseline.
 const FINGER_GAP = 5;
@@ -83,21 +86,15 @@ function toBars(notes: StaffNote[]) {
   return bars;
 }
 
-function layOut(notes: StaffNote[], room: number) {
-  const lines: StaffNote[][][] = [[]];
-  for (const bar of toBars(notes)) {
-    const line = lines.at(-1)!;
-    const isFull = line.length === MAX_BARS_PER_LINE || (line.flat().length + bar.length) * BAR_NOTE_WIDTH > room;
-    if (line.length > 0 && isFull) lines.push([bar]);
-    else line.push(bar);
-  }
-  return lines;
+function layOut(notes: StaffNote[]) {
+  const bars = toBars(notes);
+  return Array.from({ length: Math.ceil(bars.length / BARS_PER_LINE) }, (_, line) => bars.slice(line * BARS_PER_LINE, (line + 1) * BARS_PER_LINE));
 }
 
 // The bars on each line of an open sheet, and the width to space each line's notes in.
 export function openLines(notes: StaffNote[], width: number) {
   const room = width - CLEF_SPACE;
-  const lines = layOut(notes, room);
+  const lines = layOut(notes);
   // Bars can hold different numbers of notes, so the fullest line sets the width of a bar, not the first line.
   const mostBars = Math.max(...lines.map((line) => line.length));
   return lines.map((line) => ({ line, formatWidth: ((room - 20) * line.length) / mostBars }));
@@ -206,6 +203,18 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   let sheet = { width: 0, height: 0, top: 0 };
   let section: Section | null = null;
   let followedBeat = 0;
+  // When set, an open sheet is drawn as large as fits this many pixels of height.
+  let fitHeight: number | null = null;
+
+  // The width to draw an open sheet at, in its own units: the fewer, the larger it shows. It's sized to fill fitHeight,
+  // but never cramps its notes, nor shrinks below a readable size, so a long piece scrolls instead.
+  function fittedWidth(notes: StaffNote[], top: number, bottom: number) {
+    const lines = layOut(notes);
+    const shownWidth = width * scale;
+    const needed = CLEF_SPACE + 20 + Math.max(...lines.map((line) => line.flat().length)) * BAR_NOTE_WIDTH;
+    const toFill = ((top + lines.length * LINE_HEIGHT + bottom) * shownWidth) / fitHeight!;
+    return Math.max(needed, Math.min(shownWidth / MIN_FITTED_SCALE, toFill));
+  }
 
   function noteAt(event: MouseEvent) {
     const box = element.querySelector("svg")!.getBoundingClientRect();
@@ -241,12 +250,14 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     element.replaceChildren();
     element.classList.toggle("collapsed", collapsed);
     const totalBeats = beatsIn(notes);
-    const lines = collapsed ? [{ line: toBars(notes), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, width);
-    // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
-    const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : width;
     const labelled = labels.names || labels.fingers;
     const top = labelled ? LABELLED_TOP : TOP;
-    const height = top + lines.length * LINE_HEIGHT + (labelled ? LABELLED_BOTTOM : 0);
+    const bottom = labelled ? LABELLED_BOTTOM : 0;
+    const sheetWidth = !collapsed && fitHeight ? fittedWidth(notes, top, bottom) : width;
+    const lines = collapsed ? [{ line: toBars(notes), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth);
+    // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
+    const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : sheetWidth;
+    const height = top + lines.length * LINE_HEIGHT + bottom;
     sheet = { width: fullWidth, height, top };
     noteLines = [];
     const renderer = new Renderer(element, Renderer.Backends.SVG);
@@ -330,6 +341,11 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     },
     setCollapsed(value: boolean) {
       collapsed = value;
+      shown = null;
+    },
+    // Draws an open sheet as large as fits this height in pixels, or as usual with null.
+    fitTo(height: number | null) {
+      fitHeight = height;
       shown = null;
     },
     resize(newWidth: number, newScale: number) {

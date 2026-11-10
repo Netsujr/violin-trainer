@@ -197,7 +197,7 @@ await shot("7-dont-wait");
 await waitForText(page, "All 15 notes done");
 await sleep(200);
 const score = await page.locator(".stats").innerText();
-check("ends with a score: 14 of 15 is 93%", (await laneScore(page)) === "Score: 93%" && score.includes("14 hit, 1 missed"), score.replaceAll("\n", " / "));
+check("ends with a score: 14 of 15 is 93%", (await laneScore(page)) === "Score: 93% · 14 hit, 1 missed" && score.includes("14 hit, 1 missed"), score.replaceAll("\n", " / "));
 await stopRun();
 check("the score goes in the log", (await savedLog(page)).at(-1).score === 93);
 await press(button("Don't wait")); await sleep(100);

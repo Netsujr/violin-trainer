@@ -1,23 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Piece } from "../src/music/notes";
-import { buildEntry, pieceTrends, plannedThisWeek, scorePercent, weekMinutes, type LogEntry } from "../src/practice/log";
+import { buildEntry, scorePercent } from "../src/practice/log";
 import { Session } from "../src/practice/session";
 
 const piece: Piece = { id: "p", title: "P", source: "test", notes: [{ pitch: "D4" }, { pitch: "E4" }, { pitch: "F#4" }, { pitch: "G4" }] };
-
-const entry = (startedAt: string, minutes: number, pieceId = "p", notesHit = 1): LogEntry => ({
-  id: startedAt,
-  startedAt,
-  pieceId,
-  pieceTitle: pieceId,
-  minutes,
-  passes: 1,
-  notesHit,
-  notesSkipped: 0,
-  averageCents: 10,
-  averagePassSeconds: 30,
-  slowest: [],
-});
 
 describe("session and log entry", () => {
   it("in tempo mode, starts the next note on the beat but keeps the real time of the hit", () => {
@@ -136,55 +122,5 @@ describe("session and log entry", () => {
   it("has no averages for free play", () => {
     const log = buildEntry(new Session({ ...piece, notes: [] }, 0), 1000);
     expect(log).toMatchObject({ passes: 0, notesHit: 0, averageCents: null, averagePassSeconds: null, slowest: [] });
-  });
-});
-
-describe("week view", () => {
-  const wednesday = new Date(2026, 10, 4, 12);
-
-  it("adds up minutes for Monday to Sunday of this week", () => {
-    const entries = [
-      entry(new Date(2026, 10, 2, 8).toISOString(), 10),
-      entry(new Date(2026, 10, 2, 20).toISOString(), 5),
-      entry(new Date(2026, 10, 8, 23).toISOString(), 7),
-      entry(new Date(2026, 10, 1, 23).toISOString(), 99),
-      entry(new Date(2026, 10, 9, 1).toISOString(), 99),
-    ];
-    expect(weekMinutes(entries, wednesday).map((day) => day.minutes)).toEqual([15, 0, 0, 0, 0, 0, 7]);
-  });
-
-  it("treats Sunday as the end of the week", () => {
-    const sunday = new Date(2026, 10, 8, 12);
-    expect(weekMinutes([], sunday)[0].day.getDate()).toBe(2);
-  });
-
-  it("shows which highlighted pieces were practised this week", () => {
-    const other = { ...piece, id: "other", title: "Other" };
-    const unplanned = { ...piece, id: "unplanned", title: "Unplanned" };
-    const planned = plannedThisWeek([piece, other, unplanned], ["p", "other"], [entry(new Date(2026, 10, 3).toISOString(), 1)], wednesday);
-    expect(planned).toEqual([
-      { title: "P", practised: true },
-      { title: "Other", practised: false },
-    ]);
-  });
-
-  it("does not count last week's practice as this week's", () => {
-    const planned = plannedThisWeek([piece], ["p"], [entry(new Date(2026, 9, 26).toISOString(), 1)], wednesday);
-    expect(planned[0].practised).toBe(false);
-  });
-});
-
-describe("piece trends", () => {
-  it("lists each piece's sessions oldest first and leaves out free play", () => {
-    const trends = pieceTrends([entry("2026-11-03T10:00:00Z", 1), entry("2026-11-02T10:00:00Z", 1), entry("2026-11-02T11:00:00Z", 1, "free", 0)]);
-    expect(trends).toHaveLength(1);
-    expect(trends[0].sessions.map((session) => session.startedAt)).toEqual(["2026-11-02T10:00:00Z", "2026-11-03T10:00:00Z"]);
-  });
-
-  it("keeps a renamed piece's history together, under its latest title", () => {
-    const trends = pieceTrends([entry("2026-11-02T10:00:00Z", 1), { ...entry("2026-11-03T10:00:00Z", 1), pieceTitle: "New name" }]);
-    expect(trends).toHaveLength(1);
-    expect(trends[0].title).toBe("New name");
-    expect(trends[0].sessions).toHaveLength(2);
   });
 });

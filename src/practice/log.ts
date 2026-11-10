@@ -1,4 +1,3 @@
-import type { Piece } from "../music/notes";
 import type { Session } from "./session";
 
 export type LogEntry = {
@@ -44,37 +43,4 @@ export function buildEntry(session: Session, now: number, recordingId?: string):
     recordingId,
     ...(session.following && { score: scorePercent(session.hits.length, session.hits.length + session.missed) }),
   };
-}
-
-function daysOfWeek(today: Date) {
-  const monday = today.getDate() - ((today.getDay() + 6) % 7);
-  return Array.from({ length: 7 }, (_, offset) => new Date(today.getFullYear(), today.getMonth(), monday + offset));
-}
-
-const sameDay = (entry: LogEntry, day: Date) => new Date(entry.startedAt).toDateString() === day.toDateString();
-
-export function weekMinutes(entries: LogEntry[], today: Date) {
-  return daysOfWeek(today).map((day) => ({
-    day,
-    minutes: entries.filter((entry) => sameDay(entry, day)).reduce((sum, entry) => sum + entry.minutes, 0),
-  }));
-}
-
-export function plannedThisWeek(pieces: Piece[], highlighted: string[], entries: LogEntry[], today: Date) {
-  const week = daysOfWeek(today);
-  return pieces
-    .filter((piece) => highlighted.includes(piece.id))
-    .map((piece) => ({
-      title: piece.title,
-      practised: entries.some((entry) => entry.pieceId === piece.id && week.some((day) => sameDay(entry, day))),
-    }));
-}
-
-export function pieceTrends(entries: LogEntry[]) {
-  const trends = new Map<string, LogEntry[]>();
-  for (const entry of [...entries].sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
-    if (entry.notesHit > 0) trends.set(entry.pieceId, [...(trends.get(entry.pieceId) ?? []), entry]);
-  }
-  // By id, so a renamed piece keeps its history, under its latest title.
-  return [...trends.values()].map((sessions) => ({ title: sessions.at(-1)!.pieceTitle, sessions }));
 }

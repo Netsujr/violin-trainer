@@ -44,6 +44,9 @@ export function createFullscreen(onChange: (on: boolean) => void) {
 
   return {
     button,
+    get on() {
+      return on;
+    },
     leave() {
       if (on) toggle();
       document.removeEventListener("fullscreenchange", onFullscreenChange);

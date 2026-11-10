@@ -114,8 +114,6 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
   }
 
   function drawGrid() {
-    if (!getSettings().toggles.grid) return;
-
     const at = position();
     const first = Math.max(0, Math.ceil(at - HIT_X / BEAT_WIDTH));
     const last = Math.min(starts.at(-1)!, Math.floor(at + (viewWidth - HIT_X) / BEAT_WIDTH));

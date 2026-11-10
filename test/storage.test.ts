@@ -75,13 +75,13 @@ describe("settings", () => {
     const { getSettings } = await settingsWith(null);
     expect(getSettings()).toMatchObject({ toleranceCents: 40, holdMs: 200, tempoOn: false, metronomeOn: false, bpm: 60, pattern: 0, staffOpen: false, optionsOpen: true });
     expect(getSettings().countInOn).toBe(true);
-    expect(getSettings().toggles).toMatchObject({ fingers: true, grid: true });
+    expect(getSettings().toggles).toMatchObject({ fingers: true, staff: true });
   });
 
   it("gives a switch added later its default on older saved settings", async () => {
-    const { getSettings } = await settingsWith({ toggles: { fingers: false, noteNames: true, letterNames: true, staff: true } });
+    const { getSettings } = await settingsWith({ toggles: { fingers: false, noteNames: true, letterNames: true } });
     expect(getSettings().toggles.fingers).toBe(false);
-    expect(getSettings().toggles.grid).toBe(true);
+    expect(getSettings().toggles.staff).toBe(true);
   });
 
   it("picks the language from the browser until one is saved", async () => {

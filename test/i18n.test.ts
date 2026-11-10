@@ -10,7 +10,7 @@ describe("language", () => {
     expect(t.start).toBe("Start");
     setLanguage("pt");
     expect(t.start).toBe("Iniciar");
-    expect(t.screens.Log).toBe("Registro");
+    expect(t.screens.Calendar).toBe("Calendário");
   });
 
   it("spells note names properly in Portuguese and keeps the spec's list in English", () => {

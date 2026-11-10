@@ -5,11 +5,11 @@ import { getSettings, saveSettings } from "./storage";
 import { h, type Screen } from "./ui/dom";
 import { libraryScreen } from "./ui/library";
 import { listenScreen } from "./ui/listen";
-import { logScreen } from "./ui/log";
+import { calendarScreen } from "./ui/calendar";
 import { practiceScreen } from "./ui/practice";
 import { createSettingsPanel } from "./ui/settings";
 
-const SCREEN_NAMES = ["Listen", "Practice", "Library", "Log"] as const;
+const SCREEN_NAMES = ["Listen", "Practice", "Library", "Calendar"] as const;
 type ScreenName = (typeof SCREEN_NAMES)[number];
 
 const LANGUAGES: [Language, string][] = [
@@ -27,7 +27,7 @@ function build(name: ScreenName, pieceId?: string, aligning = false) {
   if (name === "Listen") return listenScreen();
   if (name === "Practice") return practiceScreen(pieceId, aligning ? () => show("Library") : undefined);
   if (name === "Library") return libraryScreen((id) => show("Practice", id), (id) => show("Practice", id, true));
-  return logScreen();
+  return calendarScreen();
 }
 
 // aligning opens Practice to line up the piece's backing track.

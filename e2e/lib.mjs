@@ -112,7 +112,8 @@ export const pickedPiece = (page) => page.locator(".piece-select").innerText();
 export const openDrawers = (page) => page.locator(".more-pieces:not([open]) > summary").evaluateAll((summaries) => summaries.forEach((summary) => summary.click()));
 export const nav = (page, name) => page.click(`nav button:text-is("${name}")`);
 export const start = (page) => page.click('button:text-is("Start")');
-export const stop = (page) => page.click('button:text-is("Stop")');
+// Stops a run if one is going. A finished run has already stopped by itself, and one can finish just as this clicks.
+export const stop = (page) => page.locator('button:text-is("Stop")').click({ timeout: 1000 }).catch(() => {});
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function check(name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  " + detail : ""}`);

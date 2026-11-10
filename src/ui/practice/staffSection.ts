@@ -40,7 +40,6 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
     createIconToggle("fingers", render),
     createIconToggle("noteNames", render),
     createIconToggle("letterNames", render),
-    createIconToggle("grid", render),
   );
 
   function labelToggle() {
@@ -72,8 +71,16 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
     staff,
     highway,
     fit,
-    showScore(percent: number | null) {
-      score.textContent = percent === null ? "" : t.score(percent);
+    // Something for the start of the bar, before the score.
+    addFirst(...nodes: Node[]) {
+      toolbar.prepend(...nodes);
+    },
+    // Another switch on the bar, after the score.
+    addToggle(node: Node) {
+      toolbar.insertBefore(node, score.nextSibling);
+    },
+    showScore(text: string) {
+      score.textContent = text;
     },
     timeline: h("div", { className: "timeline-section" }, toolbar, highway.element),
     sheet: h("div", { className: "staff-section" }, panel),

@@ -140,7 +140,7 @@ header details[open] > summary {
   margin: 0;
 }
 
-.row > .piece-select {
+.section-bar .piece-select {
   --pico-form-element-spacing-vertical: 0.25rem;
   --pico-form-element-spacing-horizontal: 0.625rem;
   max-width: 13rem;
@@ -434,7 +434,8 @@ section > ul > li {
   --pico-form-element-spacing-horizontal: 1rem;
 }
 
-.bpm {
+.bpm,
+.speed {
   display: flex;
   flex: 1;
   align-items: center;
@@ -443,13 +444,15 @@ section > ul > li {
   font-variant-numeric: tabular-nums;
 }
 
-.bpm input {
+.bpm input,
+.speed input {
   flex: 1;
   min-width: 0;
   margin: 0;
 }
 
-.bpm output {
+.bpm output,
+.speed output {
   white-space: nowrap;
 }
 
@@ -466,8 +469,8 @@ section > ul > li {
   color: var(--pico-primary);
 }
 
-/* The score is on the lanes' bar, so the card under them needn't repeat it. Fullscreen hides that bar, so there it stays. */
-html:not(.fullscreen) .stats .score {
+/* A run's result is on the lanes' bar. Fullscreen hides that bar, so there it shows as a card over the lanes instead. */
+html:not(.fullscreen) .stats {
   display: none;
 }
 
@@ -1131,12 +1134,13 @@ a[download] {
     min-height: 1.5rem;
   }
 
-  .section-bar label {
+  .section-bar .box-toggle {
     min-width: 2.75rem;
     min-height: 2.25rem;
   }
 
   .bpm input,
+  .speed input,
   .setting input {
     height: 2.25rem;
   }
@@ -1223,31 +1227,61 @@ a[download] {
   top: 50%;
   left: 50%;
   z-index: 10;
-  width: min(20rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 75vw;
+  height: 75vh;
   margin: 0;
-  padding: 1rem 1.25rem;
+  padding: 2rem;
   text-align: center;
   box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
   transform: translate(-50%, -50%);
 }
 
+/* Sized to the screen, so the result reads from across the room. */
 .fullscreen .stats p {
-  margin-bottom: 0.375rem;
+  margin: 0;
+  font-size: clamp(1rem, 4vmin, 2.25rem);
 }
 
 .fullscreen .stats .score {
-  font-size: 1.75rem;
-  line-height: 1.2;
+  font-size: clamp(2.5rem, min(15vmin, 8vw), 10rem);
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
-.fullscreen .stats button {
+.fullscreen .stats button:not(.stats-close) {
   margin-top: 0.5rem;
-  padding: 0.375rem 1rem;
+  padding: 0.75rem 2.5rem;
+  font-size: clamp(1rem, 3vmin, 1.5rem);
+}
+
+.stats-close {
+  display: none;
+}
+
+.fullscreen .stats-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--pico-muted-color);
+  background: none;
+  border: none;
 }
 
 /* Phones, and small ones in landscape: the note counter takes its own row, leaving the buttons the whole width. */
 @media (max-width: 600px), (max-height: 500px) and (max-width: 700px) {
-  .fullscreen .bpm {
+  .fullscreen .bpm,
+  .fullscreen .speed {
     min-width: 7rem;
   }
 
@@ -1263,7 +1297,8 @@ a[download] {
 }
 
 @media (max-height: 500px) {
-  .fullscreen .bpm {
+  .fullscreen .bpm,
+  .fullscreen .speed {
     min-width: 7rem;
   }
 }
@@ -1288,7 +1323,7 @@ a[download] {
 }
 
 /* The piece picker: a button that opens a menu of groups, each with its pieces beside it. */
-.row > .piece-select {
+.section-bar .piece-select {
   width: auto;
   margin: 0;
   color: inherit;
@@ -1296,7 +1331,7 @@ a[download] {
   border-color: var(--pico-form-element-border-color);
 }
 
-.row > .piece-select::after {
+.section-bar .piece-select::after {
   content: " ▾";
 }
 
@@ -1421,6 +1456,308 @@ a[download] {
 }
 
 .options .track:not(:empty) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
   margin-top: 0.5rem;
   font-size: 0.875rem;
+}
+
+/* The lanes' switches: an icon in a box that lights up when on. */
+.box-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--pico-muted-color);
+  background: none;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.box-toggle .icon svg {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.box-toggle[aria-pressed="true"] {
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 18%, transparent);
+  border-color: var(--pico-primary);
+}
+
+/* The BPM, or a backing track's speed in its place: whichever shows sits in the row as if on its own. */
+.tempo {
+  display: contents;
+}
+
+.bpm[hidden],
+.speed[hidden] {
+  display: none;
+}
+
+/* Calendar: a month of practice, each day a tile, shaded more strongly the longer it was practised, then the day picked. */
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.calendar-head h2 {
+  margin: 0;
+  line-height: 1;
+  font-size: 1.5rem;
+  text-transform: capitalize;
+}
+
+.calendar-head button {
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.375rem;
+  margin-block: 1rem;
+}
+
+.calendar-weekday {
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: clamp(3.25rem, 12vw, 5.5rem);
+  margin: 0;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  color: #f3ead9;
+  text-align: start;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.calendar-day.practised {
+  background: color-mix(in srgb, var(--pico-primary) var(--level), var(--pico-card-background-color));
+}
+
+/* The busier days are bright enough to want dark text. */
+.calendar-day.busy {
+  color: #1c1408;
+}
+
+.calendar-day.other-month {
+  opacity: 0.4;
+}
+
+.calendar-day.today {
+  border-color: var(--pico-primary);
+}
+
+.calendar-day.today .calendar-date {
+  font-weight: 800;
+  color: var(--pico-primary);
+}
+
+.calendar-day.busy.today .calendar-date {
+  color: inherit;
+}
+
+.calendar-day.selected {
+  outline: 2px solid var(--pico-primary);
+  outline-offset: 1px;
+}
+
+.calendar-minutes {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.calendar-plan {
+  font-size: 1rem;
+  line-height: 0.5;
+  color: var(--pico-primary);
+  letter-spacing: 0.1em;
+}
+
+.day-details {
+  padding: 1rem 1.25rem;
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+}
+
+.day-details h3 {
+  margin-bottom: 0.25rem;
+  text-transform: capitalize;
+}
+
+.day-details h4 {
+  margin: 1rem 0 0.5rem;
+}
+
+.day-total {
+  color: var(--pico-muted-color);
+}
+
+.day-piece {
+  margin-top: 0.75rem;
+}
+
+.day-piece-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.day-piece ul,
+.plan {
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+.day-piece li,
+.plan li {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+  list-style: none;
+}
+
+.plan-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.plan-remove {
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+}
+
+.day-details select {
+  margin: 0.5rem 0 0;
+}
+
+.calendar-storage {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+}
+
+/* Phones: smaller tiles and type, so a whole week fits across. */
+@media (max-width: 600px) {
+  .calendar-grid {
+    gap: 0.25rem;
+  }
+
+  .calendar-day {
+    padding: 0.25rem 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  .calendar-minutes {
+    font-size: 0.6875rem;
+  }
+}
+
+/* Record, when on: red and pulsing. It stays at full strength though it can't be switched mid-run. */
+.record-toggle[aria-pressed="true"],
+.actions .record-toggle[aria-pressed="true"],
+.actions .record-toggle[aria-pressed="true"]:disabled {
+  color: #e5484d;
+  background: rgb(229 72 77 / 0.15);
+  border-color: #e5484d;
+  opacity: 1;
+  animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgb(229 72 77 / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .record-toggle[aria-pressed="true"] {
+    animation: none;
+  }
+}
+
+/* The count-in's beats, sized to sit with the small switches beside it. */
+.options .toggles select {
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0.125rem 1.75rem 0.125rem 0.5rem;
+  font-size: 0.875rem;
+  background-position: center right 0.375rem;
+}
+
+/* Record, beside Start: the size of the icon buttons in that row. */
+.actions .box-toggle {
+  min-width: 2.5rem;
+  height: 2.5rem;
+}
+
+@media (max-width: 600px) {
+  .actions .box-toggle {
+    min-width: 2.25rem;
+    height: 2.25rem;
+  }
+}
+
+/* Staff only: the lanes are hidden, but keep running underneath, because the staff follows them. Their bar heads the staff. */
+.staff-only .practice .highway {
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.staff-only .practice .timeline-section {
+  margin-bottom: 0;
+}
+
+.staff-only .practice .staff-section {
+  margin-top: 0;
+}
+
+.staff-only .practice .section-bar {
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+/* In fullscreen, the full sheet fills the screen below the controls, and scrolls if it's longer. */
+.fullscreen.staff-only .practice .staff-section {
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;
+}
+
+.staff-only .practice .staff-panel .staff {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }

@@ -5,7 +5,7 @@ import { h } from "../dom";
 
 export const ICON_BUTTON = "secondary outline icon-button";
 
-type OptionKey = { [Key in keyof Settings]: Settings[Key] extends boolean ? Key : never }[keyof Settings];
+type OptionKey = { [Key in keyof Settings]-?: Settings[Key] extends boolean ? Key : never }[keyof Settings];
 // Ends a running session, before a change it can't carry on through.
 type StopRun = () => Promise<unknown>;
 

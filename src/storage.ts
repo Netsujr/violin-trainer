@@ -22,10 +22,16 @@ export type Settings = {
   pattern: number;
   staffOpen: boolean;
   staffBig: boolean;
+  // The staff on its own, with the lanes hidden. In fullscreen it's the full sheet.
+  staffOnly: boolean;
   optionsOpen: boolean;
-  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean; grid: boolean };
+  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean };
   // Pieces marked for practice, in no particular order.
   highlighted: string[];
+  // Pieces planned for a day, by its date as "2026-11-10".
+  plan: Record<string, string[]>;
+  // The piece Practice had open last, to open on again.
+  lastPieceId?: string;
 };
 
 export type Recording = { blob: Blob; markers: { pitch: string; seconds: number }[] };
@@ -47,8 +53,10 @@ const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   pattern: 0,
   staffOpen: false,
   staffBig: false,
-  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true, grid: true },
+  staffOnly: false,
+  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true },
   highlighted: [],
+  plan: {},
 };
 
 const read = <T>(key: string, fallback: T): T => {
@@ -80,6 +88,12 @@ export function getSettings() {
 }
 
 export const saveSettings = () => write("settings", getSettings());
+
+// Practice opens on the piece it had open last.
+export function rememberPiece(pieceId: string) {
+  getSettings().lastPieceId = pieceId;
+  saveSettings();
+}
 
 const withWayDown = (notes: PieceNote[]) => [...notes, ...notes.slice(0, -1).reverse()];
 
@@ -139,7 +153,6 @@ export const deleteRecording = (id: string) => del(id);
 // A recording to play along with, linked to a piece: its tempo, where the piece's first note falls in it (in seconds),
 // whether a run uses it, how fast it plays, and whether the mic listens and scores meanwhile.
 export type Track = { name: string; blob: Blob; bpm: number; offset: number; on: boolean; speed: number; listen: boolean };
-export const TRACK_SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1];
 const trackKey = (pieceId: string) => `track:${pieceId}`;
 export const getTrack = (pieceId: string) => get<Track>(trackKey(pieceId));
 export const saveTrack = (pieceId: string, track: Track) => set(trackKey(pieceId), track);

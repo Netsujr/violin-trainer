@@ -102,7 +102,7 @@ await page.click('button:text-is("Start")');
 await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
 await sleep(200);
 const stats = await page.locator(".stats").innerText();
-check("with the mic on, playing along is scored", (await laneScore(page)) === "Score: 100%" && stats.includes("17 hit, 0 missed"), stats.replaceAll("\n", " / "));
+check("with the mic on, playing along is scored", (await laneScore(page)) === "Score: 100% · 17 hit, 0 missed" && stats.includes("17 hit, 0 missed"), stats.replaceAll("\n", " / "));
 await page.click('button:text-is("Stop")'); await sleep(300);
 check("and logged", (await savedLog(page)).length === 1);
 

@@ -63,7 +63,7 @@ const gaps = changes.slice(1).map((frame, index) => Math.round(frame.at - change
 check("one note per beat", near(gaps, [500], 40), gaps.join(" "));
 check("the lanes stop at the end", Math.abs(run.at(-1).left - 15 * BEAT_PX) < 2, String(run.at(-1).left));
 const silent = await page.locator(".stats").innerText();
-check("the first note alone scores 7%, the rest missed", (await laneScore(page)) === "Score: 7%" && silent.includes("1 hit, 14 missed") && !silent.includes("Slowest"), silent.replaceAll("\n", " / "));
+check("the first note alone scores 7%, the rest missed", (await laneScore(page)) === "Score: 7% · 1 hit, 14 missed" && silent.includes("1 hit, 14 missed") && !silent.includes("Slowest"), silent.replaceAll("\n", " / "));
 await page.screenshot({ path: OUT + "follow-silent.png" });
 await stop(page); await sleep(200);
 const entry = (await savedLog(page)).at(-1);
@@ -74,7 +74,7 @@ await freshPractice(page, 120);
 await followNotes(page, { midis: D });
 await begin(page); await waitForText(page, "All", 60000); await sleep(150);
 const perfect = await page.locator(".stats").innerText();
-check("playing every note scores 100%", (await laneScore(page)) === "Score: 100%" && perfect.includes("15 hit, 0 missed"), perfect.replaceAll("\n", " / "));
+check("playing every note scores 100%", (await laneScore(page)) === "Score: 100% · 15 hit, 0 missed" && perfect.includes("15 hit, 0 missed"), perfect.replaceAll("\n", " / "));
 check("the finished notes fill pale green", await canvasHasColor(page, 201, 237, 212));
 check("with no green border left on them", !(await canvasHasColor(page, 76, 208, 125)));
 await page.click('button:text-is("Play again")'); await sleep(150);
@@ -91,10 +91,10 @@ await begin(page);
 await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 7 of 15", null, { timeout: 15000 });
 await sleep(100);
 check("a miss fills pale red as it passes", await canvasHasColor(page, 246, 207, 200));
-check("the score sits on the lanes' bar, kept up as notes pass", /^Score: \d+%$/.test(await laneScore(page)) && (await laneScore(page)) !== "Score: 100%", await laneScore(page));
+check("the score sits on the lanes' bar, kept up as notes pass", /^Score: \d+% · \d+ hit, [1-9]\d* missed$/.test(await laneScore(page)), await laneScore(page));
 await waitForText(page, "All", 60000); await sleep(150);
 const someMissed = await page.locator(".stats").innerText();
-check("a wrong note and a silent one are missed: 13 of 15 is 87%", (await laneScore(page)) === "Score: 87%" && someMissed.includes("13 hit, 2 missed"), someMissed.replaceAll("\n", " / "));
+check("a wrong note and a silent one are missed: 13 of 15 is 87%", (await laneScore(page)) === "Score: 87% · 13 hit, 2 missed" && someMissed.includes("13 hit, 2 missed"), someMissed.replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 
 await freshPractice(page, 90);
@@ -103,7 +103,7 @@ await page.locator(".piece", { hasText: "Hot Cross Buns" }).locator('button[aria
 await followNotes(page, { midis: BUNS });
 await begin(page); await waitForText(page, "All", 60000); await sleep(150);
 const buns = await page.locator(".stats").innerText();
-check("a song counts its repeated eighths with no break in the sound", (await laneScore(page)) === "Score: 100%" && buns.includes("17 hit, 0 missed"), buns.replaceAll("\n", " / "));
+check("a song counts its repeated eighths with no break in the sound", (await laneScore(page)) === "Score: 100% · 17 hit, 0 missed" && buns.includes("17 hit, 0 missed"), buns.replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 
 // Changing things mid-run
@@ -140,7 +140,7 @@ await sleep(100);
 check("the lanes start from that note", Math.abs((await page.locator(".highway-scroll").evaluate((e) => e.scrollLeft)) - 2 * BEAT_PX) < BEAT_PX / 2 && (await progress(page)) === "Note 3 of 15", await progress(page));
 await waitForText(page, "All", 60000); await sleep(150);
 const partial = await page.locator(".stats").innerText();
-check("only the notes from there are scored", partial.includes("13 hit, 0 missed") && (await laneScore(page)) === "Score: 100%", partial.replaceAll("\n", " / "));
+check("only the notes from there are scored", partial.includes("13 hit, 0 missed") && (await laneScore(page)) === "Score: 100% · 13 hit, 0 missed", partial.replaceAll("\n", " / "));
 await stop(page); await sleep(200);
 
 // The metronome waits for the first note, then joins on the beat
@@ -203,6 +203,10 @@ check("in fullscreen the lanes keep their pace at the larger scale", Math.abs(le
 await waitForText(page, "All", 60000); await sleep(150);
 const card = await page.locator(".stats").boundingBox();
 check("and the score shows on screen", (await page.locator(".stats .score").isVisible()) && card.y >= 0 && card.y + card.height <= 950, JSON.stringify(card));
+const screen = page.viewportSize();
+check("covering three quarters of it", Math.abs(card.width / screen.width - 0.75) < 0.02 && Math.abs(card.height / screen.height - 0.75) < 0.02, JSON.stringify(card));
+await page.click(".stats-close"); await sleep(150);
+check("and its ✕ closes it, leaving the run as it was", (await page.locator(".stats").innerText()) === "" && (await page.locator('button:text-is("Stop")').count()) === 1);
 await page.screenshot({ path: OUT + "follow-fullscreen.png" });
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(200);
 await stop(page); await sleep(200);

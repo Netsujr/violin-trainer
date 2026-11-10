@@ -1,6 +1,6 @@
 import { decodeAudio, findBeat } from "../../audio/tempo";
 import { localNumber, t } from "../../i18n";
-import { TRACK_SPEEDS, type Track } from "../../storage";
+import type { Track } from "../../storage";
 import { h } from "../dom";
 import { BEAT_WIDTH, HIT_X } from "../highway";
 import { contentWidth, timelineScale } from "../layout";
@@ -14,6 +14,35 @@ const FIRST_NOTE_COLOR = "#4cd07d";
 const HIT_LINE_COLOR = "rgba(176, 48, 32, 0.8)";
 
 type Deps = { track: () => Track | null; audio: HTMLAudioElement; save: () => void; onDone: () => void };
+
+// The recording's speed, 50% to 100%, keeping its pitch. It applies as it moves, and is saved once let go.
+export function createSpeedSlider(audio: HTMLAudioElement, save: () => void) {
+  let track: Track | null = null;
+  const value = h("output");
+  const showValue = () => (value.textContent = `${t.trackSpeed} ${input.value}%`);
+  const input = h("input", {
+    type: "range",
+    min: "50",
+    max: "100",
+    step: "5",
+    ariaLabel: t.trackSpeed,
+    oninput() {
+      if (!track) return;
+      track.speed = Number(input.value) / 100;
+      audio.playbackRate = track.speed;
+      showValue();
+    },
+    onchange: () => save(),
+  });
+  return {
+    element: h("label", { className: "speed" }, input, value),
+    use(next: Track) {
+      track = next;
+      input.value = String(Math.round(next.speed * 100));
+      showValue();
+    },
+  };
+}
 
 // Lining a backing track up with its piece. The recording's waveform runs under the lanes on the same timeline, and is
 // dragged until its notes sit under the tiles. Tempo, first note and speed can be set by hand too, all while it plays.
@@ -102,12 +131,8 @@ export function createTrackAlign({ track, audio, save, onDone }: Deps) {
       save();
     });
     offsetInput = numberInput(current.offset, "0.01", t.firstNoteAt, (value) => setOffset(value));
-    const speed = h(
-      "select",
-      { ariaLabel: t.trackSpeed, onchange: () => ((current.speed = Number(speed.value)), (audio.playbackRate = current.speed), save()) },
-      ...TRACK_SPEEDS.map((value) => h("option", { value: String(value), selected: value === current.speed, textContent: `${value * 100}%` })),
-    );
-    const listen = h("input", { type: "checkbox", checked: current.listen, onchange: () => ((current.listen = listen.checked), save()) });
+    const speed = createSpeedSlider(audio, save);
+    speed.use(current);
     const firstNoteNow = button(t.firstNoteNow, () => setOffset(audio.currentTime));
     firstNoteNow.disabled = audio.paused;
     audio.onplay = audio.onpause = () => (firstNoteNow.disabled = audio.paused);
@@ -129,8 +154,7 @@ export function createTrackAlign({ track, audio, save, onDone }: Deps) {
         h("label", {}, `${t.firstNoteAt} `, offsetInput),
         button("−", () => setOffset(current.offset - NUDGE_SECONDS), t.earlier),
         button("+", () => setOffset(current.offset + NUDGE_SECONDS), t.later),
-        h("label", {}, `${t.trackSpeed} `, speed),
-        h("label", {}, listen, ` ${t.listenToNotes}`),
+        speed.element,
       ),
       h("div", { className: "row" }, firstNoteNow, detectAgain, h("button", { type: "button", textContent: t.done, onclick: onDone }), status),
     );

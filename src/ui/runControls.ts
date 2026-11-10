@@ -2,6 +2,7 @@ import { t } from "../i18n";
 import type { Piece } from "../music/notes";
 import { startRun, type Run } from "../practice/run";
 import { h } from "./dom";
+import { boxToggle, RECORD_ICON } from "./toggles";
 
 export function createRunControls(options: {
   piece: () => Piece;
@@ -12,7 +13,10 @@ export function createRunControls(options: {
   onStop?: () => void;
 }) {
   const button = h("button", { textContent: t.start, onclick: () => (run ? stop() : start()) });
-  const record = h("input", { type: "checkbox" });
+  // Red and pulsing while it's on.
+  let recordOn = false;
+  const record = boxToggle(h("span", { className: "icon", innerHTML: RECORD_ICON }), t.record, false, (on) => (recordOn = on));
+  record.classList.add("record-toggle");
   const message = h("span", { className: "warning" });
   let run: Run | null = null;
   let saving: Promise<void> = Promise.resolve();
@@ -28,7 +32,7 @@ export function createRunControls(options: {
     button.disabled = true;
     message.textContent = "";
     try {
-      const started = await startRun(options.piece(), record.checked, options.onReading, options.listen?.() ?? true);
+      const started = await startRun(options.piece(), recordOn, options.onReading, options.listen?.() ?? true);
       if (left) {
         await started.stop();
         return;
@@ -61,7 +65,7 @@ export function createRunControls(options: {
 
   return {
     startButton: button,
-    recordLabel: h("label", {}, record, ` ${t.record}`),
+    recordToggle: record,
     message,
     stop,
     leave() {

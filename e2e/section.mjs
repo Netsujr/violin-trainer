@@ -125,7 +125,7 @@ await clickTile(4); await clickTile(6, true);
 await followNotes(page, { midis: D });
 await begin(page);
 await waitForText(page, "All 3 notes done"); await sleep(200);
-check("Don't wait scores only the section", (await laneScore(page)) === "Score: 100%" && (await stats()).includes("3 hit, 0 missed"), (await stats()).replaceAll("\n", " / "));
+check("Don't wait scores only the section", (await laneScore(page)) === "Score: 100% · 3 hit, 0 missed" && (await stats()).includes("3 hit, 0 missed"), (await stats()).replaceAll("\n", " / "));
 check("the lanes stop at its end", Math.abs((await scrollLeft()) - 7 * BEAT) <= 2, String(await scrollLeft()));
 await stop(page); await sleep(200);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
