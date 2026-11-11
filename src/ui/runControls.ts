@@ -10,8 +10,10 @@ const FINISH_TAIL_MS = 1000;
 export function createRunControls(options: {
   piece: () => Piece;
   onReading: (frequency: number | null, now: number) => void;
-  // Whether the mic listens. Off is a play-along that's neither heard nor logged.
+  // Whether the mic listens. Off is a play-along: nothing heard, and only its minutes logged, unless it's lining a
+  // track up, which isn't practice.
   listen?: () => boolean;
+  aligning?: boolean;
   onStart?: () => void;
   onStop?: () => void;
 }) {
@@ -35,7 +37,7 @@ export function createRunControls(options: {
     button.disabled = true;
     message.textContent = "";
     try {
-      const started = await startRun(options.piece(), recordOn, options.onReading, options.listen?.() ?? true);
+      const started = await startRun(options.piece(), recordOn, options.onReading, options.listen?.() ?? true, !options.aligning);
       if (left) {
         await started.stop();
         return;

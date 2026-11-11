@@ -2,7 +2,7 @@ import { localNumber, t } from "../../i18n";
 import { noteLabels, type PieceNote } from "../../music/notes";
 import { buildEntry, scorePercent } from "../../practice/log";
 import type { Session } from "../../practice/session";
-import { troubleSpots, type TroubleSpot } from "../../practice/trouble";
+import { spotScore, troubleSpots, type TroubleSpot } from "../../practice/trouble";
 import { h } from "../dom";
 import type { Section } from "../highway";
 
@@ -55,12 +55,16 @@ function summary(session: Session, run: Run) {
 const MOST_ROUNDS = 5;
 type SpotActions = { onSpot(spot: TroubleSpot | null): void; onPractise(spot: TroubleSpot, rounds: number): void };
 
-function troubleChips(spots: TroubleSpot[], { onSpot, onPractise }: SpotActions) {
+// spotScores: how the last round of each spot practised went, by its notes, shown on its chip.
+const spotKey = ({ first, last }: Section) => `${first}-${last}`;
+
+function troubleChips(spots: TroubleSpot[], spotScores: Map<string, number>, { onSpot, onPractise }: SpotActions) {
   let picked: { spot: TroubleSpot; rounds: number } | null = null;
   const practise = h("button", { type: "button", className: "trouble-practise", textContent: t.practise, hidden: true, onclick: () => onPractise(picked!.spot, picked!.rounds) });
   const chips = spots.map((spot) => {
     const chip = h("button", { type: "button", className: "trouble-chip" });
-    const label = t.troubleSpot(spot.firstBar, spot.lastBar, spot.missed);
+    const practised = spotScores.get(spotKey(spot));
+    const label = t.troubleSpot(spot.firstBar, spot.lastBar, spot.missed) + (practised === undefined ? "" : ` · ${practised}%`);
     const draw = () => {
       const on = picked?.spot === spot;
       chip.textContent = on ? `${label} · ${picked!.rounds}×` : label;
@@ -78,18 +82,35 @@ function troubleChips(spots: TroubleSpot[], { onSpot, onPractise }: SpotActions)
   return spots.length ? [h("div", { className: "trouble-spots" }, ...chips, practise)] : [];
 }
 
+type Shown = Run & { results: Map<number, boolean> | null; listening: boolean; notes: PieceNote[] };
+
+// After a trouble spot's rounds (spot given), the card goes back to the whole run's, so another spot can be practised.
 export function createResults(board: { showScore(text: string): void }, onPlayAgain: () => void, spotActions: SpotActions) {
   const element = h("div", { className: "stats" });
+  let whole: { session: Session; shown: Shown } | null = null;
+  const spotScores = new Map<string, number>();
+
+  function render(session: Session, { results, listening, notes, ...run }: Shown) {
+    const waited = !results && listening ? summary(session, run) : null;
+    board.showScore(!listening ? t.playedAlong : waited ? `${waited.done} ${waited.totals}` : scoreLine(results));
+    const trouble = troubleChips(results && listening ? troubleSpots(notes, results) : [], spotScores, spotActions);
+    const card = !listening ? playedAlongCard() : waited ? [waited.done, waited.totals, waited.slowest].map((line) => h("p", {}, line)) : [...scoreCard(results!), ...trouble];
+    element.replaceChildren(...resultsCard(card, onPlayAgain, () => element.replaceChildren()));
+  }
+
   return {
     element,
     // The score so far, as notes are judged. A play-along with nothing heard has none.
     live: (results: Map<number, boolean> | null) => board.showScore(scoreLine(results)),
-    show(session: Session, { results, listening, notes, ...run }: Run & { results: Map<number, boolean> | null; listening: boolean; notes: PieceNote[] }) {
-      const waited = !results && listening ? summary(session, run) : null;
-      board.showScore(!listening ? t.playedAlong : waited ? `${waited.done} ${waited.totals}` : scoreLine(results));
-      const trouble = troubleChips(results && listening ? troubleSpots(notes, results) : [], spotActions);
-      const card = !listening ? playedAlongCard() : waited ? [waited.done, waited.totals, waited.slowest].map((line) => h("p", {}, line)) : [...scoreCard(results!), ...trouble];
-      element.replaceChildren(...resultsCard(card, onPlayAgain, () => element.replaceChildren()));
+    show(session: Session, shown: Shown & { spot?: Section | null }) {
+      if (shown.spot && whole) {
+        const score = shown.results && spotScore(shown.results, shown.spot);
+        if (score !== null) spotScores.set(spotKey(shown.spot), score);
+        return render(whole.session, whole.shown);
+      }
+      whole = { session, shown };
+      spotScores.clear();
+      render(session, shown);
     },
     clear() {
       element.replaceChildren();

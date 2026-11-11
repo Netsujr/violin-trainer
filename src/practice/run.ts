@@ -7,16 +7,17 @@ import { Session } from "./session";
 
 export type Run = Awaited<ReturnType<typeof startRun>>;
 
-// listen false is a play-along with nothing heard: no mic, no recording, and nothing logged. The readings, all
-// silent, still come once a frame, to move things along.
+// listen false is a play-along with nothing heard: no mic and no recording, and only its minutes are logged, if logged.
+// The readings, all silent, still come once a frame, to move things along.
 export async function startRun(
   piece: Piece,
   record: boolean,
   onReading: (frequency: number | null, now: number) => void,
   listen = true,
+  logged = true,
 ) {
   const settings = getSettings();
-  if (!listen) return silentRun(piece, onReading);
+  if (!listen) return silentRun(piece, onReading, logged);
 
   const mic = await startMic(() => settings.minRms, onReading);
   const recorder = record ? startRecorder(mic.stream) : null;
@@ -46,7 +47,7 @@ export async function startRun(
   };
 }
 
-function silentRun(piece: Piece, onReading: (frequency: number | null, now: number) => void) {
+function silentRun(piece: Piece, onReading: (frequency: number | null, now: number) => void, logged: boolean) {
   const session = new Session(piece, performance.now());
   let animationFrame = requestAnimationFrame(function tick(now) {
     onReading(null, now);
@@ -56,6 +57,7 @@ function silentRun(piece: Piece, onReading: (frequency: number | null, now: numb
     session,
     async stop() {
       cancelAnimationFrame(animationFrame);
+      if (logged) appendLog({ ...buildEntry(session, performance.now()), score: undefined, playedAlong: true });
     },
   };
 }

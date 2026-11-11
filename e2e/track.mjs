@@ -88,6 +88,8 @@ check("the line says so", (await page.locator(".mode-note").innerText()).startsW
 await page.click('button:text-is("Start")'); await sleep(3500);
 check("Start plays along, with the lanes moving", (await lanes()).left > 0 && !(await page.evaluate(() => window.trackAudio.paused)));
 await page.click('button:text-is("Stop")'); await sleep(300);
+const along = await savedLog(page);
+check("a play-along with the mic off logs its minutes, as played along", along.length === 1 && along[0].playedAlong === true && along[0].minutes > 0 && along[0].score === undefined, JSON.stringify(along));
 await playAlong().click(); await sleep(150);
 check("switched off, the piece waits for each note again, with the BPM back", (await page.locator(".mode-note").innerText()).startsWith("Waits for each note") && (await page.locator(".options .bpm").isVisible()));
 await playAlong().click(); await sleep(150);
@@ -104,7 +106,7 @@ await page.waitForFunction(() => document.querySelector("section > p").textConte
 await sleep(200);
 check("with the mic on, playing along is scored", (await laneScore(page)) === "Score: 100% · 17 hit, 0 missed", await laneScore(page));
 await page.click('button:text-is("Stop")'); await sleep(300);
-check("and logged", (await savedLog(page)).length === 1);
+check("and logged", (await savedLog(page)).length === 2);
 
 // Removing it
 await nav(page, "Library"); await sleep(250);

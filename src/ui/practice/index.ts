@@ -164,8 +164,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       if (spotRun ? spotRun.rounds-- > 0 : settings.loopOn) loopAgain(session, previousMidi);
       else {
         doneAt = shownIndex();
+        results.show(session, { results: following.results, listening: track.listening, notes: piece.notes, section: selection.section, pattern: piece.pattern, startIndex, spot: spotRun && selection.section });
         spotRun = null;
-        results.show(session, { results: following.results, listening: track.listening, notes: piece.notes, section: selection.section, pattern: piece.pattern, startIndex });
         controls.finish(() => doneAt !== null);
       }
     }
@@ -195,6 +195,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     piece: () => piece,
     onReading,
     listen: () => track.listening,
+    aligning: Boolean(aligning),
     onStart() {
       metronome.reset();
       // A backing track keeps moving like the music it is, so it always runs as "Don't wait".

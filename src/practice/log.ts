@@ -15,6 +15,8 @@ export type LogEntry = {
   recordingId?: string;
   // Only when the lanes kept moving, where notesSkipped holds the missed notes.
   score?: number;
+  // A play-along with nothing heard: only its minutes count.
+  playedAlong?: true;
 };
 
 export const scorePercent = (hit: number, total: number) => (total === 0 ? 0 : Math.round((hit / total) * 100));

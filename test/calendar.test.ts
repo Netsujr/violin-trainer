@@ -58,6 +58,15 @@ describe("calendar", () => {
     expect(waited).toMatchObject({ scored: false, runs: 1, minutes: 2, passes: 1, hit: 10, missed: 0, averageCents: 5 });
   });
 
+  it("keeps play-alongs on a line of their own, with only their minutes", () => {
+    const along: LogEntry = { ...entry(new Date(2026, 10, 10, 9), "a", 3), passes: 0, notesHit: 0, averageCents: null, playedAlong: true };
+    const lines = summarise([along, { ...along, minutes: 1 }, entry(new Date(2026, 10, 10, 10), "a", 2)]);
+    expect(lines.map((line) => [line.playedAlong, line.runs, line.minutes])).toEqual([
+      [false, 1, 2],
+      [true, 2, 4],
+    ]);
+  });
+
   it("marks a planned piece done at its target, or with none once practised, and part done in between", () => {
     expect(planProgress(0, 10)).toEqual({ status: "○", percent: 0 });
     expect(planProgress(5, 10)).toEqual({ status: "◐", percent: 50 });

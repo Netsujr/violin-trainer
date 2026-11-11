@@ -1,4 +1,5 @@
 import { BAR_BEATS, type PieceNote } from "../music/notes";
+import { scorePercent } from "./log";
 
 // A spot lasts at most this many bars, so a rough run still points somewhere useful rather than at the whole piece.
 const MOST_BARS = 2;
@@ -8,6 +9,12 @@ const MOST_SPOTS = 3;
 const AROUND_BEATS = 2;
 
 export type TroubleSpot = { firstBar: number; lastBar: number; first: number; last: number; missed: number };
+
+// How a spot went in a run: the share of its judged notes hit, or null if none of them were judged.
+export function spotScore(results: Map<number, boolean>, { first, last }: { first: number; last: number }) {
+  const judged = [...results].filter(([index]) => index >= first && index <= last);
+  return judged.length ? scorePercent(judged.filter(([, hit]) => hit).length, judged.length) : null;
+}
 
 // Where each note starts, in beats from the first.
 function startsOf(notes: PieceNote[]) {

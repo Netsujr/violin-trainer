@@ -13,9 +13,11 @@ const describeRuns = (runs: ReturnType<typeof summarise>[number]) =>
   [
     t.runs(runs.runs),
     `${localNumber(runs.minutes, 1)} min`,
-    ...(runs.scored
-      ? [t.score(scorePercent(runs.hit, runs.hit + runs.missed)), t.hitMissed(runs.hit, runs.missed)]
-      : [t.passes(runs.passes), t.hitSkipped(runs.hit, runs.missed)]),
+    ...(runs.playedAlong
+      ? [t.playedAlongRuns]
+      : runs.scored
+        ? [t.score(scorePercent(runs.hit, runs.hit + runs.missed)), t.hitMissed(runs.hit, runs.missed)]
+        : [t.passes(runs.passes), t.hitSkipped(runs.hit, runs.missed)]),
     runs.averageCents === null ? null : t.centsOff(Math.round(runs.averageCents)),
   ]
     .filter(Boolean)
@@ -199,7 +201,11 @@ export function calendarScreen(): Screen {
         if (panel.isConnected) {
           panel.querySelector("audio")!.pause();
           panel.remove();
-        } else button.closest(".day-piece-title")!.after(panel);
+        } else {
+          // One open at a time: any other closes first.
+          details.querySelectorAll<HTMLElement>('.recording-note[aria-pressed="true"]').forEach((other) => other.click());
+          button.closest(".day-piece-title")!.after(panel);
+        }
         button.ariaPressed = String(panel.isConnected);
       };
     });

@@ -40,7 +40,11 @@ export function piecesOn(entries: LogEntry[], day: string) {
 // waited for each note. The score comes from all the notes together, so a long run counts for more than a short one,
 // and the cents are the average over every note hit.
 export function summarise(sessions: LogEntry[]) {
-  const kinds = [sessions.filter((session) => session.score !== undefined), sessions.filter((session) => session.score === undefined)];
+  const kinds = [
+    sessions.filter((session) => session.score !== undefined),
+    sessions.filter((session) => session.score === undefined && !session.playedAlong),
+    sessions.filter((session) => session.playedAlong),
+  ];
   return kinds
     .filter((runs) => runs.length > 0)
     .map((runs) => {
@@ -49,6 +53,7 @@ export function summarise(sessions: LogEntry[]) {
       const centsWeight = sum((run) => (run.averageCents === null ? 0 : run.notesHit));
       return {
         scored: runs[0].score !== undefined,
+        playedAlong: Boolean(runs[0].playedAlong),
         runs: runs.length,
         minutes: sum((run) => run.minutes),
         passes: sum((run) => run.passes),

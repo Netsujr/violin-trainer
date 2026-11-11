@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PieceNote } from "../src/music/notes";
-import { aroundSpot, troubleSpots } from "../src/practice/trouble";
+import { aroundSpot, spotScore, troubleSpots } from "../src/practice/trouble";
 
 // Four bars of four quarter notes: bar 1 is notes 0–3, bar 2 notes 4–7, and so on.
 const notes: PieceNote[] = Array.from({ length: 16 }, () => ({ pitch: "D4", beats: 1 }));
@@ -45,5 +45,17 @@ describe("around a spot", () => {
   it("starts from a long note still sounding 2 beats before", () => {
     const long: PieceNote[] = [{ pitch: "D4", beats: 4 }, { pitch: "E4", beats: 1 }, { pitch: "F#4", beats: 1 }, { pitch: "G4", beats: 4 }];
     expect(aroundSpot(long, { first: 1, last: 2 })).toEqual({ first: 0, last: 3 });
+  });
+});
+
+describe("a spot's score", () => {
+  it("counts only the spot's own notes, not the lead in and out", () => {
+    // Notes 2–9 played: the lead-in (2, 3) and lead-out (8, 9) missed, the spot (4–7) three of four hit.
+    const results = new Map([[2, false], [3, false], [4, true], [5, false], [6, true], [7, true], [8, false], [9, false]]);
+    expect(spotScore(results, { first: 4, last: 7 })).toBe(75);
+  });
+
+  it("has none when none of its notes were judged", () => {
+    expect(spotScore(new Map([[0, true]]), { first: 4, last: 7 })).toBeNull();
   });
 });
