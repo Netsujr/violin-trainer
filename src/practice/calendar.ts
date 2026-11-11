@@ -59,3 +59,10 @@ export function summarise(sessions: LogEntry[]) {
       };
     });
 }
+
+// How far a planned piece has got: ✓ once its target is met (or, with none, once it's practised at all), ◐ partway,
+// ○ not started; and the share of its target done, as a percentage.
+export function planProgress(done: number, target?: number) {
+  const met = target === undefined ? done > 0 : done >= target;
+  return { status: met ? "✓" : done > 0 ? "◐" : "○", percent: target ? Math.min(100, (done / target) * 100) : 0 };
+}

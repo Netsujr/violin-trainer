@@ -1,4 +1,4 @@
-import { t } from "../../i18n";
+import { localTitle, t } from "../../i18n";
 import type { Piece } from "../../music/notes";
 import { getSettings, isScale, saveSettings } from "../../storage";
 import { h } from "../dom";
@@ -9,6 +9,7 @@ import { DONT_WAIT_ICON, LOOP_ICON, SHEET_ICON, STAFF_ICON } from "../toggles";
 import { createFullscreen } from "./fullscreen";
 import { createBpmControl, createCountInPicker, createOptionsPanel, createPatternRow, ICON_BUTTON, modeButton, optionSwitch } from "./options";
 import { createPieceMenu } from "./pieceMenu";
+import { createTodayPlan } from "./todayPlan";
 import type { createStaffSection } from "./staffSection";
 
 // Room left under a fullscreen sheet, in pixels.
@@ -38,6 +39,11 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
 
   // Options: the switches and the BPM. The piece and the backing track are on the lanes' bar, and recording is by Start.
   const pieceMenu = createPieceMenu(pieces, piece(), onPick);
+  // Picking from today's plan is picking from the menu.
+  const todayPlan = createTodayPlan(pieces, piece, (picked) => {
+    pieceMenu.button.textContent = localTitle(picked.id, picked.title);
+    onPick(picked);
+  });
   const bpmControl = createBpmControl(resetBeat);
   // Tempo smooths the move to the next note after a hit, which has no meaning when the lanes don't wait for one.
   const tempoSwitch = optionSwitch("tempoOn", t.tempo);
@@ -56,6 +62,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
 
   const modeNote = h("div", { className: "mode-note" });
   function showModes() {
+    todayPlan.refresh();
     const current = section();
     const scale = isScale(piece());
     repeatTopButton.disabled = !scale;
@@ -117,6 +124,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
 
   return {
     optionsPanel,
+    todayPlan: todayPlan.element,
     actions,
     modeNote,
     patternRow,

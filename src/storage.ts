@@ -30,6 +30,8 @@ export type Settings = {
   highlighted: string[];
   // Pieces planned for a day, by its date as "2026-11-10".
   plan: Record<string, string[]>;
+  // Whether Practice's "Today's plan" is open. Closed, it shows just the open piece.
+  todayPlanOpen: boolean;
   // Minutes to practise planned pieces for, by day and piece, and the last target each piece had.
   planTargets: Record<string, Record<string, number>>;
   lastTargets: Record<string, number>;
@@ -60,6 +62,7 @@ const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   toggles: { fingers: true, noteNames: true, letterNames: true, staff: true },
   highlighted: [],
   plan: {},
+  todayPlanOpen: true,
   planTargets: {},
   lastTargets: {},
 };

@@ -1,5 +1,6 @@
 import { localNumber, localTitle, t } from "../i18n";
 import type { Piece } from "../music/notes";
+import { planProgress } from "../practice/calendar";
 import { getSettings, saveSettings } from "../storage";
 import { h } from "./dom";
 import { createPieceMenu } from "./practice/pieceMenu";
@@ -71,11 +72,11 @@ export function planSection({ day, editable, pieces, practised, onChange }: Opti
     function show() {
       const target = targetOf(pieceId);
       const done = practised.get(pieceId) ?? 0;
-      const met = target === undefined ? done > 0 : done >= target;
-      piece.textContent = `${met ? "✓" : done > 0 ? "◐" : "○"} ${name}${target ? ` (${target} min)` : ""}`;
+      const { status, percent } = planProgress(done, target);
+      piece.textContent = `${status} ${name}${target ? ` (${target} min)` : ""}`;
       piece.title = target ? t.targetProgress(localNumber(done, 0), target) : editable ? t.tapForTime : name;
       // The cell fills faintly from the left as the target is practised.
-      item.style.setProperty("--progress", target ? `${Math.min(100, (done / target) * 100)}%` : "0%");
+      item.style.setProperty("--progress", `${percent}%`);
     }
 
     // The − stays while the target is being set, and goes 5 seconds after the last tap.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../src/practice/calendar";
+import { dayKey, minutesByDay, monthGrid, piecesOn, planProgress, summarise } from "../src/practice/calendar";
 import type { LogEntry } from "../src/practice/log";
 
 const entry = (startedAt: Date, pieceId: string, minutes: number): LogEntry => ({
@@ -56,5 +56,13 @@ describe("calendar", () => {
     expect(moving.minutes).toBeCloseTo(1.6);
     expect(moving.averageCents).toBe(11);
     expect(waited).toMatchObject({ scored: false, runs: 1, minutes: 2, passes: 1, hit: 10, missed: 0, averageCents: 5 });
+  });
+
+  it("marks a planned piece done at its target, or with none once practised, and part done in between", () => {
+    expect(planProgress(0, 10)).toEqual({ status: "○", percent: 0 });
+    expect(planProgress(5, 10)).toEqual({ status: "◐", percent: 50 });
+    expect(planProgress(12, 10)).toEqual({ status: "✓", percent: 100 });
+    expect(planProgress(0)).toEqual({ status: "○", percent: 0 });
+    expect(planProgress(2)).toEqual({ status: "✓", percent: 0 });
   });
 });

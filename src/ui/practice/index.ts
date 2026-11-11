@@ -204,13 +204,13 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       holdProgress = 0;
       tuning.clear();
       renderNotes();
+      toolbar.showModes(); // Today's plan, with the run just logged.
     },
   });
   const toolbar = createPracticeControls({
     run: controls, pieces, board, track, referenceButton: tone.button, loadPiece, render: renderNotes,
     piece: () => basePiece, section: () => section,
-    resetBeat: () => glide.resetBeat(),
-    clearStats: () => results.clear(),
+    resetBeat: () => glide.resetBeat(), clearStats: () => results.clear(),
     async onPick(picked) {
       await controls.stop();
       basePiece = picked;
@@ -227,7 +227,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     element: h(
       "section",
       { className: "practice" },
-      track.panel ?? toolbar.optionsPanel,
+      ...(track.panel ? [track.panel] : [toolbar.optionsPanel, toolbar.todayPlan]),
       progress,
       toolbar.actions,
       toolbar.modeNote,

@@ -77,6 +77,22 @@ check("its ✕ takes it off", (await page.locator(".plan-item:not(.empty)").coun
 await pickDay(-1); await sleep(150);
 check("a past day can't be planned", (await page.locator(".plan-add .piece-select").count()) === 0 && (await page.locator(".plan").count()) === 0);
 
+// Today's plan in Practice
+await nav(page, "Practice"); await sleep(300);
+const chips = () => page.locator(".today-chips .today-chip").evaluateAll((items) => items.map((item) => `${item.textContent}${item.ariaPressed === "true" ? "*" : ""}`).join(" | "));
+check("Practice shows today's plan as chips, with no title", (await page.locator(".today-plan").isVisible()) && (await page.locator(".today-plan > summary").innerText()) === "" && (await chips()) === "✓ D (Ré) major · 10 min* | ◐ Hills and Dales · 20 min | ○ Twinkle Twinkle Little Star · 10 min", await chips());
+await page.locator(".today-chip", { hasText: "Hills and Dales" }).click(); await sleep(300);
+check("picking a chip opens that piece", (await page.locator(".piece-select").innerText()) === "Hills and Dales" && (await chips()).includes("Hills and Dales · 20 min*"));
+await page.locator(".today-plan > summary").click(); await sleep(150);
+const box = await page.locator(".today-plan").evaluate((drawer) => ({ open: drawer.open, text: drawer.querySelector("summary").textContent, progress: drawer.style.getPropertyValue("--progress"), filled: drawer.classList.contains("showing-progress") }));
+check("closed, the drawer itself shows the open piece's progress", !box.open && box.text === "◐ Hills and Dales · 20 min" && box.progress === "50%" && box.filled, JSON.stringify(box));
+await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Practice"); await sleep(300);
+check("and stays closed after a reload", !(await page.locator(".today-plan").evaluate((drawer) => drawer.open)));
+await page.click('button[aria-label="Fullscreen"]'); await sleep(200);
+check("fullscreen leaves it out", await page.locator(".today-plan").isHidden());
+await page.click('button[aria-label="Exit fullscreen"]'); await sleep(200);
+await nav(page, "Calendar"); await sleep(250);
+
 await page.click('.language button:text-is("PT")'); await sleep(250);
 await page.locator("nav button").nth(3).click(); await sleep(250);
 check("pt: translated", (await page.locator(".plan-total").innerText()) === "20 de 40 min" && (await page.locator('button[aria-label="Copiar plano"]').count()) === 1);
