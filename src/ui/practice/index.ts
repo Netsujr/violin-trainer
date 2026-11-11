@@ -4,6 +4,7 @@ import { midiOf } from "../../music/notes";
 import { withPattern, withRepeatedTop } from "../../music/patterns";
 import { createJudge } from "../../practice/judge";
 import type { Session } from "../../practice/session";
+import { aroundSpot } from "../../practice/trouble";
 import { allPieces, getSettings, isScale, rememberPiece } from "../../storage";
 import { h, type Screen } from "../dom";
 import type { Section } from "../highway";
@@ -33,8 +34,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   // While looping: which time round this is, and the score of the one before, in place of the results card.
   let loopCount = 1;
   let lastScore: number | null = null;
-  // A trouble spot's rounds still to play after this one, each counted in with 2 beats.
-  let rounds: number | null = null;
+  // A trouble spot being played: its rounds still to come after this one, and the notes played, 2 beats either side of it.
+  let spotRun: (Section & { rounds: number }) | null = null;
   let holdProgress = 0;
   let startIndex = 0;
   // A run that's finished ends by itself. The note it ended on stays shown, as done, until the next run.
@@ -42,9 +43,9 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
 
   const selection = createSelection((picked) => { highway.showSection(picked); toolbar.showModes(); });
   const currentIndex = () => controls.session?.index ?? startIndex;
-  const endIndex = () => (selection.section?.last ?? piece.notes.length - 1) + 1;
+  const endIndex = () => ((spotRun ?? selection.section)?.last ?? piece.notes.length - 1) + 1;
   // A finished section stays on its last note, rather than moving on to the one after it.
-  const shownIndex = () => doneAt ?? (controls.session?.finished && selection.section ? selection.section.last : currentIndex());
+  const shownIndex = () => doneAt ?? (controls.session?.finished && selection.section ? endIndex() - 1 : currentIndex());
   const holdMs = () => holdMsFor(piece.notes[currentIndex()]?.beats, settings.tempoOn && currentIndex() < endIndex() - 1);
   const withLoopNumber = (text: string) => (loopCount > 1 ? `${text} · ${t.loopNumber(loopCount, lastScore)}` : text);
 
@@ -63,7 +64,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const waiting = createWaitingRun({ judge, glide, staff, showReading: tuning.show, isMuted: tone.isMuted, endIndex, holdMs, showProgress: (value) => (holdProgress = value), moveOn });
 
   function pickNote(index: number, extend: boolean) {
-    rounds = null;
+    spotRun = null;
     startFrom(selection.pick(index, extend));
   }
 
@@ -79,8 +80,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   // A trouble spot played on its own, so many times. After one, Play again goes back to the whole piece.
   function practiseSpot(spot: Section, times: number) {
     selection.spot(spot);
-    rounds = times - 1;
-    playFrom((startIndex = spot.first));
+    spotRun = { ...aroundSpot(piece.notes, spot), rounds: times - 1 };
+    playFrom((startIndex = spotRun.first));
   }
 
   function playAgain() {
@@ -114,7 +115,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     if (session) {
       session.jumpTo(index, performance.now(), endIndex());
       judge.setTarget(session.currentMidi);
-      if (session.following && rounds === null) startFollowing(index);
+      if (session.following && !spotRun) startFollowing(index);
     }
     [holdProgress, loopCount, lastScore] = [0, 1, null];
     results.clear();
@@ -129,7 +130,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
 
   // A spot's rounds count in with 2 beats, even with "Don't wait", where the lanes start once it's counted.
   function countInFor(session: Session) {
-    if (rounds !== null) countIn.start(2);
+    if (spotRun) countIn.start(2);
     else if (!session.following && settings.countInOn) countIn.start();
     renderNotes();
   }
@@ -141,7 +142,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     glide.resetBeat();
     session.jumpTo(startIndex, performance.now(), endIndex());
     judge.setTarget(session.currentMidi, piece.pattern ? undefined : previousMidi);
-    if (session.following && rounds === null) startFollowing(startIndex);
+    if (session.following && !spotRun) startFollowing(startIndex);
     else {
       following.stop(true); // Until it's counted in, with this time round's notes still marked.
       highway.jumpTo(startIndex);
@@ -160,10 +161,10 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     if (following.active) results.live(track.listening ? following.results : null);
     if (session.finished) {
       tuning.clear();
-      if (rounds === null ? settings.loopOn : rounds-- > 0) loopAgain(session, previousMidi);
+      if (spotRun ? spotRun.rounds-- > 0 : settings.loopOn) loopAgain(session, previousMidi);
       else {
-        rounds = null;
         doneAt = shownIndex();
+        spotRun = null;
         results.show(session, { results: following.results, listening: track.listening, notes: piece.notes, section: selection.section, pattern: piece.pattern, startIndex });
         controls.finish(() => doneAt !== null);
       }
@@ -206,7 +207,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       following.stop(doneAt !== null);
       countIn.cancel();
       if (glide.cancel()) highway.jumpTo(currentIndex());
-      [rounds, loopCount, lastScore, holdProgress] = [null, 1, null, 0];
+      [spotRun, loopCount, lastScore, holdProgress] = [null, 1, null, 0];
       tuning.clear();
       renderNotes();
       toolbar.showModes(); // Today's plan, with the run just logged.

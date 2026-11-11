@@ -75,9 +75,10 @@ check("recording ready straight after leaving Practice", (await page.locator("au
 await page.reload();
 await page.waitForSelector("nav button");
 await nav(page, "Calendar");
-await page.waitForSelector("audio");
+await page.waitForSelector(".recording-note");
+check("recording survives a reload", (await page.locator(".recording-note").count()) === 1);
+await page.click(".recording-note");
 await sleep(800);
-check("recording survives a reload", (await page.locator("audio").count()) === 1);
 await page.screenshot({ path: OUT + "log.png", fullPage: true });
 
 const info = await page.evaluate(async () => {
@@ -88,35 +89,32 @@ const info = await page.evaluate(async () => {
 console.log("  audio:", JSON.stringify(info));
 check("duration is known, so seeking works", Number.isFinite(info.duration) && info.duration > 5);
 
-const markerCount = await page.locator("button.marker").count();
-check("15 note markers", markerCount === 15, String(markerCount));
-
-// Each marker: jump, then decode the recording and confirm that pitch sounds there
+// Each saved note marker: decode the recording and confirm that pitch sounds there
 const jump = await page.evaluate(async () => {
   const { createDetector } = await import("/src/audio/detector.ts");
   const { nearestMidi, midiOf } = await import("/src/music/notes.ts");
+  const { getRecording, loadLog } = await import("/src/storage.ts");
+  const { markers } = await getRecording(loadLog().at(-1).recordingId);
   const audio = document.querySelector("audio");
   const ctx = new OfflineAudioContext(1, 48000, 48000);
   const decoded = await ctx.decodeAudioData(await (await fetch(audio.src)).arrayBuffer());
   const samples = decoded.getChannelData(0);
   const rate = decoded.sampleRate;
   const rows = [];
-  for (const button of document.querySelectorAll("button.marker")) {
-    button.click();
-    await new Promise((r) => setTimeout(r, 120));
-    const seekTo = audio.currentTime;
-    audio.pause();
+  for (const marker of markers) {
+    // Where a jump there would have played to after 120 ms, as the old marker buttons did.
+    const seekTo = marker.seconds + 0.12;
     const detect = createDetector(2048, rate);
     let hz = null;
     const windowStart = Math.floor((seekTo + 0.12) * rate);
     for (let f = 0; f < 5; f++) hz = detect(samples.slice(windowStart + f * 512, windowStart + f * 512 + 2048), 0.01) ?? hz;
-    rows.push({ want: button.textContent, seekTo: +seekTo.toFixed(2), heard: hz ? nearestMidi(hz) === midiOf(button.textContent) : false });
+    rows.push({ want: marker.pitch, seekTo: +seekTo.toFixed(2), heard: hz ? nearestMidi(hz) === midiOf(marker.pitch) : false });
   }
   return { rows, decodedSeconds: decoded.duration, size: (await (await fetch(audio.src)).blob()).size };
 });
 console.log("  decoded seconds", jump.decodedSeconds, "size bytes", jump.size);
 console.log("  ", jump.rows.map((r) => `${r.want}@${r.seekTo}:${r.heard ? "ok" : "MISS"}`).join("  "));
-check("every marker lands on its note", jump.rows.every((r) => r.heard));
+check("15 markers, each landing on its note", jump.rows.length === 15 && jump.rows.every((r) => r.heard));
 
 // The Calendar: today's minutes on its tile, and what was practised
 const dayText = await page.locator(".day-details").innerText();
@@ -124,12 +122,9 @@ check("today's tile shows the minutes, and the day lists the piece", (await page
 
 // Download link and delete
 check("download link has a filename", (await page.locator("a[download]").getAttribute("download")).endsWith(".webm"), await page.locator("a[download]").getAttribute("download"));
-await page.click('button:text-is("Delete recording")');
-await sleep(100);
-check("it asks first", (await page.locator("dialog[open]").innerText()).includes("Delete this recording"));
-await answer(page, "Delete");
+await page.click('.recording-actions button:text-is("Delete")');
 await sleep(200);
-check("delete removes the player", (await page.locator("audio").count()) === 0);
+check("Delete removes it straight away, player and note", (await page.locator("audio").count()) === 0 && (await page.locator(".recording-note").count()) === 0);
 
 // Closing mid-session still logs
 await nav(page, "Practice");

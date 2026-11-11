@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PieceNote } from "../src/music/notes";
-import { troubleSpots } from "../src/practice/trouble";
+import { aroundSpot, troubleSpots } from "../src/practice/trouble";
 
 // Four bars of four quarter notes: bar 1 is notes 0–3, bar 2 notes 4–7, and so on.
 const notes: PieceNote[] = Array.from({ length: 16 }, () => ({ pitch: "D4", beats: 1 }));
@@ -29,5 +29,21 @@ describe("trouble spots", () => {
   it("counts bars by the notes' lengths", () => {
     const long: PieceNote[] = [{ pitch: "D4", beats: 4 }, { pitch: "E4", beats: 2 }, { pitch: "F#4", beats: 2 }, { pitch: "G4", beats: 4 }];
     expect(troubleSpots(long, new Map([[0, true], [1, true], [2, false], [3, true]]))).toEqual([{ firstBar: 2, lastBar: 2, first: 1, last: 2, missed: 1 }]);
+  });
+});
+
+describe("around a spot", () => {
+  it("leads in and out by 2 beats", () => {
+    expect(aroundSpot(notes, { first: 4, last: 7 })).toEqual({ first: 2, last: 9 });
+  });
+
+  it("stops at the piece's ends", () => {
+    expect(aroundSpot(notes, { first: 0, last: 3 })).toEqual({ first: 0, last: 5 });
+    expect(aroundSpot(notes, { first: 12, last: 15 })).toEqual({ first: 10, last: 15 });
+  });
+
+  it("starts from a long note still sounding 2 beats before", () => {
+    const long: PieceNote[] = [{ pitch: "D4", beats: 4 }, { pitch: "E4", beats: 1 }, { pitch: "F#4", beats: 1 }, { pitch: "G4", beats: 4 }];
+    expect(aroundSpot(long, { first: 1, last: 2 })).toEqual({ first: 0, last: 3 });
   });
 });

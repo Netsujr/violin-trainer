@@ -2,10 +2,9 @@ import { localNumber, localTitle, t } from "../i18n";
 import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practice/calendar";
 import { scorePercent, type LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording, type RecordingView } from "../storage";
-import { confirmAction } from "./confirm";
 import { planSection } from "./calendarPlan";
 import { h, type Screen } from "./dom";
-import { EXPAND_ICON, LANES_ICON, SHEET_ICON, STAFF_ICON, TRASH_ICON } from "./toggles";
+import { EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON } from "./toggles";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
 
@@ -55,31 +54,21 @@ function recordingViews({ view, fullscreen }: Recording) {
   return [viewIcon(icon, label()), ...(fullscreen ? [viewIcon(EXPAND_ICON, t.fullscreen)] : [])];
 }
 
-function recordingPlayer(entry: LogEntry, recording: Recording, urls: string[], onDelete: () => void) {
-  const url = URL.createObjectURL(recording.blob);
-  urls.push(url);
+// A recording under its piece's title: when it was made and in which view, its player, Download, and Delete, which doesn't ask.
+function recordingPanel(entry: LogEntry, recording: Recording, url: string, onDelete: () => void) {
   const audio = h("audio", { controls: true, src: url, preload: "metadata" });
   makeSeekable(audio);
-
-  const markers = recording.markers.map((marker) =>
-    h("button", {
-      textContent: marker.pitch,
-      className: "marker secondary outline",
-      onclick() {
-        audio.currentTime = marker.seconds;
-        audio.play();
-      },
-    }),
-  );
-
   return h(
     "div",
-    {},
+    { className: "day-recording" },
+    h("p", {}, t.recordedAt(timeOf(entry)), ...recordingViews(recording)),
     audio,
-    h("a", { href: url, download: recordingName(entry, recording.blob), textContent: t.download }),
-    " ",
-    h("button", { innerHTML: TRASH_ICON, title: t.deleteRecording, ariaLabel: t.deleteRecording, className: "secondary outline icon-button", onclick: onDelete }),
-    h("div", { className: "row" }, ...markers),
+    h(
+      "div",
+      { className: "recording-actions" },
+      h("a", { href: url, download: recordingName(entry, recording.blob), textContent: t.download }),
+      h("button", { type: "button", className: "link-button", textContent: t.delete, onclick: onDelete }),
+    ),
   );
 }
 
@@ -170,8 +159,8 @@ export function calendarScreen(): Screen {
       h(
         "div",
         { className: "day-piece" },
-        h("div", { className: "day-piece-title" }, h("strong", {}, title(piece.pieceId, piece.title)), h("span", {}, `${localNumber(piece.minutes, 1)} min`)),
-        h("ul", {}, ...summarise(piece.sessions).map((runs) => h("li", {}, describeRuns(runs))), ...piece.sessions.filter((session) => session.recordingId).map(recordingRow)),
+        h("div", { className: "day-piece-title" }, h("strong", {}, title(piece.pieceId, piece.title), ...piece.sessions.filter((session) => session.recordingId).map(recordingButton)), h("span", {}, `${localNumber(piece.minutes, 1)} min`)),
+        h("ul", {}, ...summarise(piece.sessions).map((runs) => h("li", {}, describeRuns(runs)))),
       ),
     );
     const plan =
@@ -188,26 +177,33 @@ export function calendarScreen(): Screen {
     );
   }
 
-  // A recorded run, by its time, with its player.
-  function recordingRow(entry: LogEntry) {
-    const row = h("li", { className: "day-recording" }, t.recordedAt(timeOf(entry)));
-    showRecording(row, entry, entry.recordingId!);
-    return row;
-  }
-
-  async function showRecording(row: HTMLElement, entry: LogEntry, recordingId: string) {
-    const recording = await getRecording(recordingId);
-    // One that couldn't be saved, or has since been deleted, leaves no row.
-    if (!recording) return row.remove();
-
-    const player = recordingPlayer(entry, recording, urls, async () => {
-      if (!(await confirmAction(t.deleteRecordingConfirm, t.delete))) return;
-
-      await deleteRecording(recordingId);
-      row.remove();
-      showStorage();
+  // A little note by the piece for each recorded run, showing it under the title, or hiding it again.
+  function recordingButton(entry: LogEntry) {
+    const label = t.recordedAt(timeOf(entry));
+    const button = h("button", { type: "button", className: "recording-note", innerHTML: NOTE_ICON, title: label, ariaLabel: label, ariaPressed: "false" });
+    getRecording(entry.recordingId!).then((recording) => {
+      // One that couldn't be saved, or has since been deleted, has no note.
+      if (!recording) return button.remove();
+      let panel: HTMLElement | null = null;
+      button.onclick = () => {
+        if (!panel) {
+          const url = URL.createObjectURL(recording.blob);
+          urls.push(url);
+          panel = recordingPanel(entry, recording, url, async () => {
+            await deleteRecording(entry.recordingId!);
+            panel!.remove();
+            button.remove();
+            showStorage();
+          });
+        }
+        if (panel.isConnected) {
+          panel.querySelector("audio")!.pause();
+          panel.remove();
+        } else button.closest(".day-piece-title")!.after(panel);
+        button.ariaPressed = String(panel.isConnected);
+      };
     });
-    row.append(...recordingViews(recording), player);
+    return button;
   }
 
   renderMonth();
