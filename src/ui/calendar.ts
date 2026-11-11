@@ -56,6 +56,12 @@ function recordingViews({ view, fullscreen }: Recording) {
   return [viewIcon(icon, label()), ...(fullscreen ? [viewIcon(EXPAND_ICON, t.fullscreen)] : [])];
 }
 
+// How a recorded run went: its score with "Don't wait", or the notes played when it waited for each.
+const runResult = (entry: LogEntry) =>
+  entry.score === undefined
+    ? [t.passes(entry.passes), t.hitSkipped(entry.notesHit, entry.notesSkipped)].join(" · ")
+    : `${t.score(entry.score)} · ${t.hitMissed(entry.notesHit, entry.notesSkipped)}`;
+
 // A recording under its piece's title: when it was made and in which view, its player, Download, and Delete, which doesn't ask.
 function recordingPanel(entry: LogEntry, recording: Recording, url: string, onDelete: () => void) {
   const audio = h("audio", { controls: true, src: url, preload: "metadata" });
@@ -63,7 +69,8 @@ function recordingPanel(entry: LogEntry, recording: Recording, url: string, onDe
   return h(
     "div",
     { className: "day-recording" },
-    h("p", {}, t.recordedAt(timeOf(entry)), ...recordingViews(recording)),
+    // When, how it went, and the view, on one line with a dot between each.
+    h("p", { className: "recording-line" }, ...[t.recordedAt(timeOf(entry)), runResult(entry), ...recordingViews(recording)].flatMap((part, index) => (index ? [h("span", { ariaHidden: "true" }, "·"), part] : [part]))),
     audio,
     h(
       "div",
