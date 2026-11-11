@@ -140,7 +140,8 @@ header details[open] > summary {
   margin: 0;
 }
 
-.section-bar .piece-select {
+.section-bar .piece-select,
+.plan-add .piece-select {
   --pico-form-element-spacing-vertical: 0.25rem;
   --pico-form-element-spacing-horizontal: 0.625rem;
   max-width: 13rem;
@@ -1325,7 +1326,8 @@ a[download] {
 }
 
 /* The piece picker: a button that opens a menu of groups, each with its pieces beside it. */
-.section-bar .piece-select {
+.section-bar .piece-select,
+.plan-add .piece-select {
   width: auto;
   margin: 0;
   color: inherit;
@@ -1333,7 +1335,8 @@ a[download] {
   border-color: var(--pico-form-element-border-color);
 }
 
-.section-bar .piece-select::after {
+.section-bar .piece-select::after,
+.plan-add .piece-select::after {
   content: " ▾";
 }
 
@@ -1782,8 +1785,13 @@ a[download] {
   flex-wrap: wrap;
 }
 
-.section-bar .piece-select {
+.section-bar .piece-select,
+.plan-add .piece-select {
   max-width: 100%;
   text-align: start;
   white-space: normal;
+}
+
+.plan-add {
+  margin-top: 0.5rem;
 }

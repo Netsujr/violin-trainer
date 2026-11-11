@@ -1,9 +1,9 @@
 import { localNumber, localTitle, t } from "../i18n";
-import type { Piece } from "../music/notes";
 import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practice/calendar";
 import { scorePercent, type LogEntry } from "../practice/log";
-import { allPieces, deleteRecording, getRecording, getSettings, loadLog, pieceGroups, saveSettings, type Recording } from "../storage";
+import { allPieces, deleteRecording, getRecording, getSettings, loadLog, saveSettings, type Recording } from "../storage";
 import { confirmAction } from "./confirm";
+import { createPieceMenu } from "./practice/pieceMenu";
 import { h, type Screen } from "./dom";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
@@ -140,19 +140,6 @@ export function calendarScreen(): Screen {
     );
   }
 
-  function pieceSelect() {
-    return h(
-      "select",
-      { ariaLabel: t.addToPlan },
-      h("option", { value: "", textContent: t.addToPlan, disabled: true, selected: true }),
-      ...pieceGroups(pieces)
-        .filter(([, group]) => group.length > 0)
-        .map(([key, group]: readonly [string, Piece[]]) =>
-          h("optgroup", { label: t[key as "scales"] }, ...group.map((piece) => h("option", { value: piece.id, textContent: localTitle(piece.id, piece.title) }))),
-        ),
-    );
-  }
-
   function setPlan(day: string, ids: string[]) {
     if (ids.length) settings.plan[day] = ids;
     else delete settings.plan[day];
@@ -187,15 +174,15 @@ export function calendarScreen(): Screen {
           : []),
       );
     });
-    const add = pieceSelect();
-    add.onchange = () => add.value && !plan.includes(add.value) && setPlan(selected, [...plan, add.value]);
+    // The same menu as Practice's, with highlighted pieces starred.
+    const add = createPieceMenu(pieces, t.addToPlan, (piece) => plan.includes(piece.id) || setPlan(selected, [...plan, piece.id]));
 
     details.replaceChildren(
       h("h3", {}, date.toLocaleDateString(t.locale, { weekday: "long", day: "numeric", month: "long" })),
       h("p", { className: "day-total" }, total > 0 ? t.practisedFor(localNumber(total, 1)) : selected > today ? t.notYet : t.nothingPractised),
       ...pieceBlocks,
       ...(plan.length || canPlan ? [h("h4", {}, t.plan), ...(plan.length ? [h("ul", { className: "plan" }, ...planRows)] : [h("p", { className: "day-total" }, t.nothingPlanned)])] : []),
-      ...(canPlan ? [add] : []),
+      ...(canPlan ? [h("div", { className: "plan-add" }, add.button, add.menu)] : []),
     );
   }
 
