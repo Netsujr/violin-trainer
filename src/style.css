@@ -385,7 +385,8 @@ section > ul > li {
 }
 
 /* Set directly, because Pico's hover and focus styles replace its variables. */
-.actions button[aria-pressed="true"] {
+/* A switched-on mode that doesn't apply, like the repeated top note on a song, is grey like any disabled button. */
+.actions button[aria-pressed="true"]:not(:disabled) {
   color: #4cd07d;
   border-color: #4cd07d;
 }
