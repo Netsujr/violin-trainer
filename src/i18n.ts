@@ -166,6 +166,11 @@ const en = {
     `"${token}" is outside first position: add a finger like ${pitch}/4`,
 
   storageUsed: (megabytes: string) => `Storage used: ${megabytes} MB`,
+  backUp: "Back up",
+  backUpWarning: "This saves your practice log, plans and pieces. Recordings and backing tracks aren't included.",
+  restore: "Restore",
+  restoreConfirm: "Replace your practice log, plans and pieces with this backup? This can't be undone.",
+  notABackup: "That file isn't a backup from this app.",
   download: "Download",
   passes: (count: number) => plural(count, "pass", "passes"),
   runs: (count: number) => plural(count, "run", "runs"),
@@ -359,6 +364,11 @@ const pt: Strings = {
   outsideFirstPosition: (token, pitch) => `"${token}" está fora da primeira posição: adicione um dedo, como ${pitch}/4`,
 
   storageUsed: (megabytes) => `Armazenamento usado: ${megabytes} MB`,
+  backUp: "Fazer backup",
+  backUpWarning: "Isso salva seu registro de prática, planos e peças. Gravações e faixas de acompanhamento não são incluídas.",
+  restore: "Restaurar",
+  restoreConfirm: "Substituir seu registro de prática, planos e peças por este backup? Isso não pode ser desfeito.",
+  notABackup: "Esse arquivo não é um backup deste app.",
   download: "Baixar",
   passes: (count) => plural(count, "passada", "passadas"),
   runs: (count) => plural(count, "rodada", "rodadas"),

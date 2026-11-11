@@ -906,8 +906,18 @@ a[download] {
 }
 
 /* The view a recording was made in, after its time. */
-.recording-view {
+.recording-chip {
   display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 999px;
+}
+
+.recording-view {
+  padding-inline: 0.5rem;
   opacity: 0.7;
 }
 
@@ -1792,9 +1802,18 @@ a[download] {
 }
 
 /* Room under it for the piece menu to open into, near the bottom of the page. */
-.calendar-storage {
+/* Storage used, with Back up and Restore beside it. */
+.calendar-storage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
   margin: 1rem 0 25vh;
   font-size: 0.875rem;
+}
+
+.calendar-storage {
+  margin: 0 auto 0 0;
   color: var(--pico-muted-color);
 }
 

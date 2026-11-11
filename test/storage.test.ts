@@ -7,12 +7,13 @@ async function settingsWith(stored: object | null, screen = { width: 1440, heigh
   vi.stubGlobal("localStorage", {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
   });
   vi.stubGlobal("navigator", { language });
   vi.stubGlobal("innerWidth", screen.width);
   vi.stubGlobal("innerHeight", screen.height);
-  const { getSettings, saveSettings } = await import("../src/storage");
-  return { getSettings, saveSettings, values };
+  const { getSettings, saveSettings, backupJson, restoreBackup } = await import("../src/storage");
+  return { getSettings, saveSettings, backupJson, restoreBackup, values };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -123,5 +124,30 @@ describe("timeline scale", () => {
     expect(await scaleOn(768, 1024)).toBe(1);
     expect(await scaleOn(390, 844)).toBe(0.75);
     expect(await scaleOn(844, 390)).toBe(0.6);
+  });
+});
+
+describe("backups", () => {
+  it("hold the settings, pieces and log, and put them back in place of what's there", async () => {
+    const { backupJson, restoreBackup, values } = await settingsWith({ bpm: 90 });
+    values.set("log", JSON.stringify([{ id: "a", minutes: 2 }]));
+    values.set("pieceDraft", JSON.stringify({ title: "draft" }));
+    const backup = backupJson();
+    expect(JSON.parse(backup)).toMatchObject({ app: "violin-trainer", settings: { bpm: 90 }, pieces: null, log: [{ id: "a" }] });
+    expect(backup).not.toContain("draft");
+
+    values.set("log", JSON.stringify([]));
+    values.set("pieces", JSON.stringify([{ id: "mine" }]));
+    expect(restoreBackup(backup)).toBe(true);
+    expect(JSON.parse(values.get("log")!)).toEqual([{ id: "a", minutes: 2 }]);
+    expect(values.has("pieces")).toBe(false);
+  });
+
+  it("refuses a file that isn't one, leaving everything as it was", async () => {
+    const { restoreBackup, values } = await settingsWith({ bpm: 90 });
+    for (const text of ["not json", "{}", JSON.stringify({ app: "violin-trainer", log: "nope", settings: {} }), JSON.stringify({ app: "other", log: [], settings: {} })]) {
+      expect(restoreBackup(text)).toBe(false);
+    }
+    expect(JSON.parse(values.get("settings")!)).toEqual({ bpm: 90 });
   });
 });

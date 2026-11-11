@@ -3,6 +3,7 @@ import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practic
 import { scorePercent, type LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording, type RecordingView } from "../storage";
 import { planSection } from "./calendarPlan";
+import { backupButtons } from "./backup";
 import { h, type Screen } from "./dom";
 import { EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON } from "./toggles";
 
@@ -47,7 +48,7 @@ const VIEWS: Record<RecordingView, [icon: string, label: () => string]> = {
   bigStaff: [STAFF_ICON, () => t.biggerStaff],
   staffOnly: [SHEET_ICON, () => t.staffOnly],
 };
-const viewIcon = (icon: string, label: string) => h("span", { className: "recording-view", innerHTML: icon, title: label, ariaLabel: label, role: "img" });
+const viewIcon = (icon: string, label: string) => h("span", { className: "recording-chip recording-view", innerHTML: icon, title: label, ariaLabel: label, role: "img" });
 
 // How the practice screen looked when it was recorded, as icons: the view, and fullscreen if it was.
 function recordingViews({ view, fullscreen }: Recording) {
@@ -69,8 +70,8 @@ function recordingPanel(entry: LogEntry, recording: Recording, url: string, onDe
   return h(
     "div",
     { className: "day-recording" },
-    // When, how it went, and the view, on one line with a dot between each.
-    h("p", { className: "recording-line" }, ...[t.recordedAt(timeOf(entry)), runResult(entry), ...recordingViews(recording)].flatMap((part, index) => (index ? [h("span", { ariaHidden: "true" }, "·"), part] : [part]))),
+    // When, how it went, and the view, each a chip.
+    h("p", { className: "recording-line" }, ...[t.recordedAt(timeOf(entry)), runResult(entry)].map((text) => h("span", { className: "recording-chip" }, text)), ...recordingViews(recording)),
     audio,
     h(
       "div",
@@ -236,7 +237,7 @@ export function calendarScreen(): Screen {
       ),
       grid,
       details,
-      storage,
+      h("div", { className: "calendar-storage-row" }, storage, ...backupButtons((problem) => ((storage.textContent = problem), (storage.className = "calendar-storage warning")))),
     ),
     leave() {
       urls.forEach((url) => URL.revokeObjectURL(url));

@@ -150,6 +150,29 @@ export type PieceDraft = { title: string; notes: PieceNote[]; editingId?: string
 export const loadDraft = () => read<PieceDraft>("pieceDraft", { title: "", notes: [] });
 export const saveDraft = (draft: PieceDraft) => write("pieceDraft", draft);
 
+// A backup: settings (with the plans), your own pieces, and the log, as JSON. Not recordings or backing tracks.
+const BACKUP_APP = "violin-trainer";
+const BACKUP_KEYS = ["settings", "pieces", "log"] as const;
+export const backupJson = () =>
+  JSON.stringify({ app: BACKUP_APP, savedAt: new Date().toISOString(), ...Object.fromEntries(BACKUP_KEYS.map((key) => [key, read(key, null)])) });
+
+// Puts a backup back, in place of what's here, and says whether the file was one. The page reloads after, to read it.
+export function restoreBackup(text: string) {
+  let backup: Record<string, unknown>;
+  try {
+    backup = JSON.parse(text);
+  } catch {
+    return false;
+  }
+  const valid = backup?.app === BACKUP_APP && Array.isArray(backup.log) && (backup.pieces === null || Array.isArray(backup.pieces)) && typeof backup.settings === "object";
+  if (!valid) return false;
+  for (const key of BACKUP_KEYS) {
+    if (backup[key] === null) localStorage.removeItem(key);
+    else write(key, backup[key]);
+  }
+  return true;
+}
+
 export const loadLog = () => read<LogEntry[]>("log", []);
 
 export const appendLog = (entry: LogEntry) => write("log", [...loadLog(), entry]);
