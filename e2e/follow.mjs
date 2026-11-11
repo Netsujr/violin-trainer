@@ -181,7 +181,7 @@ await page.waitForSelector('button:text-is("Start"):not([disabled])');
 await nav(page, "Calendar"); await page.waitForSelector("audio"); await sleep(400);
 const markers = await page.locator("button.marker").count();
 check("a recording gets its 15 markers", markers === 15, String(markers));
-const row = await page.locator(".day-details li").first().innerText();
+const row = await page.locator(".day-piece li").first().innerText();
 check("the Calendar sums the day's scored runs into one line, with no passes or slowest notes", /^\d+ runs · [\d.]+ min · Score: \d+% · \d+ hit, \d+ missed/.test(row) && !row.includes("slowest") && !row.includes("pass"), row);
 const times = await page.evaluate(async () => {
   const { getRecording, loadLog } = await import("/src/storage.ts");

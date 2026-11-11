@@ -30,6 +30,9 @@ export type Settings = {
   highlighted: string[];
   // Pieces planned for a day, by its date as "2026-11-10".
   plan: Record<string, string[]>;
+  // Minutes to practise planned pieces for, by day and piece, and the last target each piece had.
+  planTargets: Record<string, Record<string, number>>;
+  lastTargets: Record<string, number>;
   // The piece Practice had open last, to open on again.
   lastPieceId?: string;
 };
@@ -57,6 +60,8 @@ const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   toggles: { fingers: true, noteNames: true, letterNames: true, staff: true },
   highlighted: [],
   plan: {},
+  planTargets: {},
+  lastTargets: {},
 };
 
 const read = <T>(key: string, fallback: T): T => {

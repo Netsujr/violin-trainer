@@ -10,6 +10,17 @@ const MENU_GAP = 4;
 // added later or imported), each opening its pieces on hover or tap. Highlighted pieces are starred.
 // shown is the piece picked, which the button names, or a fixed label for a button that adds one.
 export function createPieceMenu(pieces: Piece[], shown: Piece | string, onPick: (piece: Piece) => void) {
+  // A group's pieces open beside it, moved up as far as they need to stay on screen. Longer than the screen, they scroll.
+  function fitSubmenu(event: Event) {
+    const submenu = (event.target as Element).closest(".piece-group")?.querySelector<HTMLElement>(".piece-submenu");
+    if (!submenu) return;
+    submenu.style.top = "";
+    if (getComputedStyle(submenu).position !== "absolute") return;
+    const { top, bottom } = submenu.getBoundingClientRect();
+    const overflow = bottom - (innerHeight - MENU_GAP);
+    if (overflow > 0) submenu.style.top = `${submenu.offsetTop - Math.min(overflow, top - MENU_GAP)}px`;
+  }
+
   const menu = h(
     "div",
     { className: "piece-menu", popover: "auto", role: "menu" },
@@ -41,6 +52,8 @@ export function createPieceMenu(pieces: Piece[], shown: Piece | string, onPick: 
         ),
       ),
   );
+  menu.addEventListener("pointerover", fitSubmenu);
+  menu.addEventListener("focusin", fitSubmenu);
   const button = h("button", { type: "button", className: "piece-select", ariaHasPopup: "menu", textContent: typeof shown === "string" ? shown : pieceTitle(shown), popoverTargetElement: menu });
   // The menu sits in the top layer, so it's placed by its button each time it opens: under it, or above it if there
   // isn't room below, as near the bottom of a page.

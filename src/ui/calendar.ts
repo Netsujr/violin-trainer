@@ -1,9 +1,9 @@
 import { localNumber, localTitle, t } from "../i18n";
 import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practice/calendar";
 import { scorePercent, type LogEntry } from "../practice/log";
-import { allPieces, deleteRecording, getRecording, getSettings, loadLog, saveSettings, type Recording } from "../storage";
+import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording } from "../storage";
 import { confirmAction } from "./confirm";
-import { createPieceMenu } from "./practice/pieceMenu";
+import { planSection } from "./calendarPlan";
 import { h, type Screen } from "./dom";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
@@ -140,10 +140,7 @@ export function calendarScreen(): Screen {
     );
   }
 
-  function setPlan(day: string, ids: string[]) {
-    if (ids.length) settings.plan[day] = ids;
-    else delete settings.plan[day];
-    saveSettings();
+  function rerender() {
     renderMonth();
     renderDay();
   }
@@ -153,7 +150,6 @@ export function calendarScreen(): Screen {
     const practised = piecesOn(entries, selected);
     const total = practised.reduce((sum, piece) => sum + piece.minutes, 0);
     const canPlan = selected >= today;
-    const plan = planFor(selected);
 
     const pieceBlocks = practised.map((piece) =>
       h(
@@ -163,26 +159,17 @@ export function calendarScreen(): Screen {
         h("ul", {}, ...summarise(piece.sessions).map((runs) => h("li", {}, describeRuns(runs))), ...piece.sessions.filter((session) => session.recordingId).map(recordingRow)),
       ),
     );
-    const planRows = plan.map((pieceId) => {
-      const done = practised.some((piece) => piece.pieceId === pieceId);
-      return h(
-        "li",
-        { className: "plan-item" },
-        `${done ? "✓" : "○"} ${title(pieceId)}`,
-        ...(canPlan
-          ? [h("button", { type: "button", className: "secondary outline plan-remove", textContent: "✕", ariaLabel: t.removeFromPlan(title(pieceId)), onclick: () => setPlan(selected, plan.filter((id) => id !== pieceId)) })]
-          : []),
-      );
-    });
-    // The same menu as Practice's, with highlighted pieces starred.
-    const add = createPieceMenu(pieces, t.addToPlan, (piece) => plan.includes(piece.id) || setPlan(selected, [...plan, piece.id]));
-
+    const plan =
+      planFor(selected).length || canPlan
+        ? planSection({ day: selected, editable: canPlan, pieces, practised: new Map(practised.map((piece) => [piece.pieceId, piece.minutes])), onChange: rerender })
+        : { tools: [], table: [] };
+    // The date with the plan's tools beside it, then the plan, then what was practised, each set apart by a line.
     details.replaceChildren(
-      h("h3", {}, date.toLocaleDateString(t.locale, { weekday: "long", day: "numeric", month: "long" })),
+      h("div", { className: "day-head" }, h("h3", {}, date.toLocaleDateString(t.locale, { weekday: "long", day: "numeric", month: "long" })), h("div", { className: "plan-add" }, ...plan.tools)),
+      h("hr"),
+      ...(plan.table.length ? [...plan.table, h("hr")] : []),
       h("p", { className: "day-total" }, total > 0 ? t.practisedFor(localNumber(total, 1)) : selected > today ? t.notYet : t.nothingPractised),
       ...pieceBlocks,
-      ...(plan.length || canPlan ? [h("h4", {}, t.plan), ...(plan.length ? [h("ul", { className: "plan" }, ...planRows)] : [h("p", { className: "day-total" }, t.nothingPlanned)])] : []),
-      ...(canPlan ? [h("div", { className: "plan-add" }, add.button, add.menu)] : []),
     );
   }
 
@@ -195,7 +182,8 @@ export function calendarScreen(): Screen {
 
   async function showRecording(row: HTMLElement, entry: LogEntry, recordingId: string) {
     const recording = await getRecording(recordingId);
-    if (!recording) return;
+    // One that couldn't be saved, or has since been deleted, leaves no row.
+    if (!recording) return row.remove();
 
     const player = recordingPlayer(entry, recording, urls, async () => {
       if (!(await confirmAction(t.deleteRecordingConfirm, t.delete))) return;
