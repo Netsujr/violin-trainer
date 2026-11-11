@@ -1700,10 +1700,6 @@ a[download] {
   gap: 1rem;
 }
 
-.day-piece-title strong.info-chip {
-  font-size: 1rem;
-}
-
 .day-piece ul,
 .plan {
   margin: 0.25rem 0 0;

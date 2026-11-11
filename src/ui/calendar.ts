@@ -15,8 +15,7 @@ const chip = (content: string | Node) => h("span", { className: "info-chip" }, c
 // A piece's runs of one kind on a day, added up, each part its own chip.
 const describeRuns = (runs: ReturnType<typeof summarise>[number]) =>
   [
-    t.runs(runs.runs),
-    `${localNumber(runs.minutes, 1)} min`,
+    `${t.runs(runs.runs)}, ${localNumber(runs.minutes, 1)} min`,
     ...(runs.playedAlong
       ? [t.playedAlongRuns]
       : runs.scored
@@ -170,7 +169,7 @@ export function calendarScreen(): Screen {
       h(
         "div",
         { className: "day-piece" },
-        h("div", { className: "day-piece-title" }, h("strong", { className: "info-chip" }, title(piece.pieceId, piece.title), ...piece.sessions.filter((session) => session.recordingId).map(recordingButton)), chip(`${localNumber(piece.minutes, 1)} min`)),
+        h("div", { className: "day-piece-title" }, h("strong", {}, title(piece.pieceId, piece.title), ...piece.sessions.filter((session) => session.recordingId).map(recordingButton)), chip(`${localNumber(piece.minutes, 1)} min`)),
         h("ul", {}, ...summarise(piece.sessions).map((runs) => h("li", { className: "chip-row" }, ...describeRuns(runs)))),
       ),
     );

@@ -57,7 +57,7 @@ check("targets are saved, and remembered for the piece", saved.planTargets[Objec
 
 // What was practised, added up
 const hills = (await page.locator(".day-piece", { hasText: "Hills and Dales" }).locator("li .info-chip").allInnerTexts()).join(" · ");
-check("a piece's runs are summed into one line of chips", hills.startsWith("2 runs · 10.0 min · Score: 60% · 60 hit, 40 missed"), hills);
+check("a piece's runs are summed into one line of chips", hills.startsWith("2 runs, 10.0 min · Score: 60% · 60 hit, 40 missed"), hills);
 
 // Copying to tomorrow, and adding from the menu
 await page.locator('button[aria-label="Copy plan"]').click();
