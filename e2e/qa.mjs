@@ -381,7 +381,7 @@ await say("Cancel");
 check("Cancel keeps the recording", (await page.locator("audio").count()) === 1);
 await press(button("Delete recording")); await sleep(200);
 await say("Delete"); await sleep(100);
-check("Delete recording removes only the audio", (await page.locator("audio").count()) === 0 && (await page.locator(".day-details li").count()) >= 5);
+check("Delete recording removes only the recording, leaving the day's summaries", (await page.locator("audio").count()) === 0 && (await page.locator(".day-recording").count()) === 0 && (await page.locator(".day-details li").count()) >= 2);
 
 flow("13. Calendar");
 const logText = await page.locator("section").innerText();

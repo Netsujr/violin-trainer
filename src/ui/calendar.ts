@@ -1,25 +1,27 @@
 import { localNumber, localTitle, t } from "../i18n";
 import type { Piece } from "../music/notes";
-import { dayKey, minutesByDay, monthGrid, piecesOn } from "../practice/calendar";
-import type { LogEntry } from "../practice/log";
+import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practice/calendar";
+import { scorePercent, type LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, pieceGroups, saveSettings, type Recording } from "../storage";
 import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
 
-// One practice session, by its time of day.
-const describeSession = (entry: LogEntry) =>
+// A piece's runs of one kind on a day, added up.
+const describeRuns = (runs: ReturnType<typeof summarise>[number]) =>
   [
-    new Date(entry.startedAt).toLocaleTimeString(t.locale, { hour: "numeric", minute: "2-digit" }),
-    `${localNumber(entry.minutes, 1)} min`,
-    ...(entry.score === undefined
-      ? [t.passes(entry.passes), t.hitSkipped(entry.notesHit, entry.notesSkipped)]
-      : [t.score(entry.score), t.hitMissed(entry.notesHit, entry.notesSkipped)]),
-    entry.averageCents === null ? null : t.centsOff(Math.round(entry.averageCents)),
+    t.runs(runs.runs),
+    `${localNumber(runs.minutes, 1)} min`,
+    ...(runs.scored
+      ? [t.score(scorePercent(runs.hit, runs.hit + runs.missed)), t.hitMissed(runs.hit, runs.missed)]
+      : [t.passes(runs.passes), t.hitSkipped(runs.hit, runs.missed)]),
+    runs.averageCents === null ? null : t.centsOff(Math.round(runs.averageCents)),
   ]
     .filter(Boolean)
     .join(" · ");
+
+const timeOf = (entry: LogEntry) => new Date(entry.startedAt).toLocaleTimeString(t.locale, { hour: "numeric", minute: "2-digit" });
 
 // Chrome records WebM and Safari MP4.
 const recordingName = (entry: LogEntry, blob: Blob) =>
@@ -171,7 +173,7 @@ export function calendarScreen(): Screen {
         "div",
         { className: "day-piece" },
         h("div", { className: "day-piece-title" }, h("strong", {}, title(piece.pieceId, piece.title)), h("span", {}, `${localNumber(piece.minutes, 1)} min`)),
-        h("ul", {}, ...piece.sessions.map(sessionRow)),
+        h("ul", {}, ...summarise(piece.sessions).map((runs) => h("li", {}, describeRuns(runs))), ...piece.sessions.filter((session) => session.recordingId).map(recordingRow)),
       ),
     );
     const planRows = plan.map((pieceId) => {
@@ -197,9 +199,10 @@ export function calendarScreen(): Screen {
     );
   }
 
-  function sessionRow(entry: LogEntry) {
-    const row = h("li", {}, describeSession(entry));
-    if (entry.recordingId) showRecording(row, entry, entry.recordingId);
+  // A recorded run, by its time, with its player.
+  function recordingRow(entry: LogEntry) {
+    const row = h("li", { className: "day-recording" }, t.recordedAt(timeOf(entry)));
+    showRecording(row, entry, entry.recordingId!);
     return row;
   }
 
@@ -211,7 +214,7 @@ export function calendarScreen(): Screen {
       if (!(await confirmAction(t.deleteRecordingConfirm, t.delete))) return;
 
       await deleteRecording(recordingId);
-      player.remove();
+      row.remove();
       showStorage();
     });
     row.append(player);

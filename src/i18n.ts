@@ -160,6 +160,8 @@ const en = {
   deleteRecording: "Delete recording",
   deleteRecordingConfirm: "Delete this recording? This can't be undone.",
   passes: (count: number) => plural(count, "pass", "passes"),
+  runs: (count: number) => plural(count, "run", "runs"),
+  recordedAt: (time: string) => `Recorded at ${time}`,
   centsOff: (cents: number) => `${centsText(cents)} off`,
   slowestLower: (notes: string) => `slowest ${notes}`,
 };
@@ -343,6 +345,8 @@ const pt: Strings = {
   deleteRecording: "Excluir gravação",
   deleteRecordingConfirm: "Excluir esta gravação? Isso não pode ser desfeito.",
   passes: (count) => plural(count, "passada", "passadas"),
+  runs: (count) => plural(count, "rodada", "rodadas"),
+  recordedAt: (time) => `Gravado às ${time}`,
   centsOff: (cents) => `${centsText(cents)} de desvio`,
   slowestLower: (notes) => `mais lentas: ${notes}`,
 };

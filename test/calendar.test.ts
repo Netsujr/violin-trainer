@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayKey, minutesByDay, monthGrid, piecesOn } from "../src/practice/calendar";
+import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../src/practice/calendar";
 import type { LogEntry } from "../src/practice/log";
 
 const entry = (startedAt: Date, pieceId: string, minutes: number): LogEntry => ({
@@ -45,5 +45,16 @@ describe("calendar", () => {
       ["b", 4, 1],
       ["a", 3, 2],
     ]);
+  });
+
+  it("adds a piece's runs up into one line per kind, the score and cents weighted by the notes", () => {
+    const scored = (minutes: number, hit: number, missed: number, cents: number | null): LogEntry => ({ ...entry(new Date(2026, 10, 10, 9), "a", minutes), passes: 0, notesHit: hit, notesSkipped: missed, averageCents: cents, score: 0 });
+    const lines = summarise([scored(1, 45, 5, 10), scored(0.5, 5, 45, 20), scored(0.1, 0, 10, null), entry(new Date(2026, 10, 10, 10), "a", 2)]);
+    expect(lines).toHaveLength(2);
+    const [moving, waited] = lines;
+    expect(moving).toMatchObject({ scored: true, runs: 3, passes: 0, hit: 50, missed: 60 });
+    expect(moving.minutes).toBeCloseTo(1.6);
+    expect(moving.averageCents).toBe(11);
+    expect(waited).toMatchObject({ scored: false, runs: 1, minutes: 2, passes: 1, hit: 10, missed: 0, averageCents: 5 });
   });
 });

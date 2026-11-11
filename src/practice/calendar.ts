@@ -35,3 +35,27 @@ export function piecesOn(entries: LogEntry[], day: string) {
   }
   return [...pieces.values()].sort((a, b) => b.minutes - a.minutes);
 }
+
+// A piece's sessions on a day, added up into one line for each kind: runs that kept moving and were scored, and runs that
+// waited for each note. The score comes from all the notes together, so a long run counts for more than a short one,
+// and the cents are the average over every note hit.
+export function summarise(sessions: LogEntry[]) {
+  const kinds = [sessions.filter((session) => session.score !== undefined), sessions.filter((session) => session.score === undefined)];
+  return kinds
+    .filter((runs) => runs.length > 0)
+    .map((runs) => {
+      const sum = (pick: (run: LogEntry) => number) => runs.reduce((total, run) => total + pick(run), 0);
+      const hit = sum((run) => run.notesHit);
+      const centsWeight = sum((run) => (run.averageCents === null ? 0 : run.notesHit));
+      return {
+        scored: runs[0].score !== undefined,
+        runs: runs.length,
+        minutes: sum((run) => run.minutes),
+        passes: sum((run) => run.passes),
+        hit,
+        // The missed notes of a scored run, or the skipped ones of a run that waited.
+        missed: sum((run) => run.notesSkipped),
+        averageCents: centsWeight === 0 ? null : sum((run) => (run.averageCents ?? 0) * run.notesHit) / centsWeight,
+      };
+    });
+}
