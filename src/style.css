@@ -1224,10 +1224,10 @@ a[download] {
 }
 
 /* The results sit over the lanes, because there's no room left for them on the page. */
-/* Anchored to the bottom, so however tall the screen it never covers the controls at the top. */
+/* Centred in the space under the controls, clear of them at the top and of the screen's bottom edge. */
 .fullscreen .stats:not(:empty) {
   position: fixed;
-  bottom: 1rem;
+  top: calc(50% + 2.5rem);
   left: 50%;
   z-index: 10;
   display: flex;
@@ -1236,12 +1236,12 @@ a[download] {
   justify-content: center;
   gap: 1rem;
   width: 75vw;
-  height: min(75vh, calc(100vh - 8rem));
+  height: min(60vh, calc(100vh - 12rem));
   margin: 0;
   padding: 2rem;
   text-align: center;
   box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 
 /* Sized to the screen, so the result reads from across the room. */

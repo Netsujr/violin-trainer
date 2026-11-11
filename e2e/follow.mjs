@@ -206,7 +206,7 @@ await waitForText(page, "All", 60000); await sleep(150);
 const card = await page.locator(".stats").boundingBox();
 check("and the score shows on screen", (await page.locator(".stats .score").isVisible()) && card.y >= 0 && card.y + card.height <= 950, JSON.stringify(card));
 const screen = page.viewportSize();
-check("covering three quarters of it", Math.abs(card.width / screen.width - 0.75) < 0.02 && Math.abs(card.height / screen.height - 0.75) < 0.02, JSON.stringify(card));
+check("three quarters wide, under the controls, clear of the bottom", Math.abs(card.width / screen.width - 0.75) < 0.02 && card.height <= screen.height * 0.6 + 1 && card.y + card.height < screen.height - 40 && card.y > (await page.locator(".actions").boundingBox()).y + 30, JSON.stringify(card));
 await page.click(".stats-close"); await sleep(150);
 check("and its ✕ closes it, leaving the run as it was", (await page.locator(".stats").innerText()) === "" && (await page.locator('button:text-is("Stop")').count()) === 1);
 await page.screenshot({ path: OUT + "follow-fullscreen.png" });
