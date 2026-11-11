@@ -9,7 +9,10 @@ import { EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON } from "./to
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
 
-// A piece's runs of one kind on a day, added up.
+// A bit of what was practised, as a small rounded chip.
+const chip = (content: string | Node) => h("span", { className: "info-chip" }, content);
+
+// A piece's runs of one kind on a day, added up, each part its own chip.
 const describeRuns = (runs: ReturnType<typeof summarise>[number]) =>
   [
     t.runs(runs.runs),
@@ -21,8 +24,8 @@ const describeRuns = (runs: ReturnType<typeof summarise>[number]) =>
         : [t.passes(runs.passes), t.hitSkipped(runs.hit, runs.missed)]),
     runs.averageCents === null ? null : t.centsOff(Math.round(runs.averageCents)),
   ]
-    .filter(Boolean)
-    .join(" · ");
+    .filter((part) => part !== null)
+    .map(chip);
 
 const timeOf = (entry: LogEntry) => new Date(entry.startedAt).toLocaleTimeString(t.locale, { hour: "numeric", minute: "2-digit" });
 
@@ -48,7 +51,7 @@ const VIEWS: Record<RecordingView, [icon: string, label: () => string]> = {
   bigStaff: [STAFF_ICON, () => t.biggerStaff],
   staffOnly: [SHEET_ICON, () => t.staffOnly],
 };
-const viewIcon = (icon: string, label: string) => h("span", { className: "recording-chip recording-view", innerHTML: icon, title: label, ariaLabel: label, role: "img" });
+const viewIcon = (icon: string, label: string) => h("span", { className: "info-chip recording-view", innerHTML: icon, title: label, ariaLabel: label, role: "img" });
 
 // How the practice screen looked when it was recorded, as icons: the view, and fullscreen if it was.
 function recordingViews({ view, fullscreen }: Recording) {
@@ -59,9 +62,7 @@ function recordingViews({ view, fullscreen }: Recording) {
 
 // How a recorded run went: its score with "Don't wait", or the notes played when it waited for each.
 const runResult = (entry: LogEntry) =>
-  entry.score === undefined
-    ? [t.passes(entry.passes), t.hitSkipped(entry.notesHit, entry.notesSkipped)].join(" · ")
-    : `${t.score(entry.score)} · ${t.hitMissed(entry.notesHit, entry.notesSkipped)}`;
+  entry.score === undefined ? [t.passes(entry.passes), t.hitSkipped(entry.notesHit, entry.notesSkipped)] : [t.score(entry.score), t.hitMissed(entry.notesHit, entry.notesSkipped)];
 
 // A recording under its piece's title: when it was made and in which view, its player, Download, and Delete, which doesn't ask.
 function recordingPanel(entry: LogEntry, recording: Recording, url: string, onDelete: () => void) {
@@ -71,7 +72,7 @@ function recordingPanel(entry: LogEntry, recording: Recording, url: string, onDe
     "div",
     { className: "day-recording" },
     // When, how it went, and the view, each a chip.
-    h("p", { className: "recording-line" }, ...[t.recordedAt(timeOf(entry)), runResult(entry)].map((text) => h("span", { className: "recording-chip" }, text)), ...recordingViews(recording)),
+    h("p", { className: "recording-line" }, ...[t.recordedAt(timeOf(entry)), ...runResult(entry)].map(chip), ...recordingViews(recording)),
     audio,
     h(
       "div",
@@ -169,8 +170,8 @@ export function calendarScreen(): Screen {
       h(
         "div",
         { className: "day-piece" },
-        h("div", { className: "day-piece-title" }, h("strong", {}, title(piece.pieceId, piece.title), ...piece.sessions.filter((session) => session.recordingId).map(recordingButton)), h("span", {}, `${localNumber(piece.minutes, 1)} min`)),
-        h("ul", {}, ...summarise(piece.sessions).map((runs) => h("li", {}, describeRuns(runs)))),
+        h("div", { className: "day-piece-title" }, h("strong", { className: "info-chip" }, title(piece.pieceId, piece.title), ...piece.sessions.filter((session) => session.recordingId).map(recordingButton)), chip(`${localNumber(piece.minutes, 1)} min`)),
+        h("ul", {}, ...summarise(piece.sessions).map((runs) => h("li", { className: "chip-row" }, ...describeRuns(runs)))),
       ),
     );
     const plan =

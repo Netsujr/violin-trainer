@@ -179,7 +179,7 @@ await begin(page); await waitForText(page, "All", 60000);
 await stop(page);
 await page.waitForSelector('button:text-is("Start"):not([disabled])');
 await nav(page, "Calendar"); await page.waitForSelector(".recording-note"); await sleep(400);
-const row = await page.locator(".day-piece li").first().innerText();
+const row = (await page.locator(".day-piece li").first().locator(".info-chip").allInnerTexts()).join(" · ");
 check("the Calendar sums the day's scored runs into one line, with no passes or slowest notes", /^\d+ runs · [\d.]+ min · Score: \d+% · \d+ hit, \d+ missed/.test(row) && !row.includes("slowest") && !row.includes("pass"), row);
 const times = await page.evaluate(async () => {
   const { getRecording, loadLog } = await import("/src/storage.ts");
