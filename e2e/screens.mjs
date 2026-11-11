@@ -209,7 +209,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
   await page.waitForFunction(() => /^Note [4-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 15000 });
   await go('button:text-is("Stop")'); await page.waitForSelector('button:text-is("Start"):not([disabled])');
-  await goNav("Calendar"); await page.waitForSelector("audio"); await sleep(500);
+  await goNav("Calendar"); await page.waitForSelector(".recording-note"); await go(".recording-note"); await sleep(500);
   await auditCheck(page, `${tag} Calendar with a recording`);
   const audio = await page.locator("audio").boundingBox();
   check(`${tag}: the player fits`, audio.x >= 0 && audio.x + audio.width <= width + 1, JSON.stringify(audio));

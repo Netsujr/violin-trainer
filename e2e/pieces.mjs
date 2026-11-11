@@ -262,15 +262,11 @@ flow("The question before anything is lost");
     storage.appendLog({ id: "entry", startedAt: new Date().toISOString(), pieceId: "other", pieceTitle: "Other tune", minutes: 1, passes: 1, notesHit: 3, notesSkipped: 0, averageCents: 5, averagePassSeconds: 10, slowest: [], recordingId: "take" });
   });
   await nav(page, "Calendar"); // Today's recordings are under today, which it opens on.
+  await page.locator(".recording-note").click();
   await page.locator("audio").waitFor({ state: "attached" });
   const hasTake = () => page.evaluate(async () => (await (await import("/src/storage.ts")).getRecording("take")) !== undefined);
-  await page.click('button:text-is("Delete recording")'); await t.modal.waitFor();
-  check("Delete recording asks too", (await t.modal.innerText()).includes("Delete this recording"));
-  await answer(page, "Cancel");
-  check("Cancel keeps the recording", (await page.locator("audio").count()) === 1 && (await hasTake()));
-  await page.click('button:text-is("Delete recording")'); await t.modal.waitFor();
-  await answer(page, "Delete"); await sleep(150);
-  check("Delete removes the recording", (await page.locator("audio").count()) === 0 && !(await hasTake()));
+  await page.click('.recording-actions button:text-is("Delete")'); await sleep(150);
+  check("Delete removes the recording, without asking", (await page.locator("dialog[open]").count()) === 0 && (await page.locator("audio, .recording-note").count()) === 0 && !(await hasTake()));
 
   await nav(page, "Library"); await sleep(200);
   await openDrawers(page);

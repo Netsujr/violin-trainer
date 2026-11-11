@@ -19,7 +19,7 @@ for (const [label, leaveHow] of [["Stop then Calendar at once", "calendar"], ["S
     });
     await s.page.waitForSelector(".calendar-grid");
     await sleep(1000);
-    check(label + ": player appears", (await s.page.locator("audio").count()) === 1);
+    check(label + ": player appears", (await s.page.locator(".recording-note").count()) === 1);
   } else {
     await stop(s.page);
     await s.page.waitForSelector('button:text-is("Start"):not([disabled])', { timeout: 5000 });
@@ -27,7 +27,7 @@ for (const [label, leaveHow] of [["Stop then Calendar at once", "calendar"], ["S
     await s.page.waitForSelector("nav button");
     await nav(s.page, "Calendar");
     await sleep(1000);
-    check(label + " (after the button is usable again): player appears", (await s.page.locator("audio").count()) === 1);
+    check(label + " (after the button is usable again): player appears", (await s.page.locator(".recording-note").count()) === 1);
   }
   await s.close();
 }
@@ -45,6 +45,6 @@ for (const [label, leaveHow] of [["Stop then Calendar at once", "calendar"], ["S
   check("a recording that can't be saved says so, and Start works again", (await s.page.locator(".warning").first().innerText()).includes("couldn't be saved"), await s.page.locator(".warning").first().innerText());
   await nav(s.page, "Calendar");
   await s.page.waitForSelector(".calendar-grid");
-  check("the screen can still be left, with the session in the Calendar", (await s.page.locator(".day-piece li").count()) === 1 && (await s.page.locator("audio").count()) === 0);
+  check("the screen can still be left, with the session in the Calendar", (await s.page.locator(".day-piece li").count()) === 1 && (await s.page.locator(".recording-note").count()) === 0);
   await s.close();
 }

@@ -69,9 +69,9 @@ while (Date.now() < deadline && !(await page.locator("section > p").first().inne
 check("recorded pass clears", (await page.locator("section > p").first().innerText()).startsWith("All 15"));
 await sleep(500);
 await nav(page, "Calendar");
-await page.waitForSelector("audio");
+await page.waitForSelector(".recording-note");
 await sleep(300);
-check("recording ready straight after leaving Practice", (await page.locator("audio").count()) === 1);
+check("recording ready straight after leaving Practice", (await page.locator(".recording-note").count()) === 1);
 await page.reload();
 await page.waitForSelector("nav button");
 await nav(page, "Calendar");

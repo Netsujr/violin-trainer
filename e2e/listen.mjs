@@ -99,8 +99,8 @@ wav(OUT + "silence.wav", [rest(4)]);
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1500);
   await nav(s.page, "Calendar");
-  await s.page.waitForSelector("audio");
-  check("Listen can record too, kept in today's Calendar", (await s.page.locator(".day-details audio").count()) === 1);
+  await s.page.waitForSelector(".recording-note");
+  check("Listen can record too, kept in today's Calendar", (await s.page.locator(".day-details .recording-note").count()) === 1);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
