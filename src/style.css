@@ -856,6 +856,19 @@ a[download] {
   font-size: 0.875rem;
 }
 
+/* The view a recording was made in, after its time. */
+.recording-view {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
+.recording-view svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 /* Tablets in portrait and phones: the tabs get their own row. */
 @media (max-width: 960px) {
   .brand {
@@ -1256,7 +1269,7 @@ a[download] {
   white-space: nowrap;
 }
 
-.fullscreen .stats button:not(.stats-close) {
+.fullscreen .stats button:not(.stats-close, .trouble-chip, .trouble-practise) {
   margin-top: 0.5rem;
   padding: 0.75rem 2.5rem;
   font-size: clamp(1rem, 3vmin, 1.5rem);
@@ -2042,3 +2055,33 @@ a[download] {
   }
 }
 
+
+/* A scored run's trouble spots in the fullscreen results: tap a chip to pick it and set its rounds, then Practise. */
+.trouble-spots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.fullscreen .stats .trouble-chip {
+  margin: 0;
+  padding: 0.375rem 1rem;
+  font-size: clamp(0.875rem, 2.5vmin, 1.125rem);
+  color: #f3ead9;
+  background: rgb(229 72 77 / 0.15);
+  border: 1px solid #e5484d;
+  border-radius: 999px;
+}
+
+.fullscreen .stats .trouble-chip[aria-pressed="true"] {
+  background: rgb(229 72 77 / 0.45);
+  font-weight: 600;
+}
+
+.fullscreen .stats .trouble-practise {
+  margin: 0;
+  padding: 0.375rem 1rem;
+  font-size: clamp(0.875rem, 2.5vmin, 1.125rem);
+  border-radius: 999px;
+}

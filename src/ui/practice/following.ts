@@ -73,10 +73,10 @@ export function createFollowing({ metronome, highway, staff, showReading, isMute
       const judged = [...state.results.values()];
       return scorePercent(judged.filter(Boolean).length, judged.length);
     },
-    start(notes: PieceNote[], index: number) {
+    // A recording sets off by itself, and so does a run that's just been counted in, so neither waits for the first note.
+    start(notes: PieceNote[], index: number, wait = !track.active) {
       const tracker = createFollow(notes, index, () => settings.toleranceCents, endIndex());
-      // A recording sets off by itself, so there's no waiting for the first note.
-      const waiting = track.active ? null : { inTuneSince: null };
+      const waiting = wait ? { inTuneSince: null } : null;
       state = { tracker, beat: tracker.startBeat, at: performance.now(), results: new Map(), waiting };
       metronome.reset();
       highway.showResults(track.listening ? state.results : null);

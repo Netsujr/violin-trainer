@@ -1,10 +1,11 @@
 import { localNumber, localTitle, t } from "../i18n";
 import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practice/calendar";
 import { scorePercent, type LogEntry } from "../practice/log";
-import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording } from "../storage";
+import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording, type RecordingView } from "../storage";
 import { confirmAction } from "./confirm";
 import { planSection } from "./calendarPlan";
 import { h, type Screen } from "./dom";
+import { EXPAND_ICON, LANES_ICON, SHEET_ICON, STAFF_ICON, TRASH_ICON } from "./toggles";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
 
@@ -40,6 +41,20 @@ function makeSeekable(audio: HTMLAudioElement) {
   );
 }
 
+const VIEWS: Record<RecordingView, [icon: string, label: () => string]> = {
+  lanes: [LANES_ICON, () => t.lanesAndStaff],
+  bigStaff: [STAFF_ICON, () => t.biggerStaff],
+  staffOnly: [SHEET_ICON, () => t.staffOnly],
+};
+const viewIcon = (icon: string, label: string) => h("span", { className: "recording-view", innerHTML: icon, title: label, ariaLabel: label, role: "img" });
+
+// How the practice screen looked when it was recorded, as icons: the view, and fullscreen if it was.
+function recordingViews({ view, fullscreen }: Recording) {
+  if (!view) return [];
+  const [icon, label] = VIEWS[view];
+  return [viewIcon(icon, label()), ...(fullscreen ? [viewIcon(EXPAND_ICON, t.fullscreen)] : [])];
+}
+
 function recordingPlayer(entry: LogEntry, recording: Recording, urls: string[], onDelete: () => void) {
   const url = URL.createObjectURL(recording.blob);
   urls.push(url);
@@ -63,7 +78,7 @@ function recordingPlayer(entry: LogEntry, recording: Recording, urls: string[], 
     audio,
     h("a", { href: url, download: recordingName(entry, recording.blob), textContent: t.download }),
     " ",
-    h("button", { textContent: t.deleteRecording, className: "secondary outline", onclick: onDelete }),
+    h("button", { innerHTML: TRASH_ICON, title: t.deleteRecording, ariaLabel: t.deleteRecording, className: "secondary outline icon-button", onclick: onDelete }),
     h("div", { className: "row" }, ...markers),
   );
 }
@@ -192,7 +207,7 @@ export function calendarScreen(): Screen {
       row.remove();
       showStorage();
     });
-    row.append(player);
+    row.append(...recordingViews(recording), player);
   }
 
   renderMonth();

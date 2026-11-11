@@ -1,7 +1,8 @@
 import { localNumber, t } from "../../i18n";
-import { noteLabels } from "../../music/notes";
+import { noteLabels, type PieceNote } from "../../music/notes";
 import { buildEntry, scorePercent } from "../../practice/log";
 import type { Session } from "../../practice/session";
+import { troubleSpots, type TroubleSpot } from "../../practice/trouble";
 import { h } from "../dom";
 import type { Section } from "../highway";
 
@@ -49,16 +50,45 @@ function summary(session: Session, run: Run) {
 }
 
 // A run's result: on the bar above the lanes, and in fullscreen, where that bar is hidden, as a card over the lanes.
-export function createResults(board: { showScore(text: string): void }, onPlayAgain: () => void) {
+// A scored run's trouble spots are chips: tapping one picks it, shown with onSpot, and each tap after plays it once more, up to 5×.
+// Practise then plays the picked spot that many times.
+const MOST_ROUNDS = 5;
+type SpotActions = { onSpot(spot: TroubleSpot | null): void; onPractise(spot: TroubleSpot, rounds: number): void };
+
+function troubleChips(spots: TroubleSpot[], { onSpot, onPractise }: SpotActions) {
+  let picked: { spot: TroubleSpot; rounds: number } | null = null;
+  const practise = h("button", { type: "button", className: "trouble-practise", textContent: t.practise, hidden: true, onclick: () => onPractise(picked!.spot, picked!.rounds) });
+  const chips = spots.map((spot) => {
+    const chip = h("button", { type: "button", className: "trouble-chip" });
+    const label = t.troubleSpot(spot.firstBar, spot.lastBar, spot.missed);
+    const draw = () => {
+      const on = picked?.spot === spot;
+      chip.textContent = on ? `${label} · ${picked!.rounds}×` : label;
+      chip.ariaPressed = String(on);
+    };
+    chip.onclick = () => {
+      picked = picked?.spot !== spot ? { spot, rounds: 1 } : picked.rounds < MOST_ROUNDS ? { spot, rounds: picked.rounds + 1 } : null;
+      chips.forEach((other) => other.draw());
+      practise.hidden = !picked;
+      onSpot(picked?.spot ?? null);
+    };
+    draw();
+    return Object.assign(chip, { draw });
+  });
+  return spots.length ? [h("div", { className: "trouble-spots" }, ...chips, practise)] : [];
+}
+
+export function createResults(board: { showScore(text: string): void }, onPlayAgain: () => void, spotActions: SpotActions) {
   const element = h("div", { className: "stats" });
   return {
     element,
     // The score so far, as notes are judged. A play-along with nothing heard has none.
     live: (results: Map<number, boolean> | null) => board.showScore(scoreLine(results)),
-    show(session: Session, { results, listening, ...run }: Run & { results: Map<number, boolean> | null; listening: boolean }) {
+    show(session: Session, { results, listening, notes, ...run }: Run & { results: Map<number, boolean> | null; listening: boolean; notes: PieceNote[] }) {
       const waited = !results && listening ? summary(session, run) : null;
       board.showScore(!listening ? t.playedAlong : waited ? `${waited.done} ${waited.totals}` : scoreLine(results));
-      const card = !listening ? playedAlongCard() : waited ? [waited.done, waited.totals, waited.slowest].map((line) => h("p", {}, line)) : scoreCard(results!);
+      const trouble = troubleChips(results && listening ? troubleSpots(notes, results) : [], spotActions);
+      const card = !listening ? playedAlongCard() : waited ? [waited.done, waited.totals, waited.slowest].map((line) => h("p", {}, line)) : [...scoreCard(results!), ...trouble];
       element.replaceChildren(...resultsCard(card, onPlayAgain, () => element.replaceChildren()));
     },
     clear() {

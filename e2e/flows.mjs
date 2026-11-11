@@ -217,7 +217,7 @@ flow("8. Calendar: recordings");
   check("Download gives a named file", download.suggestedFilename().startsWith("D (Ré) major") && download.suggestedFilename().endsWith(".webm"), download.suggestedFilename());
   const storage = await s.page.locator("section > p").filter({ hasText: "Storage" }).innerText();
   check("storage is shown", /Storage used: \d+\.\d MB/.test(storage), storage);
-  await s.page.click('button:text-is("Delete recording")'); await sleep(100);
+  await s.page.click('button[aria-label="Delete recording"]'); await sleep(100);
   await answer(s.page, "Delete"); await sleep(150);
   check("Delete recording removes only the recording, leaving the run's summary", (await s.page.locator("audio").count()) === 0 && (await s.page.locator(".day-recording").count()) === 0 && (await s.page.locator(".day-piece li").count()) === 1);
   await s.page.reload(); await s.page.waitForSelector("nav button"); await nav(s.page, "Calendar"); await sleep(400);

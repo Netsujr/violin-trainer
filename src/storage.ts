@@ -39,7 +39,9 @@ export type Settings = {
   lastPieceId?: string;
 };
 
-export type Recording = { blob: Blob; markers: { pitch: string; seconds: number }[] };
+// view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
+export type RecordingView = "lanes" | "bigStaff" | "staffOnly";
+export type Recording = { blob: Blob; markers: { pitch: string; seconds: number }[]; view?: RecordingView; fullscreen?: boolean };
 
 export const COUNT_IN_CHOICES = [2, 4, 6, 8, 10];
 

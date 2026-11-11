@@ -20,6 +20,8 @@ export async function startRun(
 
   const mic = await startMic(() => settings.minRms, onReading);
   const recorder = record ? startRecorder(mic.stream) : null;
+  const view = settings.staffOnly ? "staffOnly" : settings.staffBig ? "bigStaff" : "lanes";
+  const fullscreen = document.documentElement.classList.contains("fullscreen");
   const session = new Session(piece, performance.now());
 
   return {
@@ -39,7 +41,7 @@ export async function startRun(
         pitch: hit.pitch,
         seconds: Math.max(0, (hit.at - settings.holdMs - recorder.startedAt) / 1000),
       }));
-      await saveRecording(recordingId, { blob: await recorded, markers });
+      await saveRecording(recordingId, { blob: await recorded, markers, view, fullscreen });
     },
   };
 }

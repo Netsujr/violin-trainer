@@ -44,6 +44,7 @@ export const PLAY_ICON = svgIcon('<path d="M7 4v16l13-8z"/>');
 export const DOWNLOAD_ICON = svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>');
 export const EAR_ICON = svgIcon('<path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/>');
 export const RECORD_ICON = svgIcon('<circle cx="12" cy="12" r="6" fill="currentColor"/>');
+export const LANES_ICON = svgIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/>');
 export const SHEET_ICON = svgIcon('<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M7 7h10M7 10h10M7 15h10M7 18h10"/>');
 export const COPY_ICON = svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>');
 export const PASTE_ICON = svgIcon('<path d="M15 2H9a1 1 0 0 0-1 1v2c0 .6.4 1 1 1h6c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1Z"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/>');

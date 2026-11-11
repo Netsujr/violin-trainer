@@ -129,6 +129,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     modeNote,
     patternRow,
     showModes,
+    // Loop on or off, as if its button were pressed.
     leave() {
       fullscreen.leave();
       document.documentElement.classList.remove("staff-only");
