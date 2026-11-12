@@ -1,7 +1,7 @@
 // Every screen and the main flows on phone and tablet sizes, by touch, plus small computer windows.
 // This is Chrome emulating those sizes: it checks layout and touch handling, not Safari or a real device's mic.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, typeNotes, openDrawers } from "./lib.mjs";
+import { laneScore, open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, staffNotes, openDrawers } from "./lib.mjs";
 
 const SIZES = [
   ["small phone", 320, 568, true],
@@ -182,9 +182,8 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
 
   // A recording, and a long title
   await goNav("Library"); await sleep(200);
-  await page.fill('input[placeholder="Title"]', LONG_TITLE);
-  await typeNotes(page, longPiece);
-  await go('.type-notes button:text-is("Save piece")'); await sleep(200);
+  await staffNotes(page, LONG_TITLE, longPiece);
+  await go('.row button:text-is("Save piece")'); await sleep(200);
   await auditCheck(page, `${tag} Library with a long title`);
   await page.locator(".piece", { hasText: LONG_TITLE }).locator('button[aria-label="Practice"]').click(); await sleep(400);
   await auditCheck(page, `${tag} Practice, long title`);
@@ -211,7 +210,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await go('button:text-is("Stop")'); await page.waitForSelector('button:text-is("Start"):not([disabled])');
   await goNav("Calendar"); await page.waitForSelector(".recording-note"); await go(".recording-note"); await sleep(500);
   await auditCheck(page, `${tag} Calendar with a recording`);
-  const audio = await page.locator("audio").boundingBox();
+  const audio = await page.locator(".waveform-player").boundingBox();
   check(`${tag}: the player fits`, audio.x >= 0 && audio.x + audio.width <= width + 1, JSON.stringify(audio));
   await goNav("Practice"); await sleep(250);
   await goNav("Listen"); await sleep(250);

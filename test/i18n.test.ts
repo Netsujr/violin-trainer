@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { centsText, localNumber, localTitle, setLanguage, t } from "../src/i18n";
 import { noteLabels } from "../src/music/notes";
-import { parseQuickText } from "../src/music/parse";
 
 afterEach(() => setLanguage("en"));
 
@@ -43,13 +42,10 @@ describe("language", () => {
     expect(centsText(12)).toBe("12 cents");
   });
 
-  it("translates fingers and parse messages in Portuguese", () => {
+  it("translates fingers in Portuguese", () => {
     setLanguage("pt");
     expect(t.finger("L2")).toBe("2 baixo");
     expect(t.finger("H3")).toBe("3 alto");
     expect(t.finger("1")).toBe("1");
-    const { errors, flagged } = parseQuickText("banana C6");
-    expect(errors[0]).toContain("Não foi possível");
-    expect(flagged[0]).toContain("primeira posição");
   });
 });

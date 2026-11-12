@@ -125,12 +125,13 @@ export function check(name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  " + detail : ""}`);
   if (!ok) process.exitCode = 1;
 }
-// The "Or type the notes" form, which starts closed. The staff above it has a Save button of its own.
-export const typeNotes = async (page, notes) => {
-  if (!(await page.locator(".type-notes").evaluate((form) => form.open))) await page.locator(".type-notes summary").click();
-  await page.fill(".type-notes textarea", notes);
+// Puts notes on the Add piece staff, as if clicked in there, written like "D4:2 E4 | F#4" (no number is 1 beat).
+export const staffNotes = async (page, title, text) => {
+  const notes = text.split(/\s+/).filter((token) => token && token !== "|").map((token) => ({ pitch: token.split(":")[0], beats: Number(token.split(":")[1] ?? 1) }));
+  await page.evaluate((draft) => localStorage.setItem("pieceDraft", JSON.stringify(draft)), { title, notes });
+  await nav(page, "Calendar"); await nav(page, "Library"); await sleep(150);
 };
-export const saveTyped = (page) => page.locator('.type-notes button:text-is("Save piece")');
+export const saveStaff = (page) => page.locator('.row button:text-is("Save piece")');
 // Answers the question that's up, by the name of its button.
 export const answer = async (page, label) => {
   await page.locator("dialog[open]").getByRole("button", { name: label, exact: true }).click();

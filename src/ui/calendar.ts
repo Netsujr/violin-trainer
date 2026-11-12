@@ -4,7 +4,9 @@ import { scorePercent, type LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording, type RecordingView } from "../storage";
 import { planSection } from "./calendarPlan";
 import { backupButtons } from "./backup";
+import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
+import { waveformPlayer } from "./waveform";
 import { EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON } from "./toggles";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
@@ -63,15 +65,16 @@ function recordingViews({ view, fullscreen }: Recording) {
 const runResult = (entry: LogEntry) =>
   entry.score === undefined ? [t.passes(entry.passes), t.hitSkipped(entry.notesHit, entry.notesSkipped)] : [t.score(entry.score), t.hitMissed(entry.notesHit, entry.notesSkipped)];
 
-// A recording under its piece's title: when it was made and in which view, its player, Download, and Delete, which doesn't ask.
+// A recording under its piece's title: when it was made and in which view, its player, Download, and Delete, which asks first.
 function recordingPanel(entry: LogEntry, recording: Recording, url: string, onDelete: () => void) {
-  const audio = h("audio", { controls: true, src: url, preload: "metadata" });
+  const audio = h("audio", { src: url, preload: "metadata" });
   makeSeekable(audio);
   return h(
     "div",
     { className: "day-recording" },
     // When, how it went, and the view, each a chip.
     h("p", { className: "recording-line" }, ...[t.recordedAt(timeOf(entry)), ...runResult(entry)].map(chip), ...recordingViews(recording)),
+    waveformPlayer(recording.blob, audio),
     audio,
     h(
       "div",
@@ -200,6 +203,7 @@ export function calendarScreen(): Screen {
           const url = URL.createObjectURL(recording.blob);
           urls.push(url);
           panel = recordingPanel(entry, recording, url, async () => {
+            if (!(await confirmAction(t.deleteRecordingConfirm, t.delete))) return;
             await deleteRecording(entry.recordingId!);
             panel!.remove();
             button.remove();

@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { wav, rest } from "./wav.mjs";
-import { answer, auditCheck, canvasHasColor, check, nav, open, openDrawers, OUT, pickPiece, progress, saveTyped, seed, sleep, typeNotes } from "./lib.mjs";
+import { answer, auditCheck, canvasHasColor, check, nav, open, openDrawers, OUT, pickPiece, progress, seed, sleep } from "./lib.mjs";
 
 const WAV = OUT + "pieces-silent.wav";
 wav(WAV, [rest(3)]);
@@ -174,29 +174,6 @@ flow("The space notes take, and the bar lines");
   await s.close();
 }
 
-flow("Typing the notes");
-{
-  const s = await open(WAV);
-  const { page } = s;
-  const t = tools(page);
-  await library(page);
-  check("the form starts closed", !(await page.locator(".type-notes textarea").isVisible()));
-  await t.title.fill("Typed");
-  await typeNotes(page, "D4:2 E4 F#4");
-  const items = await page.locator(".type-notes ol li").allInnerTexts();
-  check("the preview reads the beats, with 1 when there are none", items[0].includes("2 beats") && items[1].includes("1 beat") && items[1].includes("Mi"), items.join(" ; "));
-  await typeNotes(page, "D4:5");
-  check("a length a note can't have is refused", (await saveTyped(page).isDisabled()) && (await page.locator(".type-notes .warning").first().innerText()).includes("D4:5"));
-  await typeNotes(page, "D4:3 E4:2");
-  check("so is a note that runs over the bar", (await saveTyped(page).isDisabled()) && (await page.locator(".type-notes .warning").first().innerText()).includes("Note 2"));
-  await typeNotes(page, "D4:2 E4 F#4 | G4:4");
-  await saveTyped(page).click();
-  await sleep(150);
-  check("saved with its lengths", (await t.stored()).at(-1).notes.map((saved) => saved.beats).join() === "2,1,1,4");
-  notProblems(s);
-  await s.close();
-}
-
 flow("The question before anything is lost");
 {
   const s = await open(WAV);
@@ -266,7 +243,11 @@ flow("The question before anything is lost");
   await page.locator("audio").waitFor({ state: "attached" });
   const hasTake = () => page.evaluate(async () => (await (await import("/src/storage.ts")).getRecording("take")) !== undefined);
   await page.click('.recording-actions button:text-is("Delete")'); await sleep(150);
-  check("Delete removes the recording, without asking", (await page.locator("dialog[open]").count()) === 0 && (await page.locator("audio, .recording-note").count()) === 0 && !(await hasTake()));
+  await answer(page, "Cancel");
+  check("Delete asks, and Cancel keeps the recording", (await page.locator(".recording-note").count()) === 1 && (await hasTake()));
+  await page.click('.recording-actions button:text-is("Delete")'); await sleep(150);
+  await answer(page, "Delete"); await sleep(150);
+  check("confirming removes it", (await page.locator("dialog[open]").count()) === 0 && (await page.locator("audio, .recording-note").count()) === 0 && !(await hasTake()));
 
   await nav(page, "Library"); await sleep(200);
   await openDrawers(page);
@@ -302,7 +283,6 @@ flow("Editing a saved song");
   check("the heading says Edit piece", (await t.heading()) === "Edit piece", await t.heading());
   check("the title, notes and lengths come along", (await t.title.inputValue()) === "My tune" && (await t.names()) === "Ré,Lá,Si" && (await t.beats()) === "2,1,1", `${await t.names()} ${await t.beats()}`);
   check("it scrolls to the editor", await page.locator("section > h2").last().evaluate((heading) => { const { top } = heading.getBoundingClientRect(); return top >= -1 && top < innerHeight; }));
-  check("the typing form steps aside", !(await page.locator(".type-notes").isVisible()));
   await page.screenshot({ path: OUT + "pieces-editing.png" });
 
   await t.clear("Cancel").click(); await sleep(100);
@@ -318,7 +298,7 @@ flow("Editing a saved song");
   check("Save updates the song in place", (await t.stored()).length === 2 && changed.title === "My better tune" && changed.notes[0].beats === 1, JSON.stringify((await t.stored()).map((piece) => piece.title)));
   check("a note left alone keeps a hand-set finger", changed.notes[1].finger === "4" && changed.notes[1].string === "D", JSON.stringify(changed.notes[1]));
   check("a note given a new pitch gets a fresh fingering", changed.notes[2].pitch === "B#4" && changed.notes[2].finger !== "1" && changed.notes[2].finger !== undefined, JSON.stringify(changed.notes[2]));
-  check("the editor goes back to adding", (await t.heading()) === "Add piece" && (await t.names()) === "" && (await page.locator(".type-notes").isVisible()));
+  check("the editor goes back to adding", (await t.heading()) === "Add piece" && (await t.names()) === "");
   check("the highlight stays with the song", await t.row("My better tune").evaluate((card) => card.classList.contains("highlighted")));
 
   await t.row("My better tune").getByRole("button", { name: "Practice", exact: true }).click(); await sleep(300);

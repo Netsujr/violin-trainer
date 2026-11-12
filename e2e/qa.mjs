@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, sleep, waitForText } from "./lib.mjs";
+import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -281,11 +281,8 @@ await shot("11-library");
 const row = page.locator(".piece", { hasText: "Twinkle" });
 await press(row.locator(".piece-name"));
 check("tapping a card highlights it, and its group counts it", (await row.evaluate((card) => card.classList.contains("highlighted"))) && (await page.locator(".library h3").nth(1).innerText()) === "Classic tunes (1 selected)", await page.locator(".library h3").nth(1).innerText());
-await page.fill('input[placeholder="Title"]', "My tune");
-await press(page.locator(".type-notes summary")); await sleep(150);
-await page.fill("textarea", "D4 E4 F#4");
-check("the preview lists the notes", (await page.locator("ol li").count()) === 3);
-await press(page.locator(".type-notes").getByRole("button", { name: "Save piece", exact: true })); await sleep(200);
+await staffNotes(page, "My tune", "D4 E4 F#4");
+await press(saveStaff(page)); await sleep(200);
 const mine = page.locator(".piece", { hasText: "My tune" });
 check("a new piece joins My songs", (await page.locator(".library > div").nth(2).locator(".piece", { hasText: "My tune" }).count()) === 1);
 await press(mine.getByRole("button", { name: "Practice", exact: true })); await sleep(400);
@@ -369,10 +366,11 @@ const format = await page.evaluate(async () => (await (await fetch(document.quer
 const link = await page.locator("a[download]").first().getAttribute("download");
 check("Download's file type matches what was recorded", format.includes("mp4") ? link.endsWith(".m4a") : link.endsWith(".webm"), `${format} > ${link}`);
 await auditCheck(page, "Calendar, with a recording");
-await page.locator("audio").first().scrollIntoViewIfNeeded();
+await page.locator(".waveform-player").scrollIntoViewIfNeeded();
 await shot("12-recording");
 await press(page.locator(".recording-actions button", { hasText: "Delete" })); await sleep(200);
-check("Delete removes only the recording, with no question, leaving the day's summaries", (await page.locator("audio").count()) === 0 && (await page.locator(".recording-note").count()) === 0 && (await page.locator(".day-piece li").count()) >= 2);
+await say("Delete");
+check("Delete, once confirmed, removes only the recording, leaving the day's summaries", (await page.locator("audio").count()) === 0 && (await page.locator(".recording-note").count()) === 0 && (await page.locator(".day-piece li").count()) >= 2);
 
 flow("13. Calendar");
 const logText = await page.locator("section").innerText();

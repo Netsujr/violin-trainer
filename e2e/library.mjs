@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveTyped, typeNotes, openDrawers } from "./lib.mjs";
+import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveStaff, staffNotes, openDrawers } from "./lib.mjs";
 
 const profile = OUT + "profile";
 rmSync(profile, { recursive: true, force: true });
@@ -9,7 +9,7 @@ wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), 
 const s = await open(OUT + "dmajor.wav", profile);
 const page = s.page;
 
-// Library: built-ins, parse, preview, save
+// Library: built-ins, and saving one from the staff
 await nav(page, "Library");
 const column = (index) => page.locator(".library > div").nth(index);
 const group = async (index) => ({
@@ -19,17 +19,8 @@ const group = async (index) => ({
 });
 const groups = [await group(0), await group(1), await group(2)];
 check("three groups, three cards each, the rest in a drawer", JSON.stringify(groups) === JSON.stringify([{ title: "Scales", shown: 3, drawer: "Show 14 more" }, { title: "Classic tunes", shown: 3, drawer: "Show 3 more" }, { title: "My songs", shown: 2, drawer: "" }]), JSON.stringify(groups));
-await page.fill('input[placeholder="Title"]', "Pasted D major");
-await typeNotes(page, "D4 E4 F#4 G4 | A4 B4 C#5 D5");
-const items = await page.locator("ol li").allInnerTexts();
-console.log("  preview:", items.join(" ; "));
-check("preview shows 8 fingered notes", items.length === 8 && items[2].includes("D string · finger 2") && items[7].includes("A string · finger 3"));
-await page.fill("textarea", "D4 banana");
-check("a bad token blocks saving", await saveTyped(page).isDisabled() && (await page.locator(".type-notes .warning").first().innerText()).includes("banana"));
-await page.fill("textarea", "C6 D4");
-check("a note above first position is flagged", (await page.locator(".type-notes .warning").first().innerText()).includes("outside first position"));
-await page.fill("textarea", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
-await saveTyped(page).click();
+await staffNotes(page, "Pasted D major", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
+await saveStaff(page).click(); await sleep(150);
 check("a saved piece joins My songs", (await column(2).locator(".piece").count()) === 3 && (await column(2).locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
 await page.locator(".piece", { hasText: "D (Ré) major" }).first().click();
 await page.screenshot({ path: OUT + "library.png" });
@@ -121,10 +112,10 @@ const dayText = await page.locator(".day-details").innerText();
 check("today's tile shows the minutes, and the day lists the piece", (await page.locator(".calendar-day.today .calendar-minutes").innerText()).endsWith("′") && dayText.includes("D (Ré) major") && dayText.includes("min practised"), dayText.replaceAll("\n", " | ").slice(0, 160));
 
 // Download link and delete
-check("download link has a filename", (await page.locator("a[download]").getAttribute("download")).endsWith(".webm"), await page.locator("a[download]").getAttribute("download"));
+check("download link has a filename", (await page.locator("a[download]").getAttribute("download")).endsWith(".m4a"), await page.locator("a[download]").getAttribute("download"));
 await page.click('.recording-actions button:text-is("Delete")');
-await sleep(200);
-check("Delete removes it straight away, player and note", (await page.locator("audio").count()) === 0 && (await page.locator(".recording-note").count()) === 0);
+await answer(page, "Delete"); await sleep(200);
+check("Delete, once confirmed, removes the player and note", (await page.locator("audio").count()) === 0 && (await page.locator(".recording-note").count()) === 0);
 
 // Closing mid-session still logs
 await nav(page, "Practice");

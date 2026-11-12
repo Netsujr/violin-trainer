@@ -1,7 +1,5 @@
 import { localTitle, t } from "../i18n";
 import { fillFingering } from "../music/fingering";
-import { parseQuickText } from "../music/parse";
-import { barMarks, BEAT_LABELS, noteLabels } from "../music/notes";
 import { allPieces, deletePiece, getSettings, isHighlighted, isScale, loadDraft, pieceGroups, saveDraft, savePiece, toggleHighlighted, updatePiece } from "../storage";
 import type { Piece } from "../music/notes";
 import { confirmAction } from "./confirm";
@@ -33,22 +31,7 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
       } else if (await confirmAction(t.clearConfirm, t.clearStaff)) editor.setNotes([]);
     },
   });
-  const text = h("textarea", {
-    rows: 6,
-    placeholder: "D4:2 E4 F#4 | G4:3 A4 | B4:4",
-    oninput: () => refreshForms(),
-  });
-  const previewView = h("div");
-  const saveTypedButton = h("button", { textContent: t.savePiece, onclick: saveFromText });
   const heading = h("h2");
-  const typedNotes = h(
-    "details",
-    { className: "type-notes" },
-    h("summary", {}, t.typeNotes),
-    h("p", { className: "editor-hint" }, t.typeHint),
-    h("div", { className: "add-piece" }, text, saveTypedButton),
-    previewView,
-  );
 
   const tracks = createCardTracks(goAlign, () => renderList());
   const subtitle = (piece: Piece) => t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length);
@@ -174,43 +157,17 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
     clearButton.disabled = !editing && editor.notes().length === 0;
     clearButton.textContent = editing ? t.cancel : t.clearStaff;
     heading.textContent = editing ? t.editPiece : t.addPiece;
-    typedNotes.hidden = editing !== undefined;
-
-    const { notes, errors, flagged } = parseQuickText(text.value);
-    const overBar = barMarks(notes).findIndex((mark) => mark.crossesBar);
-    saveTypedButton.disabled = !hasTitle || notes.length === 0 || errors.length > 0 || overBar >= 0;
-    previewView.replaceChildren(
-      ...[...errors, ...flagged, ...(overBar >= 0 ? [t.noteOverBar(overBar + 1)] : [])].map((problem) => h("p", { className: "warning" }, problem)),
-      h(
-        "ol",
-        {},
-        ...notes.map((note) => {
-          const { solfege, letter } = noteLabels(note.pitch);
-          const length = t.beatCount(BEAT_LABELS[note.beats!], note.beats! > 1);
-          return h("li", {}, `${solfege} / ${letter} · ${t.stringFinger(t.strings[note.string!], t.finger(note.finger ?? "?"))} · ${length}`);
-        }),
-      ),
-    );
   }
 
-  function savePieceWith(notes: Piece["notes"]) {
+  function saveFromStaff() {
     const name = title.value.trim();
+    const notes = editor.notes().map(fillFingering);
     if (editing) updatePiece({ ...editing, title: name, notes });
     else savePiece({ id: crypto.randomUUID(), title: name, source: "imported", notes });
     editing = undefined;
     title.value = "";
-    renderList();
-  }
-
-  function saveFromStaff() {
-    savePieceWith(editor.notes().map(fillFingering));
     editor.setNotes([]);
-  }
-
-  function saveFromText() {
-    savePieceWith(parseQuickText(text.value).notes);
-    text.value = "";
-    refreshForms();
+    renderList();
   }
 
   renderList();
@@ -228,7 +185,6 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
       h("div", { className: "add-piece" }, title),
       editor.element,
       h("div", { className: "row" }, saveButton, clearButton),
-      typedNotes,
     ),
     leave() {},
   };

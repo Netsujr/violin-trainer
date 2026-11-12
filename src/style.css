@@ -813,10 +813,6 @@ button.editor-name:is(:hover, :active, :focus) {
   border-radius: var(--pico-border-radius);
 }
 
-.type-notes {
-  margin-top: 1.5rem;
-}
-
 .add-piece {
   display: flex;
   flex-direction: column;
@@ -869,7 +865,7 @@ a[download] {
   height: 1rem;
 }
 
-/* A recording, opened under its piece's title: Download on the left, Delete on the right. */
+/* A recording, opened under its piece's title, with Download and Delete on the right. */
 .day-recording {
   margin: 0.5rem 0;
 }
@@ -882,13 +878,47 @@ a[download] {
   margin: 0 0 0.25rem;
 }
 
+.waveform-player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 999px;
+}
+
+.waveform-player .icon-button {
+  flex: none;
+  margin: 0;
+  border: none;
+}
+
+.waveform-player .icon-button:not(:focus-visible) {
+  box-shadow: none;
+}
+
+.waveform {
+  flex: 1;
+  min-width: 0;
+  height: 3rem;
+  cursor: pointer;
+}
+
+.waveform-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+}
+
 .day-recording audio {
   width: 100%;
 }
 
 .recording-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 1rem;
 }
 
 .link-button {
