@@ -44,7 +44,7 @@ describe("highlighted pieces", () => {
     expect(pieceGroups(allPieces())[2][1].map((piece) => piece.id)).toEqual(groups[2][1].map((piece) => piece.id));
     toggleHighlighted(hills);
     expect(isHighlighted(hills)).toBe(false);
-    expect(groups.map(([key, pieces]) => [key, pieces.length])).toEqual([["scales", 17], ["songs", 6], ["customSongs", 2]]);
+    expect(groups.map(([key, pieces]) => [key, pieces.length])).toEqual([["scales", 17], ["songs", 8], ["customSongs", 2]]);
   });
 });
 

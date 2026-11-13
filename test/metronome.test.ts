@@ -57,6 +57,17 @@ describe("metronome", () => {
     expect(clicks.map((click) => click.hz)).toEqual([3200, 2500, 2500, 2500, 3200, 2500, 2500, 2500, 3200]);
   });
 
+  it("accents the first of every three in 3/4, and a pickup's lead lands the accent on the first whole bar", () => {
+    const metronome = createMetronome();
+    metronome.meter = { beatsPerBar: 3, pickup: 1 };
+    run(metronome, 0, 6500, 60);
+    expect(clicks.map((click) => click.hz)).toEqual([3200, 2500, 2500, 3200, 2500, 2500, 3200]);
+    clicks.length = 0;
+    metronome.reset(1, 10000);
+    run(metronome, 9900, 13100, 60);
+    expect(clicks.map((click) => click.hz)).toEqual([2500, 3200, 2500, 2500]);
+  });
+
   it("keeps its clicks above what the detector listens to", () => {
     const metronome = createMetronome();
     run(metronome, 0, 3000, 60);

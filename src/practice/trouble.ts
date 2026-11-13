@@ -1,4 +1,4 @@
-import { BAR_BEATS, type PieceNote } from "../music/notes";
+import { COMMON_TIME, type Meter, type PieceNote } from "../music/notes";
 import { scorePercent } from "./log";
 
 // A spot lasts at most this many bars, so a rough run still points somewhere useful rather than at the whole piece.
@@ -35,9 +35,10 @@ export function aroundSpot(notes: PieceNote[], { first, last }: { first: number;
 }
 
 // Where a scored run went wrong: its missed notes, by bar, with neighbouring bars joined into spots, the worst first.
-// Bars count from 1, and first and last are the notes the spot spans. results is each judged note: hit or missed.
-export function troubleSpots(notes: PieceNote[], results: Map<number, boolean>): TroubleSpot[] {
-  const barOf = startsOf(notes).map((start) => Math.floor(start / BAR_BEATS) + 1);
+// Bars count from 1, a pickup counting with the first, and first and last are the notes the spot spans. results is each
+// judged note: hit or missed.
+export function troubleSpots(notes: PieceNote[], results: Map<number, boolean>, { beatsPerBar, pickup }: Meter = COMMON_TIME): TroubleSpot[] {
+  const barOf = startsOf(notes).map((start) => Math.max(1, Math.floor((start - pickup) / beatsPerBar) + 1));
   const missedIn = new Map<number, number>();
   for (const [index, hit] of results) if (!hit) missedIn.set(barOf[index], (missedIn.get(barOf[index]) ?? 0) + 1);
 

@@ -1,7 +1,7 @@
 import { localTitle, t } from "../i18n";
 import { fillFingering } from "../music/fingering";
 import { allPieces, deletePiece, getSettings, isHighlighted, isScale, loadDraft, pieceGroups, saveDraft, savePiece, toggleHighlighted, updatePiece } from "../storage";
-import type { Piece } from "../music/notes";
+import { meterOf, type Piece } from "../music/notes";
 import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
 import { createCardTracks } from "./libraryTracks";
@@ -72,7 +72,7 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
               title: t.downloadPdf,
               ariaLabel: t.downloadPdf,
               onclick: () =>
-                downloadSheet(localTitle(piece.id, piece.title), piece.notes, { names: settings.toggles.noteNames, fingers: settings.toggles.fingers }),
+                downloadSheet(localTitle(piece.id, piece.title), piece.notes, { names: settings.toggles.noteNames, fingers: settings.toggles.fingers }, meterOf(piece)),
             }),
           ]),
       ...(piece.source === "imported"

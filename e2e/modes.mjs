@@ -17,7 +17,7 @@ const GREEN = "rgb(76, 208, 125)";
 await nav(page, "Practice"); await sleep(250);
 check("there's no Skip", (await page.locator('button:text-is("Skip")').count()) === 0);
 const order = await page.locator(".actions button").evaluateAll((buttons) => buttons.map((button) => button.ariaLabel ?? button.textContent));
-check("the buttons sit together, Record first and Fullscreen last", order.join() === "Record,Start,Play reference,Loop,Repeat the top note,Don't wait,Lanes and staff,Fullscreen", order.join());
+check("the buttons sit together, Record first and Fullscreen last", order.join() === "Record,Start,Play reference,Loop,Repeat the top note,Don't wait,Pitch line,Lanes and staff,Fullscreen", order.join());
 check("all off to begin with", !(await pressed(loop())) && !(await pressed(top())) && !(await pressed(dontWait())));
 check("the line beneath describes that", (await note_()) === "Waits for each note · Plays once · Top note once", await note_());
 const below = await page.evaluate(() => document.querySelector(".mode-note").getBoundingClientRect().top >= document.querySelector(".actions").getBoundingClientRect().bottom - 1);

@@ -5,7 +5,7 @@ import { h } from "../dom";
 import type { Section } from "../highway";
 import type { createRunControls } from "../runControls";
 import type { createBackingTrack } from "./backingTrack";
-import { COUNT_IN_ICON, DONT_WAIT_ICON, LOOP_ICON, METRONOME_ICON, SHEET_ICON, STAFF_ICON, TEMPO_ICON } from "../toggles";
+import { COUNT_IN_ICON, DONT_WAIT_ICON, LOOP_ICON, METRONOME_ICON, PITCH_LINE_ICON, SHEET_ICON, STAFF_ICON, TEMPO_ICON } from "../toggles";
 import { createFullscreen } from "./fullscreen";
 import { createBpmControl, createCountInButton, createPatternRow, iconSwitch, ICON_BUTTON, modeButton } from "./options";
 import { createPieceMenu } from "./pieceMenu";
@@ -61,7 +61,11 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     const current = section();
     const scale = isScale(piece());
     // What doesn't apply is hidden: the repeated top note on a song, "Don't wait" when a backing track sets the pace
-    // anyway, and Tempo, which smooths the move after a hit, when the lanes don't wait for one.
+    // anyway, Tempo, which smooths the move after a hit, when the lanes don't wait for one, and the pitch line unless
+    // they don't wait and the staff is the moving line.
+    const pitchLine = (settings.followOn || track.active) && board.staff.collapsed;
+    pitchLineButton.hidden = !pitchLine;
+    if (!pitchLine) board.staff.clearTrace();
     repeatTopButton.hidden = !scale;
     followButton.hidden = track.active;
     tempoSwitch.label.hidden = settings.followOn || track.active;
@@ -105,8 +109,14 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     board.staff.fitTo(sheet ? innerHeight - board.sheet.getBoundingClientRect().top - SHEET_MARGIN : null);
     board.fit();
     render();
+    showModes();
   }
   showView();
+  board.whenViewChanges(showModes);
+  const pitchLineButton = modeButton("pitchLineOn", t.pitchLine, PITCH_LINE_ICON, `${t.pitchLine}: ${t.pitchLineHint}`, () => {
+    board.staff.clearTrace();
+    render();
+  });
   const followButton = modeButton("followOn", t.dontWait, DONT_WAIT_ICON, `${t.dontWait}: ${t.dontWaitHint}`, () => {
     showModes();
     clearStats();
@@ -122,7 +132,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     }
     applyView();
   });
-  const actions = h("div", { className: "row actions" }, run.recordToggle, run.startButton, referenceButton, run.message, loopButton, repeatTopButton, followButton, viewButton, fullscreen.button);
+  const actions = h("div", { className: "row actions" }, run.recordToggle, run.startButton, referenceButton, run.message, loopButton, repeatTopButton, followButton, pitchLineButton, viewButton, fullscreen.button);
   const patternRow = createPatternRow(stopRun, loadPiece);
 
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fillFingering, fingerOn, stringFor } from "../src/music/fingering";
-import { midiOf } from "../src/music/notes";
+import { meterOf, midiOf } from "../src/music/notes";
 import { builtInPieces, committedPieces } from "../src/storage";
 
 const EXPECTED: [string, string, string][] = [
@@ -62,17 +62,18 @@ describe("built-in songs", () => {
   const songs = committedPieces();
 
   it("are in order, easiest first", () => {
-    expect(songs.map((song) => song.id)).toEqual(["hot-cross-buns", "mary-had-a-little-lamb", "twinkle-twinkle", "lightly-row", "frere-jacques", "ode-to-joy", "hills-and-dales", "upstairs-downstairs"]);
+    expect(songs.map((song) => song.id)).toEqual(["hot-cross-buns", "mary-had-a-little-lamb", "twinkle-twinkle", "lightly-row", "frere-jacques", "ode-to-joy", "hills-and-dales", "upstairs-downstairs", "amazing-grace", "greensleeves"]);
   });
 
-  it.each(songs.map((song) => [song.id, song] as const))("%s fills whole 4-beat bars", (_, song) => {
-    let inBar = 0;
+  // The last bar is whole, or makes up the pickup's bar.
+  it.each(songs.map((song) => [song.id, song] as const))("%s fills whole bars of its time, after any pickup", (_, song) => {
+    const { beatsPerBar, pickup } = meterOf(song);
+    let room = pickup || beatsPerBar;
     for (const note of song.notes) {
-      inBar += note.beats!;
-      expect(inBar).toBeLessThanOrEqual(4);
-      if (inBar === 4) inBar = 0;
+      expect(note.beats!).toBeLessThanOrEqual(room);
+      room = room - note.beats! || beatsPerBar;
     }
-    expect(inBar).toBe(0);
+    expect([beatsPerBar, pickup || beatsPerBar]).toContain(room);
   });
 
   it.each(songs.map((song) => [song.id, song] as const))("%s uses only the beginner finger pattern, on the strings it lists", (_, song) => {

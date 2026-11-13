@@ -1,6 +1,6 @@
+import { COMMON_TIME, type Meter } from "../music/notes";
 import { sharedAudioContext } from "./reference";
 
-const BEATS_PER_BAR = 4;
 // Above the detector's 2000 Hz ceiling, so a click the mic hears reads as no note rather than a wrong one.
 const CLICK_HZ = 2500;
 const ACCENT_HZ = 3200;
@@ -30,13 +30,21 @@ export function createMetronome() {
   let nextClick: number | null = null;
   let lastClick: number | null = null;
   let count = 0;
+  let meter = COMMON_TIME;
 
   return {
+    // The piece's bars: each one's first beat gets the accent.
+    get meter() {
+      return meter;
+    },
+    set meter(next: Meter) {
+      meter = next;
+    },
     // Runs on Practice's own timer while it's switched on, run or no run.
     tick(now: number, bpm: number) {
       if (nextClick === null || nextClick < now) nextClick = now + FIRST_CLICK_DELAY_MS;
       while (nextClick - now < SCHEDULE_AHEAD_MS + outputLatencyMs()) {
-        playClick(nextClick, count % BEATS_PER_BAR === 0);
+        playClick(nextClick, count % meter.beatsPerBar === 0);
         lastClick = nextClick;
         nextClick += 60000 / bpm;
         count++;
@@ -47,7 +55,7 @@ export function createMetronome() {
     reset(leadBeats = 0, firstClickAt: number | null = null) {
       nextClick = firstClickAt;
       lastClick = null;
-      count = (BEATS_PER_BAR - (leadBeats % BEATS_PER_BAR)) % BEATS_PER_BAR;
+      count = (meter.beatsPerBar - (leadBeats % meter.beatsPerBar)) % meter.beatsPerBar;
     },
     // When the next click is due, if it's ticking.
     get nextClick() {

@@ -2400,3 +2400,17 @@ a[download] {
   font-size: clamp(0.875rem, 2.5vmin, 1.125rem);
   border-radius: 999px;
 }
+
+/* "Don't wait": the pitch played, as a line through the staff. In tune, it crosses the middle of the notehead. */
+.pitch-trace {
+  pointer-events: none;
+}
+
+.pitch-trace polyline {
+  fill: none;
+  stroke: #d62828;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.85;
+}

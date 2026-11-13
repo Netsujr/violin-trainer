@@ -1,7 +1,7 @@
 import { createMetronome } from "../../audio/metronome";
 import { sharedAudioContext } from "../../audio/reference";
 import { t } from "../../i18n";
-import { midiOf } from "../../music/notes";
+import { meterOf, midiOf } from "../../music/notes";
 import { withPattern, withRepeatedTop } from "../../music/patterns";
 import { createJudge } from "../../practice/judge";
 import type { Session } from "../../practice/session";
@@ -77,6 +77,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   // From its first note, with no section.
   function loadPiece() {
     piece = buildPiece();
+    board.setMeter((metronome.meter = meterOf(piece)));
     rememberPiece(basePiece.id);
     track.load(basePiece.id);
     highway.jumpTo(0);
@@ -171,7 +172,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       if (spotRun ? spotRun.rounds-- > 0 : settings.loopOn) loopAt = { at: performance.now() + LOOP_GAP_MS, previousMidi };
       else {
         doneAt = shownIndex();
-        results.show(session, { results: following.results, listening: track.listening, notes: piece.notes, section: selection.section, pattern: piece.pattern, startIndex, spot: spotRun && selection.section });
+        results.show(session, { results: following.results, listening: track.listening, notes: piece.notes, meter: metronome.meter, section: selection.section, pattern: piece.pattern, startIndex, spot: spotRun && selection.section });
         spotRun = null;
         controls.finish(() => doneAt !== null);
       }

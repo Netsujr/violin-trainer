@@ -23,6 +23,8 @@ export type Settings = {
   staffBig: boolean;
   // The staff on its own, with the lanes hidden. In fullscreen it's the full sheet.
   staffOnly: boolean;
+  // "Don't wait" on the moving line: what's played, drawn as a line through the staff.
+  pitchLineOn: boolean;
   toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean };
   // Pieces marked for practice, in no particular order.
   highlighted: string[];
@@ -64,6 +66,7 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   staffOpen: false,
   staffBig: false,
   staffOnly: false,
+  pitchLineOn: false,
   toggles: { fingers: true, noteNames: true, letterNames: true },
   highlighted: [],
   plan: {},

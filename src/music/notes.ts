@@ -17,6 +17,9 @@ export type Piece = {
   source: string;
   notes: PieceNote[];
   pattern?: number;
+  // Beats to a bar, when it isn't 4, and the beats before the first whole bar, when it starts with a pickup.
+  beatsPerBar?: number;
+  pickup?: number;
 };
 
 const ACCIDENTAL: Record<string, string> = { "": "", "#": "♯", b: "♭" };
@@ -28,6 +31,13 @@ export const nearestMidi = (frequency: number) => Math.round(69 + 12 * Math.log2
 export const BEAT_LENGTHS = [0.5, 1, 1.5, 2, 3, 4];
 export const BEAT_LABELS: Record<number, string> = { 0.5: "½", 1: "1", 1.5: "1½", 2: "2", 3: "3", 4: "4" };
 export const BAR_BEATS = 4;
+
+// How a piece is counted in bars.
+export type Meter = { beatsPerBar: number; pickup: number };
+export const COMMON_TIME: Meter = { beatsPerBar: BAR_BEATS, pickup: 0 };
+export const meterOf = ({ beatsPerBar = BAR_BEATS, pickup = 0 }: Pick<Piece, "beatsPerBar" | "pickup">): Meter => ({ beatsPerBar, pickup });
+// Where a beat falls in its bar, from 0 on the bar's first beat. A pickup is the end of a bar before the first.
+export const beatInBar = (beat: number, { beatsPerBar, pickup }: Meter) => (((beat - pickup) % beatsPerBar) + beatsPerBar) % beatsPerBar;
 
 // Where each note ends a bar, and whether it runs over one, which the staff has no way to draw without ties.
 export function barMarks(notes: PieceNote[]) {

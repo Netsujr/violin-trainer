@@ -1,6 +1,6 @@
 import { t } from "../i18n";
 import type { PieceNote, StringName } from "../music/notes";
-import { BAR_BEATS, noteLabels } from "../music/notes";
+import { beatInBar, COMMON_TIME, noteLabels, type Meter } from "../music/notes";
 import { getSettings } from "../storage";
 import { h } from "./dom";
 import { contentWidth, timelineScale } from "./layout";
@@ -77,6 +77,7 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
   let notes: PieceNote[] = [];
   // The beat each note starts on, then the total, so index notes.length is the end of the piece.
   let starts = [0];
+  let meter = COMMON_TIME;
   let currentIndex = 0;
   let holdProgress = 0;
   let glideFrame = 0;
@@ -118,7 +119,7 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
     const first = Math.max(0, Math.ceil(at - HIT_X / BEAT_WIDTH));
     const last = Math.min(starts.at(-1)!, Math.floor(at + (viewWidth - HIT_X) / BEAT_WIDTH));
     for (let beat = first; beat <= last; beat++) {
-      context.fillStyle = beat % BAR_BEATS === 0 ? BAR_LINE_COLOR : BEAT_LINE_COLOR;
+      context.fillStyle = beatInBar(beat, meter) === 0 ? BAR_LINE_COLOR : BEAT_LINE_COLOR;
       context.fillRect(HIT_X + (beat - at) * BEAT_WIDTH, 0, 1, HEIGHT);
     }
   }
@@ -221,6 +222,10 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
 
   return {
     element: h("div", { className: "highway" }, canvas, scroller),
+    // The piece's bars, for its bar lines.
+    setMeter(next: Meter) {
+      meter = next;
+    },
     draw(pieceNotes: PieceNote[], index: number, progress: number) {
       if (pieceNotes !== notes) {
         notes = pieceNotes;

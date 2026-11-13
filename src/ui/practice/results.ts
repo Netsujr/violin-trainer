@@ -1,5 +1,5 @@
 import { localNumber, t } from "../../i18n";
-import { noteLabels, type PieceNote } from "../../music/notes";
+import { noteLabels, type Meter, type PieceNote } from "../../music/notes";
 import { buildEntry, scorePercent } from "../../practice/log";
 import type { Session } from "../../practice/session";
 import { spotScore, troubleSpots, type TroubleSpot } from "../../practice/trouble";
@@ -82,7 +82,7 @@ function troubleChips(spots: TroubleSpot[], spotScores: Map<string, number>, { o
   return spots.length ? [h("div", { className: "trouble-spots" }, ...chips, practise)] : [];
 }
 
-type Shown = Run & { results: Map<number, boolean> | null; listening: boolean; notes: PieceNote[] };
+type Shown = Run & { results: Map<number, boolean> | null; listening: boolean; notes: PieceNote[]; meter: Meter };
 
 // After a trouble spot's rounds (spot given), the card goes back to the whole run's, so another spot can be practised.
 export function createResults(board: { showScore(text: string): void }, onPlayAgain: () => void, spotActions: SpotActions) {
@@ -90,10 +90,10 @@ export function createResults(board: { showScore(text: string): void }, onPlayAg
   let whole: { session: Session; shown: Shown } | null = null;
   const spotScores = new Map<string, number>();
 
-  function render(session: Session, { results, listening, notes, ...run }: Shown) {
+  function render(session: Session, { results, listening, notes, meter, ...run }: Shown) {
     const waited = !results && listening ? summary(session, run) : null;
     board.showScore(!listening ? t.playedAlong : waited ? `${waited.done} ${waited.totals}` : scoreLine(results));
-    const trouble = troubleChips(results && listening ? troubleSpots(notes, results) : [], spotScores, spotActions);
+    const trouble = troubleChips(results && listening ? troubleSpots(notes, results, meter) : [], spotScores, spotActions);
     const card = !listening ? playedAlongCard() : waited ? [waited.done, waited.totals, waited.slowest].map((line) => h("p", {}, line)) : [...scoreCard(results!), ...trouble];
     element.replaceChildren(...resultsCard(card, onPlayAgain, () => element.replaceChildren()));
   }

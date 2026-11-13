@@ -1,5 +1,5 @@
 import type { createMetronome } from "../../audio/metronome";
-import type { PieceNote } from "../../music/notes";
+import { beatInBar, type PieceNote } from "../../music/notes";
 import { createFollow } from "../../practice/follow";
 import { centsToTarget } from "../../practice/judge";
 import { scorePercent } from "../../practice/log";
@@ -52,7 +52,7 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
     current.beat = current.tracker.startBeat + (now - waiting.inTuneSince) / beatMs();
     // The metronome joins on the next whole beat, accenting each bar's first.
     const nextBeat = Math.ceil(current.beat);
-    metronome.reset(4 - (nextBeat % 4), now + (nextBeat - current.beat) * beatMs());
+    metronome.reset(metronome.meter.beatsPerBar - beatInBar(nextBeat, metronome.meter), now + (nextBeat - current.beat) * beatMs());
   }
 
   return {
@@ -78,13 +78,17 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
       const waiting = wait ? { inTuneSince: null } : null;
       state = { tracker, beat: tracker.startBeat, at: performance.now(), results: new Map(), waiting };
       metronome.reset();
+      staff.clearTrace();
       highway.showResults(track.listening ? state.results : null);
       highway.jumpTo(index);
     },
     // A finished run leaves its notes filled in as hit or missed, until the next.
     stop(keepResults = false) {
       state = null;
-      if (!keepResults) highway.showResults(null);
+      if (!keepResults) {
+        highway.showResults(null);
+        staff.clearTrace();
+      }
     },
     // Moves the lanes on to now, judging any note they've passed. Returns the current note's progress, while they're moving.
     read(session: Session, frequency: number | null, now: number) {
@@ -118,7 +122,10 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
 
       const cents = frequency === null ? null : centsToTarget(frequency, session.currentMidi);
       const played = heard === null || current.beat < current.tracker.startBeat ? null : cents;
-      staff.showPlayed(session.index, played, played !== null && Math.abs(played) <= settings.toleranceCents);
+      const inTune = played !== null && Math.abs(played) <= settings.toleranceCents;
+      // On the moving line, the pitch line, if it's on, drawn where the sound was played, a moment before the hit line.
+      if (settings.pitchLineOn && staff.collapsed) staff.tracePlayed(micBeat, played === null ? null : heard, played, inTune);
+      else staff.showPlayed(session.index, played, inTune);
       session.heard(played);
       return current.tracker.progress;
     },

@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:browser": "s=0; for f in listen practice library pieces race timeline sections language tempo follow modes section played flows fullscreen screens track calendar progress qa; do echo \"== $f\"; node e2e/$f.mjs || s=1; done; exit $s",
+    "test:browser": "s=0; for f in listen practice library pieces race timeline sections language tempo follow modes section played flows fullscreen screens track calendar progress pitchline qa; do echo \"== $f\"; node e2e/$f.mjs || s=1; done; exit $s",
     "test:devices": "s=0; for p in ipad phone; do echo \"== $p\"; node e2e/qa.mjs $p || s=1; done; exit $s"
   },
   "devDependencies": {

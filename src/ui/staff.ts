@@ -1,8 +1,9 @@
 import { Note } from "tonal";
-import { BAR_BEATS, midiOf, noteLabels, staffStepsFrom } from "../music/notes";
+import { BAR_BEATS, centsFrom, COMMON_TIME, midiOf, noteLabels, staffStepsFrom, type Meter } from "../music/notes";
 import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice, type RenderContext } from "vexflow/bravura";
 import { h } from "./dom";
 import type { Section } from "./highway";
+import { createTrace } from "./staffTrace";
 
 type StaffNote = { pitch: string; beats?: number; finger?: string };
 export type StaffLabels = { names: boolean; fingers: boolean };
@@ -72,30 +73,33 @@ function beamEighths(bar: StaffNote[], staveNotes: StaveNote[]) {
 const beatsOf = (note: StaffNote) => note.beats ?? 1;
 const beatsIn = (notes: StaffNote[]) => notes.reduce((sum, note) => sum + beatsOf(note), 0);
 
-// A note with no written length, like a scale's, counts as one beat.
-function toBars(notes: StaffNote[]) {
+// A note with no written length, like a scale's, counts as one beat. A pickup is a short bar of its own.
+function toBars(notes: StaffNote[], { beatsPerBar, pickup }: Meter) {
   const bars: StaffNote[][] = [[]];
-  let beats = 0;
+  let room = pickup || beatsPerBar;
   for (const note of notes) {
-    if (beats === BAR_BEATS) {
+    if (room === 0) {
       bars.push([]);
-      beats = 0;
+      room = beatsPerBar;
     }
     bars.at(-1)!.push(note);
-    beats += beatsOf(note);
+    room -= beatsOf(note);
   }
   return bars;
 }
 
-function layOut(notes: StaffNote[]) {
-  const bars = toBars(notes);
+// A time that isn't 4/4 is written at the start, as 3/4 is.
+export const addTime = (stave: Stave, { beatsPerBar }: Meter) => (beatsPerBar === BAR_BEATS ? stave : stave.addTimeSignature(`${beatsPerBar}/4`));
+
+function layOut(notes: StaffNote[], meter: Meter) {
+  const bars = toBars(notes, meter);
   return Array.from({ length: Math.ceil(bars.length / BARS_PER_LINE) }, (_, line) => bars.slice(line * BARS_PER_LINE, (line + 1) * BARS_PER_LINE));
 }
 
 // The bars on each line of an open sheet, and the width to space each line's notes in.
-export function openLines(notes: StaffNote[], width: number) {
+export function openLines(notes: StaffNote[], width: number, meter = COMMON_TIME) {
   const room = width - CLEF_SPACE;
-  const lines = layOut(notes);
+  const lines = layOut(notes, meter);
   // Bars can hold different numbers of notes, so the fullest line sets the width of a bar, not the first line.
   const mostBars = Math.max(...lines.map((line) => line.length));
   return lines.map((line) => ({ line, formatWidth: ((room - 20) * line.length) / mostBars }));
@@ -206,7 +210,9 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   let noteLines: number[] = [];
   let noteYs: number[] = [];
   let shownNotes: StaffNote[] = [];
+  let meter = COMMON_TIME;
   const played = createPlayedNote();
+  const trace = createTrace(placeAt);
   let sheet = { width: 0, height: 0, top: 0 };
   let section: Section | null = null;
   let followedBeat = 0;
@@ -216,7 +222,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   // The width to draw an open sheet at, in its own units: the fewer, the larger it shows. It's sized to fill fitHeight,
   // but never cramps its notes, nor shrinks below a readable size, so a long piece scrolls instead.
   function fittedWidth(notes: StaffNote[], top: number, bottom: number) {
-    const lines = layOut(notes);
+    const lines = layOut(notes, meter);
     const shownWidth = width * scale;
     const needed = CLEF_SPACE + 20 + Math.max(...lines.map((line) => line.flat().length)) * BAR_NOTE_WIDTH;
     const toFill = ((top + lines.length * LINE_HEIGHT + bottom) * shownWidth) / fitHeight!;
@@ -263,7 +269,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const top = labelled ? LABELLED_TOP : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
     const sheetWidth = !collapsed && fitHeight ? fittedWidth(notes, top, bottom) : width;
-    const lines = collapsed ? [{ line: toBars(notes), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth);
+    const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
     const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : sheetWidth;
     const height = top + lines.length * LINE_HEIGHT + bottom;
@@ -282,6 +288,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     lines.forEach(({ line, formatWidth }, lineIndex) => {
       const staveX = collapsed ? COLLAPSED_MARGIN : 0;
       const stave = new Stave(staveX, top + lineIndex * LINE_HEIGHT, fullWidth - staveX - 1).addClef("treble");
+      if (lineIndex === 0) addTime(stave, meter);
       if (collapsed) stave.setNoteStartX(COLLAPSED_NOTE_START);
       const drawn = drawLine(context, stave, line, formatWidth, labels, (...label) => svgText(svg, ...label));
       allNotes.push(...drawn);
@@ -298,6 +305,40 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       noteBeats.push(beat);
       beat += beatsOf(note);
     }
+    trace.redraw(svg);
+  }
+
+  // Where a reading at a beat goes: across with the beat, on its note's line of the sheet, and up or down from that note by
+  // how far the pitch is from it, to the nearest octave, so in tune lands on the middle of its notehead.
+  function placeAt(beat: number, frequency: number) {
+    const index = Math.max(0, noteBeats.findLastIndex((start) => start <= beat));
+    const note = shownNotes[index];
+    const sameLine = noteLines[index + 1] === noteLines[index];
+    const nextX = sameLine ? noteXs[index + 1] : noteXs[index] + (collapsed ? beatsOf(note) * COLLAPSED_BEAT_WIDTH : NOTE_TAIL);
+    const between = Math.max(0, Math.min(1, (beat - noteBeats[index]) / beatsOf(note)));
+    const midi = midiOf(note.pitch);
+    const cents = centsFrom(frequency, midi);
+    const lineTop = sheet.top + noteLines[index] * LINE_HEIGHT;
+    const y = noteYs[index] - staffStepsFrom(midi, cents - 1200 * Math.round(cents / 1200)) * STAFF_STEP_HEIGHT;
+    return {
+      x: noteXs[index] + NOTEHEAD_CENTER + between * (nextX - noteXs[index]),
+      y: Math.max(lineTop + GHOST_EDGE, Math.min(lineTop + LINE_HEIGHT - GHOST_EDGE, y)),
+      line: noteLines[index],
+    };
+  }
+
+  function placeGhost(x: number, y: number, cents: number, inTune: boolean) {
+    const color = inTune ? PLAYED_IN_TUNE_COLOR : PLAYED_COLOR;
+    played.head.setAttribute("cx", String(x));
+    played.head.setAttribute("cy", String(y));
+    played.head.setAttribute("fill", color);
+    played.head.setAttribute("transform", `rotate(-20 ${x} ${y})`);
+    played.arrow.textContent = inTune ? "" : cents < 0 ? "↑" : "↓";
+    played.arrow.setAttribute("x", String(x + 12));
+    played.arrow.setAttribute("y", String(y + 6));
+    played.arrow.setAttribute("fill", color);
+    played.group.dataset.inTune = String(inTune);
+    if (played.group.parentNode !== element.querySelector("svg")) element.querySelector("svg")?.append(played.group);
   }
 
   // The reverse of scrollToBeat: the beat under the hit line, sliding between notes as the lanes do.
@@ -351,17 +392,24 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       // Far off, like an octave out, it stops at the sheet's edge, where its arrow still says which way to go.
       const offset = inTune ? 0 : staffStepsFrom(midiOf(note.pitch), cents) * STAFF_STEP_HEIGHT;
       const y = Math.max(GHOST_EDGE, Math.min(sheet.height - GHOST_EDGE, noteYs[index] - offset));
-      const color = inTune ? PLAYED_IN_TUNE_COLOR : PLAYED_COLOR;
-      played.head.setAttribute("cx", String(x));
-      played.head.setAttribute("cy", String(y));
-      played.head.setAttribute("fill", color);
-      played.head.setAttribute("transform", `rotate(-20 ${x} ${y})`);
-      played.arrow.textContent = inTune ? "" : cents < 0 ? "↑" : "↓";
-      played.arrow.setAttribute("x", String(x + 12));
-      played.arrow.setAttribute("y", String(y + 6));
-      played.arrow.setAttribute("fill", color);
-      played.group.dataset.inTune = String(inTune);
-      if (played.group.parentNode !== element.querySelector("svg")) element.querySelector("svg")?.append(played.group);
+      placeGhost(x, y, cents, inTune);
+    },
+    // "Don't wait": what's heard at a beat, as the pitch line, with the ghost notehead at its tip. cents and inTune are
+    // against the note being judged, for the ghost's colour and arrow. Silence, with frequency null, hides the ghost.
+    tracePlayed(beat: number, frequency: number | null, cents: number | null, inTune: boolean) {
+      const point = trace.add(beat, frequency);
+      if (!point || cents === null) played.group.remove();
+      else placeGhost(point.x, point.y, cents, inTune);
+    },
+    clearTrace: () => trace.clear(),
+    // The piece's bars, for where they fall.
+    setMeter(next: Meter) {
+      meter = next;
+      shown = null;
+    },
+    // The moving line, as opposed to the open sheet.
+    get collapsed() {
+      return collapsed;
     },
     setCollapsed(value: boolean) {
       collapsed = value;

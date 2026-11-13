@@ -1,7 +1,7 @@
 import { Renderer, Stave } from "vexflow/bravura";
-import type { PieceNote } from "../music/notes";
+import { COMMON_TIME, type Meter, type PieceNote } from "../music/notes";
 import { pdfFromJpegs } from "../pdf";
-import { drawLine, LINE_HEIGHT, openLines, type StaffLabels } from "./staff";
+import { addTime, drawLine, LINE_HEIGHT, openLines, type StaffLabels } from "./staff";
 
 // A4, in PDF points. Each point gets 4 pixels, which is about 290 dots per inch: sharp on paper, and under a megabyte.
 const PAGE = { width: 595, height: 842 };
@@ -17,7 +17,8 @@ const LINES_TOP = 44;
 const LINE_SPACING = LINE_HEIGHT + 24;
 const LINES_PER_PAGE = Math.floor(((PAGE.height - 2 * MARGIN) / POINTS_PER_UNIT - LINES_TOP) / LINE_SPACING);
 
-function drawPage(title: string, lines: ReturnType<typeof openLines>, labels: StaffLabels) {
+// meter, on the first page, is written at the start of its first line.
+function drawPage(title: string, lines: ReturnType<typeof openLines>, labels: StaffLabels, meter: Meter | null) {
   const canvas = document.createElement("canvas");
   canvas.width = PIXELS.width;
   canvas.height = PIXELS.height;
@@ -41,6 +42,7 @@ function drawPage(title: string, lines: ReturnType<typeof openLines>, labels: St
   writeText(title, 0, TITLE_Y, "#000", 24, "left");
   lines.forEach(({ line, formatWidth }, index) => {
     const stave = new Stave(0, LINES_TOP + index * LINE_SPACING, SHEET_WIDTH - 1).addClef("treble");
+    if (index === 0 && meter) addTime(stave, meter);
     drawLine(context, stave, line, formatWidth, labels, writeText);
   });
 
@@ -48,11 +50,11 @@ function drawPage(title: string, lines: ReturnType<typeof openLines>, labels: St
   return Uint8Array.from(encoded, (character) => character.charCodeAt(0));
 }
 
-export function downloadSheet(title: string, notes: PieceNote[], labels: StaffLabels) {
-  const lines = openLines(notes, SHEET_WIDTH);
+export function downloadSheet(title: string, notes: PieceNote[], labels: StaffLabels, meter = COMMON_TIME) {
+  const lines = openLines(notes, SHEET_WIDTH, meter);
   const pages = [];
   for (let first = 0; first < lines.length; first += LINES_PER_PAGE) {
-    pages.push(drawPage(title, lines.slice(first, first + LINES_PER_PAGE), labels));
+    pages.push(drawPage(title, lines.slice(first, first + LINES_PER_PAGE), labels, first === 0 ? meter : null));
   }
   const link = document.createElement("a");
   link.href = URL.createObjectURL(pdfFromJpegs(pages, PIXELS, PAGE));

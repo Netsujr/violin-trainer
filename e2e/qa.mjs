@@ -275,7 +275,7 @@ const columns = await page.locator(".library > div").evaluateAll((list) => list.
 check(`scales and songs ${isPhone ? "stack" : "sit side by side"}`, (columns[0] === columns[1]) === isPhone, JSON.stringify(columns));
 const shownCards = await page.locator(".library > div").evaluateAll((groups) => groups.map((group) => group.querySelectorAll(":scope > .piece").length));
 const drawers = await page.locator(".library .more-pieces > summary").allInnerTexts();
-check("three groups, three cards each, the rest in drawers", shownCards.join() === "3,3,2" && drawers.join() === "Show 14 more,Show 3 more", `${shownCards.join()} | ${drawers.join()}`);
+check("three groups, three cards each, the rest in drawers", shownCards.join() === "3,3,2" && drawers.join() === "Show 14 more,Show 5 more", `${shownCards.join()} | ${drawers.join()}`);
 await auditCheck(page, "Library");
 await shot("11-library");
 const row = page.locator(".piece", { hasText: "Twinkle" });

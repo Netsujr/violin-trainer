@@ -18,7 +18,7 @@ const group = async (index) => ({
   drawer: (await column(index).locator(".more-pieces > summary").allInnerTexts()).join(),
 });
 const groups = [await group(0), await group(1), await group(2)];
-check("three groups, three cards each, the rest in a drawer", JSON.stringify(groups) === JSON.stringify([{ title: "Scales", shown: 3, drawer: "Show 14 more" }, { title: "Classic tunes", shown: 3, drawer: "Show 3 more" }, { title: "My songs", shown: 2, drawer: "" }]), JSON.stringify(groups));
+check("three groups, three cards each, the rest in a drawer", JSON.stringify(groups) === JSON.stringify([{ title: "Scales", shown: 3, drawer: "Show 14 more" }, { title: "Classic tunes", shown: 3, drawer: "Show 5 more" }, { title: "My songs", shown: 2, drawer: "" }]), JSON.stringify(groups));
 await staffNotes(page, "Pasted D major", "D4 E4 F#4 G4 | A4 B4 C#5 D5");
 await saveStaff(page).click(); await sleep(150);
 check("a saved piece joins My songs", (await column(2).locator(".piece").count()) === 3 && (await column(2).locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
