@@ -146,7 +146,7 @@ export function createTrackAlign({ track, audio, save, onDone }: Deps) {
     });
 
     panel.replaceChildren(
-      h("p", { className: "track-align-title" }, h("strong", {}, t.aligning(current.name)), " ", t.alignHint),
+      h("p", { className: "track-align-title" }, h("small", {}, t.aligning(current.name)), t.alignHint),
       h(
         "div",
         { className: "row" },

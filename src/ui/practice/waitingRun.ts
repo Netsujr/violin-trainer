@@ -8,7 +8,6 @@ type Deps = {
   judge: ReturnType<typeof createJudge>;
   glide: ReturnType<typeof createTempoGlide>;
   staff: ReturnType<typeof createStaff>;
-  showReading: (cents: number | null, frequency: number | null) => void;
   isMuted: (now: number) => boolean;
   endIndex: () => number;
   holdMs: () => number;
@@ -19,7 +18,7 @@ type Deps = {
 };
 
 // The usual run: each note waits until it's played in tune for its hold time. With tempo on, a hit glides on to the next beat.
-export function createWaitingRun({ judge, glide, staff, showReading, isMuted, endIndex, holdMs, showProgress, moveOn }: Deps) {
+export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdMs, showProgress, moveOn }: Deps) {
   const settings = getSettings();
 
   // A hit that waited for its beat lands on it.
@@ -37,7 +36,6 @@ export function createWaitingRun({ judge, glide, staff, showReading, isMuted, en
       if (arrived) arriveOnBeat(session, arrived);
       const verdict = judge.update(isMuted(now) ? null : frequency, now);
       showProgress(glide.pending ? 1 : verdict.progress);
-      showReading(verdict.cents, frequency);
       staff.showPlayed(session.index, verdict.cents, verdict.inTune);
       if (verdict.hit && !glide.pending) {
         if (settings.tempoOn && session.index < endIndex() - 1) {

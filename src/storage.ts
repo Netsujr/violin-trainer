@@ -4,7 +4,6 @@ import { fillFingering } from "./music/fingering";
 import type { Language } from "./i18n";
 import type { Piece, PieceNote } from "./music/notes";
 import type { LogEntry } from "./practice/log";
-import { isSmallScreen } from "./ui/layout";
 
 export type Settings = {
   language: Language;
@@ -24,8 +23,7 @@ export type Settings = {
   staffBig: boolean;
   // The staff on its own, with the lanes hidden. In fullscreen it's the full sheet.
   staffOnly: boolean;
-  optionsOpen: boolean;
-  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean; staff: boolean };
+  toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean };
   // Pieces marked for practice, in no particular order.
   highlighted: string[];
   // Pieces planned for a day, by its date as "2026-11-10".
@@ -37,6 +35,11 @@ export type Settings = {
   lastTargets: Record<string, number>;
   // The piece Practice had open last, to open on again.
   lastPieceId?: string;
+  // Listen's note guesser: on or off, notes shown at a time, and the user's own notes to draw from instead of random ones.
+  guesserOn: boolean;
+  guesserCount: number;
+  guesserWrittenOn: boolean;
+  guesserNotes: PieceNote[];
 };
 
 // view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
@@ -45,7 +48,7 @@ export type Recording = { blob: Blob; markers: { pitch: string; seconds: number 
 
 export const COUNT_IN_CHOICES = [2, 4, 6, 8, 10];
 
-const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
+const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   toleranceCents: 40,
   holdMs: 200,
   minRms: 0.01,
@@ -61,12 +64,16 @@ const DEFAULT_SETTINGS: Omit<Settings, "language" | "optionsOpen"> = {
   staffOpen: false,
   staffBig: false,
   staffOnly: false,
-  toggles: { fingers: true, noteNames: true, letterNames: true, staff: true },
+  toggles: { fingers: true, noteNames: true, letterNames: true },
   highlighted: [],
   plan: {},
   todayPlanOpen: true,
   planTargets: {},
   lastTargets: {},
+  guesserOn: false,
+  guesserCount: 1,
+  guesserWrittenOn: false,
+  guesserNotes: [],
 };
 
 const read = <T>(key: string, fallback: T): T => {
@@ -82,8 +89,6 @@ export function getSettings() {
     const stored = read<Partial<Settings>>("settings", {});
     settings = {
       language: navigator.language.startsWith("pt") ? "pt" : "en",
-      // Open, the options would push the timeline off a phone screen.
-      optionsOpen: !isSmallScreen(),
       ...DEFAULT_SETTINGS,
       ...stored,
       // Merged separately, so a switch added later still gets its default on settings saved before it existed.
@@ -190,6 +195,9 @@ const trackKey = (pieceId: string) => `track:${pieceId}`;
 export const getTrack = (pieceId: string) => get<Track>(trackKey(pieceId));
 export const saveTrack = (pieceId: string, track: Track) => set(trackKey(pieceId), track);
 export const deleteTrack = (pieceId: string) => del(trackKey(pieceId));
+// The pieces that have a backing track, without loading the recordings.
+export const piecesWithTracks = async () =>
+  new Set((await keys()).map(String).filter((key) => key.startsWith("track:")).map((key) => key.slice("track:".length)));
 export async function listTracks() {
   const ids = (await keys()).map(String).filter((key) => key.startsWith("track:"));
   const tracks = await getMany<Track>(ids);

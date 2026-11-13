@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, open, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
+import { setRecord, open, seed, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
@@ -55,7 +55,7 @@ wav(OUT + "silence.wav", [rest(4)]);
   await start(s.page);
   const seen = new Set();
   for (let i = 0; i < 60; i++) { seen.add(await s.page.locator(".big-note").innerText()); await sleep(25); }
-  seen.delete("Press Start and play"); check("silence shows Listening…", seen.size === 1 && seen.has("Listening…"), [...seen].join(","));
+  seen.delete(""); check("silence shows Listening…", seen.size === 1 && seen.has("Listening…"), [...seen].join(","));
   await s.close();
 }
 
@@ -102,5 +102,35 @@ wav(OUT + "silence.wav", [rest(4)]);
   await s.page.waitForSelector(".recording-note");
   check("Listen can record too, kept in today's Calendar", (await s.page.locator(".day-details .recording-note").count()) === 1);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}
+
+// Note guesser: with a written A4 to play, A440 gets it right, which ends the game and the run.
+{
+  const s = await open(OUT + "a440.wav");
+  await seed(s.page, { settings: { countInOn: false, guesserOn: true, guesserWrittenOn: true, guesserNotes: [{ pitch: "A4", beats: 1 }] } });
+  const staffTop = async () => (await s.page.locator(".listen > .staff").boundingBox()).y;
+  const before = await staffTop();
+  await start(s.page);
+  check("a game of written notes is the list, played once", (await s.page.locator(".guess-score").innerText()) === "0 of 1");
+  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Done!"), null, { timeout: 8000 });
+  await s.page.waitForSelector('button:text-is("Start")', { timeout: 3000 });
+  check("playing it right finishes the game and stops the run", true);
+  check("its note shows with no name, and the staff stays put as notes start", (await s.page.locator(".listen .staff text[font-family^=system-ui]").count()) === 0 && Math.abs((await staffTop()) - before) < 1, `${before} → ${await staffTop()}`);
+  await s.page.screenshot({ path: OUT + "listen-guesser.png" });
+  check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}
+
+// After a note played right, the next waits 5 seconds.
+{
+  const s = await open(OUT + "a440.wav");
+  await seed(s.page, { settings: { countInOn: false, guesserOn: true, guesserWrittenOn: true, guesserNotes: [{ pitch: "A4", beats: 1 }, { pitch: "A4", beats: 1 }] } });
+  await start(s.page);
+  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Right! Next in 5"), null, { timeout: 8000 });
+  const t0 = Date.now();
+  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Done!"), null, { timeout: 9000 });
+  const waited = Date.now() - t0;
+  check("the next note comes 5 seconds after one played right", waited >= 4500 && waited < 7000, `${waited} ms`);
   await s.close();
 }

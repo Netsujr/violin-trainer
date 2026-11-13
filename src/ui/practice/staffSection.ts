@@ -14,7 +14,8 @@ const STAFF_SIDE_PADDING = 16;
 export function createStaffSection(pickNote: (index: number, extend: boolean) => void, render: () => void, onMove: (beat: number) => void) {
   const settings = getSettings();
   const staffWidth = () => (contentWidth() - STAFF_SIDE_PADDING) / staffScale();
-  const staff = createStaff(staffWidth(), !settings.staffOpen, staffScale(), pickNote);
+  // Scrolling the staff by hand moves the lanes, which bring the staff along, as when the lanes are scrolled.
+  const staff = createStaff(staffWidth(), !settings.staffOpen && !settings.staffOnly, staffScale(), pickNote, (beat) => highway.moveToBeat(beat));
   const highway = createHighway(pickNote, (beat) => {
     staff.follow(beat);
     onMove(beat);
@@ -33,14 +34,15 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
   const panel = h("div", { className: "staff-panel" }, staff.element, toggle);
   // The run's score, on the left of the bar above the lanes.
   const score = h("span", { className: "lane-score" });
-  const toolbar = h(
+  // The label switches, kept together so fullscreen can take them to its buttons.
+  const labels = h(
     "div",
-    { className: "section-bar" },
-    score,
+    { className: "row toggles label-toggles" },
     createIconToggle("fingers", render),
     createIconToggle("noteNames", render),
     createIconToggle("letterNames", render),
   );
+  const toolbar = h("div", { className: "section-bar" }, score, labels);
 
   function labelToggle() {
     const label = settings.staffOpen ? t.collapseSheet : t.showFullSheet;
@@ -79,6 +81,9 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
     addToggle(node: Node) {
       toolbar.insertBefore(node, score.nextSibling);
     },
+    labels,
+    // The label switches back at the end of the bar, after fullscreen.
+    returnLabels: () => toolbar.append(labels),
     showScore(text: string) {
       score.textContent = text;
     },

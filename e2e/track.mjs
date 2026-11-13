@@ -43,7 +43,7 @@ await card().locator('button[aria-label="Add a backing track"]').click();
 await (await chooser).setFiles(CLICKS);
 await page.waitForSelector(".track-align-panel .track-align-title", { timeout: 15000 });
 check("choosing a file finds its beat and opens it to line up", (await page.locator(".track-align-title").innerText()).startsWith("Aligning track-clicks-100.wav") && (await field("BPM").inputValue()) === "100" && (await field("First note at (s)").inputValue()) === "2");
-check("with the track's controls in place of Options, and the waveform under the lanes", (await page.locator(".options").count()) === 0 && (await page.locator(".waveform").isVisible()) && (await progress(page)) === "Note 1 of 17");
+check("with the track's controls, the lanes and the waveform boxed together in place of Options", (await page.locator(".options").count()) === 0 && (await page.locator(".track-align > .track-align-panel + .timeline-section + .waveform").isVisible()) && (await progress(page)) === "Note 1 of 17");
 check("at full speed to start", (await page.locator(".track-align-panel .speed input").inputValue()) === "100" && (await page.locator(".track-align-panel .speed output").innerText()) === "Speed 100%");
 
 // Lining it up

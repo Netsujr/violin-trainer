@@ -83,7 +83,8 @@ header .language button {
 
 nav button:not([aria-current]),
 .language button[aria-pressed="false"],
-.patterns button[aria-pressed="false"] {
+.patterns button[aria-pressed="false"],
+.listen [role="group"] button:not([aria-pressed="true"]) {
   --pico-background-color: var(--pico-card-background-color);
   --pico-border-color: var(--pico-muted-border-color);
   --pico-color: var(--pico-muted-color);
@@ -346,6 +347,34 @@ section > ul > li {
   margin: 1rem auto;
 }
 
+/* Lines that come and go keep their height, so the staff below doesn't jump as notes start and stop. */
+.listen > p {
+  min-height: 1lh;
+}
+
+.listen [role="group"] {
+  width: auto;
+  margin: 0;
+}
+
+.listen [role="group"] button {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.guesser .row {
+  gap: 0.75rem;
+}
+
+.guess-hint {
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+}
+
+.guess-writer {
+  text-align: left;
+}
+
 .big-note {
   margin-block: 1.5rem 0.5rem;
   font-size: clamp(3rem, 9vw, 5.5rem);
@@ -357,7 +386,8 @@ section > ul > li {
 .big-note.idle {
   font-size: 2rem;
   font-weight: 400;
-  line-height: 3.025;
+  /* The same height as a note's name, at every width. */
+  line-height: calc(clamp(3rem, 9vw, 5.5rem) * 1.1);
   color: var(--pico-muted-color);
 }
 
@@ -387,7 +417,7 @@ section > ul > li {
 
 /* Set directly, because Pico's hover and focus styles replace its variables. */
 /* A switched-on mode that doesn't apply, like the repeated top note on a song, is grey like any disabled button. */
-.actions button[aria-pressed="true"]:not(:disabled) {
+.actions button[aria-pressed="true"]:not(:disabled, .box-toggle) {
   color: #4cd07d;
   border-color: #4cd07d;
 }
@@ -412,19 +442,75 @@ section > ul > li {
   height: 1.25rem;
 }
 
+/* Tempo, metronome and count-in as icons, in front of the BPM, boxed just above the lanes. */
 .options {
-  padding: 0.5rem 0.875rem;
+  padding: 0.25rem 0.875rem;
   margin-bottom: 0.5rem;
   border: 1px solid var(--pico-muted-border-color);
   border-radius: var(--pico-border-radius);
 }
 
-.options > summary {
-  font-size: 0.875rem;
+.options > .toggles {
+  flex: none;
+  gap: 0.375rem;
+  margin: 0;
 }
 
-.options[open] > summary {
-  margin-bottom: 0.5rem;
+/* A checkbox laid invisibly over its icon, so the whole box is the switch. */
+/* The same size as the switches on the lanes' bar. */
+.icon-switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.125rem;
+  height: 2rem;
+  margin: 0;
+  color: var(--pico-muted-color);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  cursor: pointer;
+}
+
+.toggles .icon-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.icon-switch .icon svg {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.options .icon-switch:has(input:checked) {
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 18%, transparent);
+  border-color: var(--pico-primary);
+}
+
+.icon-switch:has(input:focus-visible) {
+  outline: 2px solid var(--pico-primary-focus);
+}
+
+.icon-switch:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .patterns [role="group"] {
@@ -502,6 +588,13 @@ html:not(.fullscreen) .stats {
   border-radius: 0.625rem 0.625rem 0 0;
 }
 
+/* On the bar, the label switches keep the bar's spacing, as if they were on it directly. */
+.section-bar .label-toggles {
+  flex: none;
+  gap: 0.875rem;
+  margin: 0;
+}
+
 .section-bar label {
   display: flex;
   align-items: center;
@@ -543,9 +636,16 @@ html:not(.fullscreen) .stats {
   cursor: pointer;
 }
 
+/* Scrolls by touch or trackpad like the lanes, with no scrollbar of its own: the lanes' one is just above. */
 .staff.collapsed {
   padding-inline: 0;
-  overflow: hidden;
+  overflow: auto hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.staff.collapsed::-webkit-scrollbar {
+  display: none;
 }
 
 /* The collapsed line's playhead, under the timeline's hit line. */
@@ -639,6 +739,11 @@ html:not(.fullscreen) .stats {
 
 .piece-menu .highlighted::before {
   content: "★ ";
+}
+
+.piece-menu .has-track::after {
+  content: " ♪";
+  opacity: 0.7;
 }
 
 .piece-name strong {
@@ -1024,11 +1129,6 @@ a[download] {
     height: 2.25rem;
   }
 
-  /* The needle's cents are enough here, and the Hz would wrap in and out as notes change. */
-  .tuning > span {
-    display: none;
-  }
-
   .add-piece {
     max-width: none;
   }
@@ -1097,13 +1197,12 @@ a[download] {
     padding-block: 0;
   }
 
-  /* The progress, needle and buttons share one line, to give that height to the timeline. */
+  /* The progress and buttons share one line, to give that height to the timeline. */
   .practice {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .practice > p,
-  .practice > .tuning,
   .practice > .actions {
     grid-row: 2;
   }
@@ -1113,30 +1212,11 @@ a[download] {
     margin: 0;
   }
 
-  .practice > .tuning {
-    grid-column: 2;
-  }
-
   .practice > .actions {
     grid-column: 3;
     margin: 0;
   }
 
-  .tuning > span {
-    display: none;
-  }
-
-  /* On the smallest phones the buttons leave the needle little room, so it shrinks to stay out from under them. */
-  .practice > .tuning,
-  .practice > .tuning .row {
-    flex-wrap: nowrap;
-    gap: 0.25rem;
-  }
-
-  .practice > .tuning .needle,
-  .practice > .tuning .needle ~ span {
-    min-width: 0;
-  }
 
   .practice > .actions {
     gap: 0.375rem;
@@ -1173,7 +1253,7 @@ a[download] {
 
   .big-note.idle {
     font-size: 1.5rem;
-    line-height: 1.667;
+    line-height: 2.75rem;
   }
 }
 
@@ -1250,14 +1330,7 @@ a[download] {
   }
 }
 
-/* Small phones in landscape: the reading would squeeze the needle to nothing, and the needle says it anyway. */
-@media (max-height: 500px) and (max-width: 760px) {
-  .practice > .tuning .needle ~ span {
-    display: none;
-  }
-}
-
-/* Small phones in landscape: the buttons fill the line, so the needle takes its own. */
+/* Small phones in landscape: the buttons fill the line beside the progress. */
 @media (max-height: 500px) and (max-width: 700px) {
   .practice {
     grid-template-columns: auto minmax(0, 1fr);
@@ -1266,12 +1339,6 @@ a[download] {
   .practice > .actions {
     grid-column: 2;
     justify-content: flex-end;
-  }
-
-  .practice > .tuning {
-    grid-row: 3;
-    grid-column: 1 / -1;
-    margin-block: 0;
   }
 }
 
@@ -1283,7 +1350,7 @@ a[download] {
 
 .fullscreen header,
 .fullscreen .options,
-.fullscreen .tuning,
+.fullscreen .reference,
 .fullscreen .mode-note,
 .fullscreen .patterns,
 .patterns[hidden],
@@ -1304,6 +1371,24 @@ a[download] {
 
 .fullscreen .practice > p {
   grid-column: 1;
+}
+
+.fullscreen .actions .toggles {
+  flex: none;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+/* The label switches, set apart by a thin line, at the options' size rather than the big buttons'. */
+.fullscreen .actions .label-toggles {
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--pico-muted-border-color);
+}
+
+.fullscreen .actions .label-toggles .box-toggle {
+  width: 2.125rem;
+  height: 2rem;
 }
 
 .fullscreen .practice > .actions {
@@ -1506,7 +1591,16 @@ a[download] {
   }
 }
 
-/* Lining up a backing track: its controls in place of Options, and the waveform under the lanes. */
+/* Lining up a backing track: its controls above the lanes and the waveform under them, boxed together. The box reaches
+   into the page's side padding, so the lanes and waveform inside it keep their full width. */
+.track-align {
+  margin-inline: calc(-0.75rem - 1px);
+  padding: 0.25rem 0.75rem 0.75rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  background: var(--pico-card-background-color);
+}
+
 .track-align-panel .row {
   gap: 0.5rem 0.75rem;
   margin-block: 0.5rem;
@@ -1533,8 +1627,15 @@ a[download] {
   font-size: 0.875rem;
 }
 
+/* The track's name small and faint above the hint. */
 .track-align-title {
   margin-bottom: 0.25rem;
+}
+
+.track-align-title small {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
 }
 
 .track-status {
@@ -1894,14 +1995,24 @@ a[download] {
   }
 }
 
-/* The count-in's beats, sized to sit with the small switches beside it. */
-.options .toggles select {
-  width: auto;
-  height: auto;
-  margin: 0;
-  padding: 0.125rem 1.75rem 0.125rem 0.5rem;
-  font-size: 0.875rem;
-  background-position: center right 0.375rem;
+/* The count-in is the options' size, among the buttons in fullscreen too, with its beats as a tiny mark in the top
+   right corner, so the button never changes size. */
+.count-in,
+.actions .box-toggle.count-in {
+  position: relative;
+  flex: none;
+  width: 2.125rem;
+  min-width: 0;
+  height: 2rem;
+  padding: 0;
+}
+
+.count-in-beats {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: 0.5625rem;
+  line-height: 1;
 }
 
 /* Record, beside Start: a square the size of the icon buttons in that row. */
@@ -1941,7 +2052,9 @@ a[download] {
   pointer-events: none;
 }
 
+/* Holds the hidden lanes, so their 100% is the page's width and not the window's, which would scroll sideways. */
 .staff-only .practice .timeline-section {
+  position: relative;
   margin-bottom: 0;
 }
 
@@ -1957,6 +2070,11 @@ a[download] {
 .fullscreen.staff-only .practice .staff-section {
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
+}
+
+/* The staff on its own is always the full sheet, so there's no line to open or close. */
+.staff-only .practice .staff-toggle {
+  display: none;
 }
 
 .staff-only .practice .staff-panel .staff {

@@ -1,4 +1,5 @@
 import { createMetronome } from "../../audio/metronome";
+import { sharedAudioContext } from "../../audio/reference";
 import { t } from "../../i18n";
 import { midiOf } from "../../music/notes";
 import { withPattern, withRepeatedTop } from "../../music/patterns";
@@ -19,8 +20,12 @@ import { createSelection } from "./selection";
 import { createStaffSection } from "./staffSection";
 import { createTempoGlide } from "./tempoGlide";
 import { holdMsFor } from "./timing";
-import { createTuning } from "./tuning";
 import { createWaitingRun } from "./waitingRun";
+
+// The pause at the end of each time round of a loop, before the next starts.
+const LOOP_GAP_MS = 2000;
+// How often the metronome schedules its clicks, well inside how far ahead it schedules them.
+const METRONOME_TICK_MS = 25;
 
 // aligning, when given, opens the piece to line its backing track up, and is the way back to Library.
 export function practiceScreen(pieceId?: string, aligning?: () => void): Screen {
@@ -40,6 +45,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   let startIndex = 0;
   // A run that's finished ends by itself. The note it ended on stays shown, as done, until the next run.
   let doneAt: number | null = null;
+  // When a loop starts its next time round, after a short gap, and the note the last one ended on.
+  let loopAt: { at: number; previousMidi?: number } | null = null;
 
   const selection = createSelection((picked) => { highway.showSection(picked); toolbar.showModes(); });
   const currentIndex = () => controls.session?.index ?? startIndex;
@@ -55,13 +62,12 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const board = createStaffSection(pickNote, renderNotes, (beat) => track.showBeat(beat));
   const results = createResults(board, playAgain, { onSpot: (spot) => { selection.spot(spot); renderNotes(); }, onPractise: practiseSpot });
   const { staff, highway } = board;
-  const tuning = createTuning(staff);
   const countIn = createCountIn(metronome, (text) => (progress.textContent = withLoopNumber(text)));
   const glide = createTempoGlide(metronome, judge, highway);
   const tone = createReferenceTone(() => (controls.session?.finished ? undefined : piece.notes[currentIndex()]));
   const track = createBackingTrack({ aligning: aligning ?? null, stopRun: () => controls.stop(), onChange: () => toolbar.showModes(), addToBar: board.addToggle });
-  const following = createFollowing({ metronome, highway, staff, showReading: tuning.show, isMuted: tone.isMuted, endIndex, track, moveOn });
-  const waiting = createWaitingRun({ judge, glide, staff, showReading: tuning.show, isMuted: tone.isMuted, endIndex, holdMs, showProgress: (value) => (holdProgress = value), moveOn });
+  const following = createFollowing({ metronome, highway, staff, isMuted: tone.isMuted, endIndex, track, moveOn });
+  const waiting = createWaitingRun({ judge, glide, staff, isMuted: tone.isMuted, endIndex, holdMs, showProgress: (value) => (holdProgress = value), moveOn });
 
   function pickNote(index: number, extend: boolean) {
     spotRun = null;
@@ -110,6 +116,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     glide.resetBeat();
     startIndex = index;
     doneAt = null;
+    loopAt = null;
     highway.showResults(null);
     const session = controls.session;
     if (session) {
@@ -160,8 +167,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     holdProgress = 0;
     if (following.active) results.live(track.listening ? following.results : null);
     if (session.finished) {
-      tuning.clear();
-      if (spotRun ? spotRun.rounds-- > 0 : settings.loopOn) loopAgain(session, previousMidi);
+      staff.hidePlayed();
+      if (spotRun ? spotRun.rounds-- > 0 : settings.loopOn) loopAt = { at: performance.now() + LOOP_GAP_MS, previousMidi };
       else {
         doneAt = shownIndex();
         results.show(session, { results: following.results, listening: track.listening, notes: piece.notes, section: selection.section, pattern: piece.pattern, startIndex, spot: spotRun && selection.section });
@@ -179,7 +186,11 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     // A run that has just ended by itself can still get the mic's last reading.
     const session = controls.session;
     if (!session) return;
-    if (settings.metronomeOn && !following.waiting && !track.active) metronome.tick(now, settings.bpm);
+    if (loopAt && now >= loopAt.at) {
+      const { previousMidi } = loopAt;
+      loopAt = null;
+      loopAgain(session, previousMidi);
+    }
     // While the lanes move, the current note's progress. Moving on to the next resets it first.
     if (countIn.active) {
       if (countIn.tick(now)) { if (session.following) startFollowing(startIndex, false); renderNotes(); }
@@ -197,7 +208,6 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     listen: () => track.listening,
     aligning: Boolean(aligning),
     onStart() {
-      metronome.reset();
       // A backing track keeps moving like the music it is, so it always runs as "Don't wait".
       controls.session!.following = settings.followOn || track.active;
       highway.jumpTo(startIndex);
@@ -208,8 +218,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       following.stop(doneAt !== null);
       countIn.cancel();
       if (glide.cancel()) highway.jumpTo(currentIndex());
-      [spotRun, loopCount, lastScore, holdProgress] = [null, 1, null, 0];
-      tuning.clear();
+      [spotRun, loopCount, lastScore, holdProgress, loopAt] = [null, 1, null, 0, null];
+      staff.hidePlayed();
       renderNotes();
       toolbar.showModes(); // Today's plan, with the run just logged.
     },
@@ -221,25 +231,32 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     async onPick(picked) { await controls.stop(); basePiece = picked; loadPiece(); },
   });
 
+  // The metronome ticks for as long as it's switched on, whether a run is going or not. A backing track stands in for
+  // it, and "Don't wait" brings it in with the first note.
+  const metronomeTimer = setInterval(() => {
+    if (settings.metronomeOn && !following.waiting && !track.active && sharedAudioContext().state === "running") metronome.tick(performance.now(), settings.bpm);
+  }, METRONOME_TICK_MS);
+
   loadPiece();
 
   return {
     element: h(
       "section",
       { className: "practice" },
-      ...(track.panel ? [track.panel] : [toolbar.optionsPanel, toolbar.todayPlan]),
+      ...(track.panel ? [] : [toolbar.todayPlan]),
       progress,
       toolbar.actions,
       toolbar.modeNote,
-      tuning.element,
-      board.timeline,
-      ...(track.strip ? [track.strip] : []),
+      ...(track.panel ? [] : [toolbar.optionsPanel]),
+      // Aligning, everything for lining the track up sits in one box: its controls, the lanes, and the waveform under them.
+      track.panel ? h("div", { className: "track-align" }, track.panel, board.timeline, track.strip!) : board.timeline,
       results.element,
       board.sheet,
       toolbar.patternRow,
       countIn.overlay,
     ),
     leave() {
+      clearInterval(metronomeTimer);
       tone.stop();
       track.leave();
       toolbar.leave();

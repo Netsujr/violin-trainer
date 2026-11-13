@@ -27,10 +27,13 @@ export function createCountIn(metronome: ReturnType<typeof createMetronome>, sho
     get beats() {
       return state?.beats ?? settings.countInBeats;
     },
-    // The first click comes after a short delay and counts in the first note, so the two share a beat.
+    // The first click comes after a short delay and counts in the first note, so the two share a beat. A metronome
+    // that's already ticking keeps its beat, and the count-in starts on its next click.
     start(beats = settings.countInBeats) {
-      metronome.reset(beats);
-      state = { beats, beatsLeft: beats + FIRST_CLICK_DELAY_MS / beatMs(), at: performance.now() };
+      const now = performance.now();
+      const firstClickAt = settings.metronomeOn ? metronome.nextClick : null;
+      metronome.reset(beats, firstClickAt);
+      state = { beats, beatsLeft: beats + (firstClickAt === null ? FIRST_CLICK_DELAY_MS : firstClickAt - now) / beatMs(), at: now };
     },
     // Counts down to now, and says whether the count-in has just ended.
     tick(now: number) {

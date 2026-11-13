@@ -14,7 +14,6 @@ type Deps = {
   metronome: ReturnType<typeof createMetronome>;
   highway: ReturnType<typeof createHighway>;
   staff: ReturnType<typeof createStaff>;
-  showReading: (cents: number | null, frequency: number | null) => void;
   isMuted: (now: number) => boolean;
   endIndex: () => number;
   // With it on, the lanes follow the recording instead of their own clock.
@@ -25,7 +24,7 @@ type Deps = {
 
 // "Don't wait": the lanes hold on the first note until it's played in tune, then keep moving at the BPM,
 // judging each note as it passes.
-export function createFollowing({ metronome, highway, staff, showReading, isMuted, endIndex, track, moveOn }: Deps) {
+export function createFollowing({ metronome, highway, staff, isMuted, endIndex, track, moveOn }: Deps) {
   const settings = getSettings();
   const beatMs = () => (track.active ? track.beatMs() : settingsBeatMs());
   // The clock the lanes move to, in beats. Until the first note is played in tune, waiting holds when it came in tune.
@@ -44,7 +43,6 @@ export function createFollowing({ metronome, highway, staff, showReading, isMute
     const cents = frequency === null || isMuted(now) ? null : centsToTarget(frequency, session.currentMidi);
     const inTune = cents !== null && Math.abs(cents) <= settings.toleranceCents;
     waiting.inTuneSince = inTune ? (waiting.inTuneSince ?? now) : null;
-    showReading(cents, frequency);
     staff.showPlayed(session.index, cents, inTune);
     if (waiting.inTuneSince === null || now - waiting.inTuneSince < settings.holdMs) return;
 
@@ -117,7 +115,6 @@ export function createFollowing({ metronome, highway, staff, showReading, isMute
       if (session.finished) return null;
 
       const cents = frequency === null ? null : centsToTarget(frequency, session.currentMidi);
-      showReading(cents, frequency);
       const played = heard === null || current.beat < current.tracker.startBeat ? null : cents;
       staff.showPlayed(session.index, played, played !== null && Math.abs(played) <= settings.toleranceCents);
       return current.tracker.progress;

@@ -20,7 +20,6 @@ const SIZES = [
   ["short window", 900, 450, false],
 ];
 const fillsWidth = (canvas, screen) => Math.abs(canvas - Math.min(960, screen - 32)) <= 2; // style.css caps the page at 960.
-const ARROW_TURN_MS = 350; // The arrow overflows its row by a pixel while it turns.
 const LONG_TITLE = "Concerto for Violin and Orchestra in D major, first movement";
 const longPiece = Array(10).fill("D4 E4 F#4 G4").join(" | ");
 wav(OUT + "screens-silent.wav", [rest(3)]);
@@ -52,9 +51,6 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   const { page } = s;
   const go = (selector) => (touch ? page.locator(selector).first().tap() : page.locator(selector).first().click());
   const goNav = (name) => (touch ? page.locator(`nav button:text-is("${name}")`).tap() : nav(page, name));
-  const isPhone = width < 600 || height < 500;
-  const openOptions = async () => { if (!(await page.locator(".options").evaluate((panel) => panel.open))) { await go(".options > summary"); await sleep(ARROW_TURN_MS); } };
-  const closeOptions = async () => { if (await page.locator(".options").evaluate((panel) => panel.open)) { await go(".options > summary"); await sleep(ARROW_TURN_MS); } };
 
   if (touch) check(`${tag}: the browser reports a finger, not a mouse`, await page.evaluate(() => matchMedia("(pointer: coarse)").matches));
 
@@ -66,8 +62,6 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
       await page.locator("nav button").nth(index).click(); await sleep(250);
       await auditCheck(page, `${tag} ${language} ${tabs[index]}`);
       if (index === 1) {
-        await openOptions();
-        await auditCheck(page, `${tag} ${language} Options open`);
         await go(".staff-toggle"); await sleep(200);
         await auditCheck(page, `${tag} ${language} full sheet`);
         await go(".staff-toggle"); await sleep(200);
@@ -82,24 +76,12 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await go('.language button:text-is("EN")'); await sleep(200);
   await goNav("Practice"); await sleep(250);
 
-  // Options are closed by default on a phone only, so this one clears what the steps above saved.
-  const fresh = await s.context.newPage();
-  await fresh.goto(page.url());
-  await fresh.evaluate(() => localStorage.clear()); await fresh.reload(); await fresh.waitForSelector("nav button");
-  await fresh.locator('nav button:text-is("Practice")').click(); await sleep(250);
-  check(`${tag}: Options start ${isPhone ? "closed" : "open"}`, (await fresh.locator(".options").evaluate((panel) => panel.open)) === !isPhone);
-  await fresh.close();
-
   // The timeline and the run buttons can be seen together
-  await closeOptions();
   await page.evaluate(() => document.querySelector(".actions").scrollIntoView({ block: "start", behavior: "instant" })); await sleep(100);
   const view = await page.evaluate(() => { const a = document.querySelector(".actions").getBoundingClientRect(), c = document.querySelector("canvas").getBoundingClientRect(); return { top: Math.round(a.top), canvasBottom: Math.round(c.bottom), canvasWidth: Math.round(c.width), height: innerHeight, width: innerWidth }; });
   check(`${tag}: Start and the timeline fit on one screen`, view.top >= 0 && view.canvasBottom <= view.height, JSON.stringify(view));
   check(`${tag}: the timeline fills the width`, fillsWidth(view.canvasWidth, view.width), JSON.stringify(view));
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
-
-  const needleWidth = await page.locator(".needle").evaluate((needle) => Math.round(needle.getBoundingClientRect().width));
-  check(`${tag}: the tuning needle stays readable`, needleWidth >= 60, `${needleWidth}px`);
 
   // Fullscreen: only the controls, lanes and staff, with nothing to scroll
   await go('button[aria-label="Fullscreen"]'); await sleep(400);
@@ -141,12 +123,10 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await page.waitForSelector('button:text-is("Start"):not([disabled])'); // A finished run ends by itself.
 
   // Tempo with the metronome, and a pattern
-  await openOptions();
   await page.locator('.options label:has-text("Tempo")').click();
   await page.locator('.options label:has-text("Metronome")').click();
   await go('.patterns button:text-is("4")'); await sleep(200);
   await auditCheck(page, `${tag} Tempo and pattern`);
-  await closeOptions();
   const notes = Number((await progress(page)).match(/of (\d+)/)[1]);
   check(`${tag}: pattern 4 expands the scale`, notes === 90, String(notes));
   await go('.patterns button:text-is("1")'); await sleep(200);
@@ -157,10 +137,8 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
     check(`${tag}: Tempo and metronome run through`, true);
   } catch { check(`${tag}: Tempo and metronome run through`, false, await progress(page)); }
   await go('button:text-is("Stop")'); await sleep(200);
-  await openOptions();
   await page.locator('.options label:has-text("Tempo")').click();
   await page.locator('.options label:has-text("Metronome")').click();
-  await closeOptions();
 
   // Turning the device mid-scale
   if (touch) {

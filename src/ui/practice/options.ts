@@ -9,8 +9,9 @@ type OptionKey = { [Key in keyof Settings]-?: Settings[Key] extends boolean ? Ke
 // Ends a running session, before a change it can't carry on through.
 type StopRun = () => Promise<unknown>;
 
-// A checkbox in Options for an on/off setting.
-export function optionSwitch(key: OptionKey, label: string, title = "", onChange?: () => void) {
+// An on/off setting shown as an icon in a box that lights up when on. It's a checkbox underneath, laid over the icon,
+// and its name is the tooltip and what screen readers say.
+export function iconSwitch(key: OptionKey, label: string, icon: string, title = label, onChange?: () => void) {
   const settings = getSettings();
   const input = h("input", {
     type: "checkbox",
@@ -21,7 +22,7 @@ export function optionSwitch(key: OptionKey, label: string, title = "", onChange
       onChange?.();
     },
   });
-  return { input, label: h("label", { title }, input, ` ${label}`) };
+  return { input, label: h("label", { className: "icon-switch", title }, input, h("span", { className: "icon", innerHTML: icon }), h("span", { className: "visually-hidden" }, label)) };
 }
 
 // An icon button by Start that turns a mode on and off. With stopRun, it ends a running session first.
@@ -68,23 +69,31 @@ export function createBpmControl(onChange: () => void) {
   );
 }
 
-// How many beats the count-in lasts, beside its switch.
-export function createCountInPicker(onChange: () => void) {
+// The count-in as one button: each press steps through off, ×2, ×4 and on up to ×10, then back to off.
+export function createCountInButton(icon: string, onChange: () => void) {
   const settings = getSettings();
-  const select = h(
-    "select",
-    {
-      ariaLabel: t.countIn,
-      disabled: !settings.countInOn,
-      onchange() {
-        settings.countInBeats = Number(select.value);
-        saveSettings();
-        onChange();
-      },
+  const beats = h("span", { className: "count-in-beats" });
+  const button = h("button", {
+    type: "button",
+    className: "box-toggle count-in",
+    onclick() {
+      const next = settings.countInOn ? COUNT_IN_CHOICES[COUNT_IN_CHOICES.indexOf(settings.countInBeats) + 1] : COUNT_IN_CHOICES[0];
+      settings.countInOn = next !== undefined;
+      if (next) settings.countInBeats = next;
+      saveSettings();
+      show();
+      onChange();
     },
-    ...COUNT_IN_CHOICES.map((beats) => h("option", { value: String(beats), selected: beats === settings.countInBeats, textContent: String(beats) })),
-  );
-  return select;
+  }, h("span", { className: "icon", innerHTML: icon }), beats);
+  function show() {
+    const label = settings.countInOn ? `×${settings.countInBeats}` : t.off;
+    beats.textContent = settings.countInOn ? label : "";
+    button.ariaPressed = String(settings.countInOn);
+    button.title = `${t.countIn}: ${label}. ${t.countInHint}`;
+    button.ariaLabel = `${t.countIn}: ${label}`;
+  }
+  show();
+  return button;
 }
 
 // The rhythm patterns under the staff, for scales.
@@ -105,23 +114,4 @@ export function createPatternRow(stopRun: StopRun, onChange: () => void) {
     }),
   );
   return h("div", { className: "row patterns" }, t.pattern, h("div", { role: "group", ariaLabel: t.pattern }, ...buttons));
-}
-
-// The Options panel, remembering whether it was left open.
-export function createOptionsPanel(...rows: Node[]) {
-  const settings = getSettings();
-  const panel = h(
-    "details",
-    {
-      className: "options",
-      open: settings.optionsOpen,
-      ontoggle() {
-        settings.optionsOpen = panel.open;
-        saveSettings();
-      },
-    },
-    h("summary", {}, t.options),
-    ...rows,
-  );
-  return panel;
 }

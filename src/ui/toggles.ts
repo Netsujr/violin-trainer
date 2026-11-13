@@ -2,32 +2,6 @@ import { t } from "../i18n";
 import { getSettings, saveSettings, type Settings } from "../storage";
 import { h } from "./dom";
 
-const TOGGLES = ["fingers", "noteNames", "letterNames", "staff"] as const;
-
-export function createToggles(onChange: () => void) {
-  const { toggles } = getSettings();
-  return h(
-    "div",
-    { className: "row toggles" },
-    ...TOGGLES.map((key) =>
-      h(
-        "label",
-        {},
-        h("input", {
-          type: "checkbox",
-          checked: toggles[key],
-          onchange: (event) => {
-            toggles[key] = (event.target as HTMLInputElement).checked;
-            saveSettings();
-            onChange();
-          },
-        }),
-        ` ${t.toggles[key]}`,
-      ),
-    ),
-  );
-}
-
 const svgIcon = (paths: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 
@@ -54,6 +28,10 @@ export const MUSIC_ICON = svgIcon('<path d="M9 18V5l12-2v13"/><circle cx="6" cy=
 export const UPLOAD_ICON = svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>');
 export const ALIGN_ICON = svgIcon('<path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0v-4a2 2 0 0 1 2-2"/>');
 export const REMOVE_TRACK_ICON = svgIcon('<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/>');
+export const SPEAKER_ICON = svgIcon('<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>');
+export const TEMPO_ICON = svgIcon('<path d="M3.5 17a9 9 0 1 1 17 0"/><path d="m12 14 4-5"/><circle cx="12" cy="14" r="1.5"/>');
+export const METRONOME_ICON = svgIcon('<path d="M9 3h6l4 18H5z"/><path d="M5.5 18h13M12 18l5-11"/>');
+export const COUNT_IN_ICON = svgIcon('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M10 2h4"/>');
 export const PENCIL_ICON = svgIcon('<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>');
 
 function iconFor(key: keyof Settings["toggles"]) {

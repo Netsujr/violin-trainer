@@ -40,5 +40,3 @@ const baseScale = () => {
 };
 export const timelineScale = () => baseScale() * timelineShare();
 export const staffScale = () => baseScale() * staffShare();
-
-export const isSmallScreen = () => innerWidth < PHONE_WIDTH || innerHeight < SHORT_HEIGHT;

@@ -71,8 +71,7 @@ wav(OUT + "ended.wav", [note(62, 3)]);
   await start(s.page);
   await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 5000 });
   await sleep(300);
-  const needle = await s.page.evaluate(() => ({ hidden: document.querySelector(".needle i").hidden, value: document.querySelector(".needle ~ span").textContent, hz: document.querySelector(".tuning > span").textContent }));
-  check("finishing clears the needle, even with the note still sounding", needle.hidden && needle.value === "—" && needle.hz === "", JSON.stringify(needle));
+  check("finishing clears the played note, even with the note still sounding, and Practice has no needle", (await s.page.locator(".played-note").count()) === 0 && (await s.page.locator(".needle").count()) === 0);
   await s.close();
 }
 {

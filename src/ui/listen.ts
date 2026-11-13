@@ -1,11 +1,12 @@
 import { centsText, localNumber, t } from "../i18n";
 import { fingerOn, LOWEST_MIDI, stringFor } from "../music/fingering";
 import { centsFrom, nearestMidi, noteLabels, pitchOf } from "../music/notes";
-import { getSettings } from "../storage";
+import { getSettings, saveSettings } from "../storage";
 import { h, type Screen } from "./dom";
+import { createGuesser } from "./guesser";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
-import { createToggles } from "./toggles";
+import { createIconToggle } from "./toggles";
 
 const SILENCE_MS = 300;
 const TRAIL_STABLE_MS = 120;
@@ -39,7 +40,8 @@ function positionGuess(midi: number) {
 }
 
 export function listenScreen(): Screen {
-  const { toggles } = getSettings();
+  const settings = getSettings();
+  const { toggles } = settings;
   const big = h("div", { className: "big-note" });
   const position = h("p");
   const hertz = h("p");
@@ -50,15 +52,28 @@ export function listenScreen(): Screen {
   let midi: number | null = null;
   let lastHeard = 0;
   let stableSince = 0;
+  const guesser = createGuesser(staff, () => controls.finish(() => true));
+  const modeButtons = [false, true].map((guessing) =>
+    h("button", { type: "button", textContent: guessing ? t.noteGuesser : t.freePlay, onclick: () => setMode(guessing) }),
+  );
+
+  function setMode(guessing: boolean) {
+    settings.guesserOn = guessing;
+    saveSettings();
+    modeButtons.forEach((button, index) => (button.ariaPressed = String(Boolean(index) === guessing)));
+    guesser.panel.hidden = !guessing;
+    staff.hidePlayed();
+    if (guessing) guesser.start();
+    renderNote();
+  }
 
   function renderNote() {
     big.classList.toggle("idle", midi === null);
-    staff.element.hidden = !toggles.staff;
     position.hidden = !toggles.fingers;
     if (midi === null) {
-      big.textContent = controls.session ? t.listening : t.pressStart;
+      big.textContent = controls.session ? t.listening : "";
       position.textContent = "";
-      staff.draw([]);
+      if (!settings.guesserOn) staff.draw([]);
       return;
     }
 
@@ -67,7 +82,7 @@ export function listenScreen(): Screen {
     const names = [toggles.noteNames && `${solfege}${octave}`, toggles.letterNames && `${letter}${octave}`];
     big.textContent = names.filter(Boolean).join(" / ");
     position.textContent = positionGuess(midi);
-    staff.draw([{ pitch }]);
+    if (!settings.guesserOn) staff.draw([{ pitch }]);
   }
 
   function hear(frequency: number, now: number) {
@@ -95,6 +110,7 @@ export function listenScreen(): Screen {
     midi = null;
     needle.show(null);
     hertz.textContent = "";
+    guesser.quiet();
     renderNote();
   }
 
@@ -103,24 +119,38 @@ export function listenScreen(): Screen {
     onReading(frequency, now) {
       if (frequency !== null) hear(frequency, now);
       else if (midi !== null && now - lastHeard > SILENCE_MS) goQuiet();
+      if (settings.guesserOn) guesser.read(frequency, now);
     },
-    onStart: renderNote,
+    onStart() {
+      if (settings.guesserOn) guesser.start();
+      renderNote();
+    },
     onStop: goQuiet,
   });
 
+  setMode(settings.guesserOn);
   goQuiet();
 
   return {
     element: h(
       "section",
       { className: "listen" },
-      createToggles(renderNote),
-      h("div", { className: "row" }, controls.recordToggle, controls.startButton, controls.message),
+      // The staff comes first, with what's heard under it.
+      staff.element,
       big,
       position,
       needle.element,
       hertz,
-      staff.element,
+      h(
+        "div",
+        { className: "row" },
+        h("div", { role: "group", className: "listen-modes" }, ...modeButtons),
+        h("div", { className: "row toggles" }, ...(["fingers", "noteNames", "letterNames"] as const).map((key) => createIconToggle(key, renderNote))),
+        controls.recordToggle,
+        controls.startButton,
+        controls.message,
+      ),
+      guesser.panel,
       h("h3", {}, t.recentNotes),
       trailView,
     ),

@@ -20,7 +20,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
 
   // Options
   const options = page.locator(".options");
-  check("options: open by default on a computer", await options.evaluate((panel) => panel.open));
+  check("options: no drawer, boxed right above the lanes", (await options.evaluate((panel) => panel.tagName)) === "DIV" && (await page.locator(".options + .timeline-section").count()) === 1);
   const text = await options.innerText();
   check("options: holds Tempo, Metronome, the count-in and BPM", ["Tempo", "Metronome", "count-in", "BPM"].every((word) => text.includes(word)) && !text.includes("Record"), text.replaceAll("\n", " ").slice(0, 80));
   check("options: the display switches moved out", !["Fingers", "Note names", "Grid"].some((word) => text.includes(word)));
@@ -31,20 +31,12 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   check("run buttons are outside the panel", (await page.locator('.options button:text-is("Start")').count()) === 0);
   const label = page.locator('.options label:has-text("Tempo")');
   const color = () => label.evaluate((element) => getComputedStyle(element).color);
-  check("options: an off label is grey", (await color()) === "rgb(163, 154, 139)", await color());
+  const off = await color();
+  check("options: an off switch is grey", off === "rgb(163, 154, 139)", off);
   await label.locator("input").check();
-  check("options: an on label is white", (await color()) === "rgb(255, 255, 255)", await color());
+  check("options: an on switch lights up", (await color()) !== off, await color());
   await label.locator("input").uncheck();
   check("options: off stays clickable", await label.locator("input").isEnabled());
-  await page.click(".options > summary");
-  await sleep(200);
-  check("options: closes, leaving the run buttons", (await page.locator(".bpm").isHidden()) && (await page.locator(".piece-select").isVisible()) && (await page.locator('button:text-is("Start")').isVisible()) && (await page.locator("section > p").isVisible()));
-  await page.reload();
-  await page.waitForSelector("nav button");
-  await nav(page, "Practice");
-  await sleep(200);
-  check("options: stays closed after a reload", !(await options.evaluate((panel) => panel.open)));
-  await page.click(".options > summary");
 
   // Bars
   check("bars: timeline order", (await titles(page, ".timeline-section")).join() === "Fingers,Note names (Do Ré Mi),Letter names (A G D)", (await titles(page, ".timeline-section")).join());
@@ -132,10 +124,10 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await s.close();
 }
 {
-  // A staff switched off before the Practice toggle was removed still shows
+  // A staff switched off before the Staff switch was removed still shows
   const s = await open(OUT + "s-silent.wav");
   await seed(s.page, { settings: { toggles: { staff: false } } });
-  check("Listen respects its Staff switch", await s.page.locator(".staff").isHidden());
+  check("Listen always shows the staff", await s.page.locator(".staff").isVisible());
   await nav(s.page, "Practice");
   await sleep(200);
   check("Practice always shows the staff", await s.page.locator(".staff").isVisible());

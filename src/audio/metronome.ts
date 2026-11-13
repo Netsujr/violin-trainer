@@ -32,7 +32,7 @@ export function createMetronome() {
   let count = 0;
 
   return {
-    // Runs from the mic loop, so clicks stop by themselves when a session ends.
+    // Runs on Practice's own timer while it's switched on, run or no run.
     tick(now: number, bpm: number) {
       if (nextClick === null || nextClick < now) nextClick = now + FIRST_CLICK_DELAY_MS;
       while (nextClick - now < SCHEDULE_AHEAD_MS + outputLatencyMs()) {
@@ -48,6 +48,10 @@ export function createMetronome() {
       nextClick = firstClickAt;
       lastClick = null;
       count = (BEATS_PER_BAR - (leadBeats % BEATS_PER_BAR)) % BEATS_PER_BAR;
+    },
+    // When the next click is due, if it's ticking.
+    get nextClick() {
+      return nextClick !== null && nextClick > performance.now() ? nextClick : null;
     },
     nearestBeat(time: number, bpm: number) {
       // Before the first click is scheduled, the time it's due still sets the beat.

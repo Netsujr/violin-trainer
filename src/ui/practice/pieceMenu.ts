@@ -1,13 +1,14 @@
 import { localTitle, t } from "../../i18n";
 import type { Piece } from "../../music/notes";
-import { isHighlighted, pieceGroups } from "../../storage";
+import { isHighlighted, pieceGroups, piecesWithTracks } from "../../storage";
 import { h } from "../dom";
 
 const pieceTitle = (piece: Piece) => localTitle(piece.id, piece.title);
 const MENU_GAP = 4;
 
 // The piece picker: a button opening a menu of groups (scales, the songs that come with the app, and songs
-// added later or imported), each opening its pieces on hover or tap. Highlighted pieces are starred.
+// added later or imported), each opening its pieces on hover or tap. Highlighted pieces are starred, and pieces with a
+// backing track have a note after them.
 // shown is the piece picked, which the button names, or a fixed label for a button that adds one.
 export function createPieceMenu(pieces: Piece[], shown: Piece | string, onPick: (piece: Piece) => void) {
   // A group's pieces open beside it, moved up as far as they need to stay on screen. Longer than the screen, they scroll.
@@ -57,7 +58,13 @@ export function createPieceMenu(pieces: Piece[], shown: Piece | string, onPick: 
   const button = h("button", { type: "button", className: "piece-select", ariaHasPopup: "menu", textContent: typeof shown === "string" ? shown : pieceTitle(shown), popoverTargetElement: menu });
   // The menu sits in the top layer, so it's placed by its button each time it opens: under it, or above it if there
   // isn't room below, as near the bottom of a page.
+  async function markTracks() {
+    const tracked = await piecesWithTracks();
+    menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]').forEach((item) => item.classList.toggle("has-track", tracked.has(item.value)));
+  }
+  markTracks();
   menu.addEventListener("toggle", () => {
+    markTracks(); // A track may have been added or removed since.
     const { left, top, bottom } = button.getBoundingClientRect();
     menu.style.left = `${left}px`;
     const fitsBelow = bottom + MENU_GAP + menu.offsetHeight <= innerHeight;

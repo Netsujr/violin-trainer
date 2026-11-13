@@ -74,28 +74,21 @@ describe("saved pieces", () => {
 describe("settings", () => {
   it("starts with sensible defaults", async () => {
     const { getSettings } = await settingsWith(null);
-    expect(getSettings()).toMatchObject({ toleranceCents: 40, holdMs: 200, tempoOn: false, metronomeOn: false, bpm: 60, pattern: 0, staffOpen: false, optionsOpen: true });
+    expect(getSettings()).toMatchObject({ toleranceCents: 40, holdMs: 200, tempoOn: false, metronomeOn: false, bpm: 60, pattern: 0, staffOpen: false });
     expect(getSettings().countInOn).toBe(true);
-    expect(getSettings().toggles).toMatchObject({ fingers: true, staff: true });
+    expect(getSettings().toggles).toMatchObject({ fingers: true, noteNames: true, letterNames: true });
   });
 
   it("gives a switch added later its default on older saved settings", async () => {
-    const { getSettings } = await settingsWith({ toggles: { fingers: false, noteNames: true, letterNames: true } });
+    const { getSettings } = await settingsWith({ toggles: { fingers: false, noteNames: true } });
     expect(getSettings().toggles.fingers).toBe(false);
-    expect(getSettings().toggles.staff).toBe(true);
+    expect(getSettings().toggles.letterNames).toBe(true);
   });
 
   it("picks the language from the browser until one is saved", async () => {
     expect((await settingsWith(null, undefined, "pt-BR")).getSettings().language).toBe("pt");
     expect((await settingsWith(null, undefined, "fr-FR")).getSettings().language).toBe("en");
     expect((await settingsWith({ language: "en" }, undefined, "pt-BR")).getSettings().language).toBe("en");
-  });
-
-  it("starts the options closed on phones, but respects a saved choice", async () => {
-    expect((await settingsWith(null, { width: 390, height: 844 })).getSettings().optionsOpen).toBe(false);
-    expect((await settingsWith(null, { width: 844, height: 390 })).getSettings().optionsOpen).toBe(false);
-    expect((await settingsWith(null, { width: 768, height: 1024 })).getSettings().optionsOpen).toBe(true);
-    expect((await settingsWith({ optionsOpen: true }, { width: 390, height: 844 })).getSettings().optionsOpen).toBe(true);
   });
 
   it("saves what changed", async () => {

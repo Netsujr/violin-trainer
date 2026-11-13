@@ -40,6 +40,7 @@ const COLLAPSED_BEAT_WIDTH = 72;
 const SECTION_COLOR = "rgba(255, 149, 0, 0.28)";
 const STAFF_STEP_HEIGHT = 5;
 const PLAYED_COLOR = "#1f6fd1";
+const GHOST_EDGE = 8;
 const PLAYED_IN_TUNE_COLOR = "#14914a";
 // How far a note's clickable slot and the section's band start before its notehead, and how far the last one runs after it.
 const NOTE_LEAD = 20;
@@ -176,8 +177,14 @@ function createPlayedNote() {
   return { group, head, arrow };
 }
 
-export function createStaff(width = 300, startCollapsed = false, scale = 1, onPick?: (noteIndex: number, extend: boolean) => void) {
+// onScroll gets the beat at the hit line when the collapsed line is scrolled by hand, so the lanes can follow it.
+export function createStaff(width = 300, startCollapsed = false, scale = 1, onPick?: (noteIndex: number, extend: boolean) => void, onScroll?: (beat: number) => void) {
   const element = h("div", { className: "staff" });
+  // Where following the lanes last put the line, so that scroll isn't taken for one by hand.
+  let followedLeft = 0;
+  element.addEventListener("scroll", () => {
+    if (collapsed && onScroll && Math.abs(element.scrollLeft - followedLeft) >= 1) onScroll(beatAtHitLine());
+  });
   if (onPick) {
     element.classList.add("pickable");
     element.addEventListener("click", (event) => {
@@ -293,6 +300,16 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     }
   }
 
+  // The reverse of scrollToBeat: the beat under the hit line, sliding between notes as the lanes do.
+  function beatAtHitLine() {
+    const x = element.scrollLeft / scale + HIT_LINE_X;
+    const index = Math.max(0, noteXs.findLastIndex((noteX) => noteX <= x));
+    if (noteXs.length === 0 || x < noteXs[0]) return 0;
+    const nextX = noteXs[index + 1] ?? noteXs[index] + COLLAPSED_BEAT_WIDTH;
+    const nextBeat = noteBeats[index + 1] ?? noteBeats[index] + beatsOf(shownNotes[index]);
+    return Math.min(nextBeat, noteBeats[index] + ((x - noteXs[index]) / (nextX - noteXs[index])) * (nextBeat - noteBeats[index]));
+  }
+
   function scrollToBeat() {
     if (!collapsed || noteXs.length === 0) return;
 
@@ -300,7 +317,10 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const nextX = noteXs[index + 1] ?? noteXs[index];
     const nextBeat = noteBeats[index + 1] ?? noteBeats[index] + 1;
     const between = Math.min(1, (followedBeat - noteBeats[index]) / (nextBeat - noteBeats[index]));
-    element.scrollLeft = (noteXs[index] + between * (nextX - noteXs[index]) - HIT_LINE_X) * scale;
+    const left = (noteXs[index] + between * (nextX - noteXs[index]) - HIT_LINE_X) * scale;
+    // Already there, as when the scroll came from the staff itself, it's left alone, which keeps a flick's momentum going.
+    if (Math.abs(left - element.scrollLeft) >= 1) element.scrollLeft = left;
+    followedLeft = element.scrollLeft;
   }
 
   return {
@@ -328,7 +348,9 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       }
       const x = noteXs[index] + NOTEHEAD_CENTER;
       // Right on the note it lands exactly on it, which is the moment it clears.
-      const y = noteYs[index] - (inTune ? 0 : staffStepsFrom(midiOf(note.pitch), cents) * STAFF_STEP_HEIGHT);
+      // Far off, like an octave out, it stops at the sheet's edge, where its arrow still says which way to go.
+      const offset = inTune ? 0 : staffStepsFrom(midiOf(note.pitch), cents) * STAFF_STEP_HEIGHT;
+      const y = Math.max(GHOST_EDGE, Math.min(sheet.height - GHOST_EDGE, noteYs[index] - offset));
       const color = inTune ? PLAYED_IN_TUNE_COLOR : PLAYED_COLOR;
       played.head.setAttribute("cx", String(x));
       played.head.setAttribute("cy", String(y));
