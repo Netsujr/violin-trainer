@@ -1,6 +1,6 @@
 // The ghost note on the staff: where it sits against the current note, which way its arrow points, and when it shows.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT } from "./lib.mjs";
+import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT, setCountIn } from "./lib.mjs";
 
 wav(OUT + "played-silent.wav", [rest(3)]);
 const s = await open(OUT + "played-silent.wav");
@@ -113,9 +113,9 @@ await page.screenshot({ path: OUT + "played-fullscreen.png" });
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(300);
 
 // While the reference sounds the mic doesn't count
-await page.click('button:text-is("Play reference")'); await sleep(200);
+await page.click('button[aria-label="Play reference"]'); await sleep(200);
 check("the reference hides it", (await ghost()) === null);
-await page.click('button:text-is("Stop reference")'); await sleep(300);
+await page.click('button[aria-label="Stop reference"]'); await sleep(300);
 await stop(page); await sleep(200);
 
 // At the end
@@ -130,14 +130,14 @@ await stop(page); await sleep(200);
 
 // The count-in, and Don't wait
 await freshPractice(page);
-await page.locator('.options label:has-text("count-in") input').check();
+await setCountIn(page, 4);
 await followNotes(page, { midis: Array(16).fill(62) });
 await begin(page);
 await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("Starts in"), null, { timeout: 3000 });
 await sleep(200);
 check("the count-in shows none", (await ghost()) === null);
 await stop(page); await sleep(200);
-await page.locator('.options label:has-text("count-in") input').uncheck();
+await setCountIn(page, 0);
 
 await freshPractice(page);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);

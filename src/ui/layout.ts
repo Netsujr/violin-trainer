@@ -15,6 +15,9 @@ const SMALL_TIMELINE_SHARE = 0.5;
 const FULLSCREEN_CONTROLS_HEIGHT = 96;
 // On a narrow screen the note counter takes its own row above the buttons.
 const FULLSCREEN_COUNTER_ROW_HEIGHT = 30;
+// The controls' height allows for one row of buttons. When they wrap onto more, the lanes and staff make room.
+const BUTTON_ROW_HEIGHT = 40;
+const extraButtonRows = () => Math.max(0, (document.querySelector<HTMLElement>(".practice > .actions")?.offsetHeight ?? 0) - BUTTON_ROW_HEIGHT);
 // The clear space ahead of the hit line, wide enough for three beats, which limits the scale on narrow screens.
 const FULLSCREEN_MIN_VIEW_WIDTH = 130 + 3 * 120;
 
@@ -32,7 +35,7 @@ const staffShare = () => (getSettings().staffBig ? BIG_STAFF_SHARE : 1);
 const baseScale = () => {
   if (fullscreen) {
     const counterRow = innerWidth < PHONE_WIDTH || (innerHeight <= SHORT_HEIGHT && innerWidth <= SMALL_LANDSCAPE_WIDTH);
-    const controls = FULLSCREEN_CONTROLS_HEIGHT + (counterRow ? FULLSCREEN_COUNTER_ROW_HEIGHT : 0);
+    const controls = FULLSCREEN_CONTROLS_HEIGHT + (counterRow ? FULLSCREEN_COUNTER_ROW_HEIGHT : 0) + extraButtonRows();
     const height = TIMELINE_HEIGHT * timelineShare() + STAFF_HEIGHT * staffShare();
     return Math.min((innerHeight - controls) / height, contentWidth() / FULLSCREEN_MIN_VIEW_WIDTH / Math.max(timelineShare(), staffShare()));
   }

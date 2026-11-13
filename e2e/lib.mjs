@@ -116,6 +116,11 @@ export const pickPiece = (page, id) => page.locator(`.piece-menu button[value="$
 export const pickedPiece = (page) => page.locator(".piece-select").innerText();
 // Library shows a few pieces per group, with the rest in drawers. Tests that need every card open them all.
 export const openDrawers = (page) => page.locator(".more-pieces:not([open]) > summary").evaluateAll((summaries) => summaries.forEach((summary) => summary.click()));
+// The count-in button steps off, ×2, ×4 and on to ×10. This presses it until it shows beats, or off with 0.
+export async function setCountIn(page, beats) {
+  const want = beats ? `×${beats}` : "off";
+  for (let i = 0; i < 7 && !(await page.locator(".count-in").getAttribute("aria-label")).endsWith(want); i++) await page.locator(".count-in").click();
+}
 export const nav = (page, name) => page.click(`nav button:text-is("${name}")`);
 export const start = (page) => page.click('button:text-is("Start")');
 // Stops a run if one is going. A finished run has already stopped by itself, and one can finish just as this clicks.

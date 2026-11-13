@@ -1,6 +1,6 @@
 // Loop, repeating a scale's top note, the steady reference tone, and the line that says which of them is on.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn } from "./lib.mjs";
 
 const D_TOP_TWICE = [62, 64, 66, 67, 69, 71, 73, 74, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "modes-silent.wav", [rest(3)]);
@@ -39,7 +39,7 @@ await stop(page); await sleep(200);
 await pickPiece(page, "g-major-2oct"); await sleep(250);
 check("a longer scale repeats its own top note", (await progress(page)) === "Note 1 of 30", await progress(page));
 await pickPiece(page, "hot-cross-buns"); await sleep(250);
-check("it doesn't apply to a song", (await progress(page)) === "Note 1 of 17" && (await top().isDisabled()) && !(await note_()).includes("Top note"), await note_());
+check("it doesn't apply to a song", (await progress(page)) === "Note 1 of 17" && (await top().isHidden()) && !(await note_()).includes("Top note"), await note_());
 check("rhythm patterns are for scales, so a song hides them", await page.locator(".patterns").isHidden());
 await pickPiece(page, "d-major-1oct"); await sleep(250);
 check("and a scale shows them again", await page.locator(".patterns").isVisible());
@@ -91,7 +91,7 @@ await stop(page); await sleep(200);
 // Loop with Don't wait
 await freshPractice(page, 120);
 await loop().click(); await dontWait().click(); await sleep(200);
-await page.locator('.options label:has-text("count-in") input').check();
+await setCountIn(page, 4);
 check("the line follows both", (await note_()).startsWith("Keeps moving · Loops until you press Stop"), await note_());
 await followNotes(page, { midis: D });
 await begin(page);
@@ -108,7 +108,7 @@ check("no results card covers the lanes when looping", (await page.locator(".sta
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(200);
 await stop(page); await sleep(200);
 await dontWait().click(); await loop().click(); await sleep(100);
-await page.locator('.options label:has-text("count-in") input').uncheck();
+await setCountIn(page, 0);
 
 // The reference tone keeps sounding
 await freshPractice(page);
@@ -119,15 +119,15 @@ await page.evaluate(() => {
   OscillatorNode.prototype.stop = function (when) { this.stopped = true; return stop.call(this, when); };
 });
 const tone = () => page.evaluate(() => { const tone = window.tones.at(-1); return tone ? { hz: Math.round(tone.frequency.value), stopped: tone.stopped, count: window.tones.length, state: tone.context.state } : null; });
-const play = () => page.click('button:text-is("Play reference")');
-const off = () => page.click('button:text-is("Stop reference")');
+const play = () => page.click('button[aria-label="Play reference"]');
+const off = () => page.click('button[aria-label="Stop reference"]');
 await play(); await sleep(300);
 check("pressing it starts the first note's pitch", (await tone()).hz === 294 && (await tone()).state === "running", JSON.stringify(await tone()));
-check("the button turns green and offers to stop", (await page.locator('button:text-is("Stop reference")').count()) === 1 && (await color(page.locator('button:text-is("Stop reference")'))) === GREEN);
+check("the button turns green and offers to stop", (await page.locator('button[aria-label="Stop reference"]').count()) === 1 && (await color(page.locator('button[aria-label="Stop reference"]'))) === GREEN);
 await sleep(2500);
 check("it's still sounding well past the old one second", !(await tone()).stopped, JSON.stringify(await tone()));
 await off(); await sleep(100);
-check("pressing again stops it", (await tone()).stopped && (await page.locator('button:text-is("Play reference")').count()) === 1);
+check("pressing again stops it", (await tone()).stopped && (await page.locator('button[aria-label="Play reference"]').count()) === 1);
 await play(); await sleep(100);
 await page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84); await sleep(150);
 check("it moves with the current note, without restarting", (await tone()).hz === 330 && !(await tone()).stopped && (await tone()).count === 2, JSON.stringify(await tone()));
@@ -136,7 +136,7 @@ check("and with the piece", (await tone()).hz === 440, JSON.stringify(await tone
 await nav(page, "Calendar"); await sleep(150);
 check("leaving Practice stops it", (await tone()).stopped);
 await nav(page, "Practice"); await sleep(200);
-check("and it reads as off on return", (await page.locator('button:text-is("Play reference")').count()) === 1);
+check("and it reads as off on return", (await page.locator('button[aria-label="Play reference"]').count()) === 1);
 
 await page.evaluate(() => localStorage.setItem("pieces", JSON.stringify([{ id: "one", title: "One", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }] }])));
 await freshPractice(page);
@@ -153,7 +153,7 @@ await stop(page); await sleep(200);
 await page.click('.language button:text-is("PT")'); await sleep(250);
 await page.locator("nav button").nth(1).click(); await sleep(200);
 const line = await note_();
-check("pt: the line and the buttons are translated", line.includes("Espera cada nota") && line.includes("Toca uma vez") && (await page.locator('button:text-is("Ouvir referência")').count()) === 1 && (await page.locator('button[aria-label="Repetir"]').count()) === 1, line);
+check("pt: the line and the buttons are translated", line.includes("Espera cada nota") && line.includes("Toca uma vez") && (await page.locator('button[aria-label="Ouvir referência"]').count()) === 1 && (await page.locator('button[aria-label="Repetir"]').count()) === 1, line);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();
 
@@ -161,7 +161,7 @@ await s.close();
 {
   const c = await open(OUT + "modes-silent.wav", undefined, { keepCountIn: true });
   const { page } = c;
-  const box_ = () => page.locator('.options label:has-text("count-in") input');
+  const countIn = () => page.locator(".options .count-in");
   const showing = () => page.evaluate(() => document.querySelector("section > p").textContent);
   // Logs the text the moment the app sets it. Anything later, even a MutationObserver, also counts the time to draw that frame.
   const watch = () => page.evaluate(() => {
@@ -180,8 +180,7 @@ await s.close();
     });
   });
   await nav(page, "Practice"); await sleep(250);
-  const beatsPicker = () => page.locator(".options .toggles select");
-check("count-in: on by default, 4 beats, in Options", (await box_().isChecked()) && (await beatsPicker().inputValue()) === "4" && (await beatsPicker().locator("option").allInnerTexts()).join() === "2,4,6,8,10");
+  check("count-in: on by default, 4 beats, in Options", (await countIn().getAttribute("aria-pressed")) === "true" && (await countIn().getAttribute("aria-label")) === "Beat count-in: ×4");
   await page.locator(".bpm input").fill("120");
   await page.evaluate(() => {
     window.clicks = [];
@@ -220,7 +219,7 @@ check("count-in: on by default, 4 beats, in Options", (await box_().isChecked())
   await stop(page); await sleep(200);
   check("count-in: and it clears", (await showing()) === "Note 1 of 15", await showing());
 
-  await beatsPicker().selectOption("2");
+  await setCountIn(page, 2);
   await watch();
   await begin(page);
   await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 1 of 15", null, { timeout: 5000 });
@@ -228,12 +227,12 @@ check("count-in: on by default, 4 beats, in Options", (await box_().isChecked())
   check("count-in: 2 picked counts 2, 1, and is saved", short.join() === "Starts in 2…,Starts in 1…" && (await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).countInBeats)) === 2, short.join());
   await stop(page); await sleep(200);
 
-  await box_().uncheck();
-  check("count-in: saved when switched off, and its beats picker greys out", (await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).countInOn)) === false && (await beatsPicker().isDisabled()));
+  await setCountIn(page, 0);
+  check("count-in: saved when switched off, and its button reads off", (await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).countInOn)) === false && (await countIn().getAttribute("aria-pressed")) === "false");
   await begin(page); await sleep(100);
   check("count-in: off starts on the sheet straight away", (await showing()) === "Note 1 of 15", await showing());
   await stop(page); await sleep(200);
-  await box_().check();
+  await setCountIn(page, 2);
   await page.click('button[aria-label="Don\'t wait"]'); await sleep(100);
   await page.locator(".bpm input").fill("120");
   await watch();

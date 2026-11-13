@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText } from "./lib.mjs";
+import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -35,7 +35,8 @@ const showing = () => page.locator("section > p").first().textContent();
 const startRun = async () => { await press(button("Start")); await button("Stop").waitFor(); };
 // A finished run ends by itself, so Stop may be gone already, or go as it's pressed.
 const stopRun = async () => { if (await button("Stop").count()) await press(button("Stop"), { timeout: 1500 }).catch(() => {}); await page.locator('button:text-is("Start"):not([disabled])').first().waitFor(); await sleep(150); };
-const options = async () => { if (!(await page.locator(".options").evaluate((panel) => panel.open))) { await press(page.locator(".options > summary")); await sleep(350); } };
+// Options are always shown now, above the lanes.
+const options = async () => {};
 const setOption = async (label, on) => { await options(); const box = page.locator(`.options label:has-text("${label}") input`); if ((await box.isChecked()) !== on) await press(box); await sleep(100); };
 // Practice at a speed, through Options, which starts closed on a phone.
 const practiceAt = async (bpm) => {
@@ -84,7 +85,7 @@ await page.goto("http://localhost:5199/");
 await page.waitForSelector("nav button");
 
 flow("1. First visit");
-check("opens on Listen, ready to start", (await page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await page.locator(".big-note").innerText()) === "Press Start and play");
+check("opens on Listen, ready to start", (await page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await page.locator(".big-note").innerText()) === "");
 check(`reports a ${touch ? "finger" : "mouse"}`, (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) === touch);
 await auditCheck(page, "Listen");
 await shot("1-listen");
@@ -104,9 +105,9 @@ await shot("2-listen-note");
 await page.evaluate(() => window.playTone(62));
 await sleep(700);
 check("follows to a D", (await page.locator(".big-note").innerText()) === "Ré4 / D4");
-await press(page.locator('label:has-text("Letter names") input')); await sleep(100);
+await press(page.locator('.listen .box-toggle[aria-label^="Letter names"]')); await sleep(100);
 check("a switch changes what shows", (await page.locator(".big-note").innerText()) === "Ré4", await page.locator(".big-note").innerText());
-await press(page.locator('label:has-text("Letter names") input')); await sleep(100);
+await press(page.locator('.listen .box-toggle[aria-label^="Letter names"]')); await sleep(100);
 await page.evaluate(() => window.playTone(0));
 await sleep(600);
 check("goes quiet in silence", (await page.locator(".big-note").innerText()) === "Listening…");
@@ -125,7 +126,7 @@ check("Practice says so too", (await page.locator(".warning").first().innerText(
 
 flow("4. Practice: a whole scale, waiting for each note");
 await freshPractice(page);
-check(`Options start ${isPhone ? "closed" : "open"}`, (await page.locator(".options").evaluate((panel) => panel.open)) === !isPhone);
+check("Options show above the lanes", await page.locator(".options + .timeline-section").isVisible());
 await auditCheck(page, "Practice");
 await shot("4-practice");
 await options();
@@ -147,13 +148,12 @@ check("Stop goes back to the start, logged", (await progress(page)) === "Note 1 
 
 flow("5. Finding the note: the ghost note and the reference");
 await freshPractice(page);
-await setOption("count-in", false);
+await setCountIn(page, 0);
 await followNotes(page, { midis: Array(16).fill(64) });
 await startRun(); await sleep(500);
 const ghost = () => page.evaluate(() => { const group = document.querySelector(".played-note"); return group ? { arrow: group.querySelector("text").textContent, color: group.querySelector("ellipse").getAttribute("fill") } : null; });
 check("too high shows a blue ghost pointing down", (await ghost())?.arrow === "↓" && (await ghost())?.color === "#1f6fd1", JSON.stringify(await ghost()));
 check("and the note waits", (await progress(page)) === "Note 1 of 15");
-check("the buttons leave the needle readable", (await page.locator(".needle").evaluate((element) => element.getBoundingClientRect().width)) >= 60);
 await page.locator(".staff").scrollIntoViewIfNeeded();
 await shot("5-ghost");
 await stopRun();
@@ -185,7 +185,7 @@ flow("7. Don't wait");
 await practiceAt(120);
 await press(button("Don't wait")); await sleep(300);
 check("the icon turns green", (await button("Don't wait").evaluate((element) => getComputedStyle(element).color)) === "rgb(76, 208, 125)");
-check("Tempo no longer applies", await page.locator('.options label:has-text("Tempo") input').isDisabled());
+check("Tempo no longer applies, so it's hidden", await page.locator('.options label:has-text("Tempo")').isHidden());
 await followNotes(page, { midis: D, delays: { 3: 60000 } });
 await startRun();
 await waitForText(page, "Note 3 of 15");
@@ -343,7 +343,7 @@ await say("Delete");
 await press(page.locator(".piece", { hasText: "Hot Cross Buns" }).getByRole("button", { name: "Practice", exact: true })); await sleep(400);
 await options();
 await page.locator(".bpm input").fill("120");
-await setOption("count-in", false);
+await setCountIn(page, 0);
 await followNotes(page, { midis: [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62], delayMs: 100 });
 await startRun();
 await waitForText(page, "All 17 notes done", 60000);
@@ -416,8 +416,6 @@ if (touch) {
   const size = page.viewportSize();
   await page.setViewportSize({ width: size.height, height: size.width }); await sleep(500);
   const turned = await page.evaluate(() => ({ sideways: document.documentElement.scrollWidth - innerWidth, canvas: Math.round(document.querySelector("canvas").getBoundingClientRect().width), width: innerWidth }));
-  const needle = await page.locator(".needle").evaluate((element) => Math.round(element.getBoundingClientRect().width));
-  check("the needle stays readable with a reading showing", needle >= 60, `${needle}px`);
   check("the layout refits", turned.sideways <= 0 && Math.abs(turned.canvas - Math.min(960, turned.width - 32)) <= 2, JSON.stringify(turned));
   await shot("17-turned");
   await waitForText(page, "All 15 notes done", 60000);

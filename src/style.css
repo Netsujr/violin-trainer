@@ -450,6 +450,16 @@ section > ul > li {
   border-radius: var(--pico-border-radius);
 }
 
+/* One line at any width: the slider shrinks beside the icons rather than dropping below them. */
+.options {
+  flex-wrap: nowrap;
+}
+
+.options .bpm,
+.options .speed {
+  min-width: 0;
+}
+
 .options > .toggles {
   flex: none;
   gap: 0.375rem;

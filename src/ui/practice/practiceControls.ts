@@ -45,9 +45,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     onPick(picked);
   });
   const bpmControl = createBpmControl(resetBeat);
-  // Tempo smooths the move to the next note after a hit, which has no meaning when the lanes don't wait for one.
   const tempoSwitch = iconSwitch("tempoOn", t.tempo, TEMPO_ICON);
-  tempoSwitch.input.disabled = settings.followOn;
   const metronomeSwitch = iconSwitch("metronomeOn", t.metronome, METRONOME_ICON, t.metronome, resetBeat);
   const countInButton = createCountInButton(COUNT_IN_ICON, render);
   // With a backing track on, its speed stands in for the BPM, which it sets.
@@ -62,10 +60,11 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     todayPlan.refresh();
     const current = section();
     const scale = isScale(piece());
-    repeatTopButton.disabled = !scale;
-    // A backing track always sets the pace, so "Don't wait" is greyed out while one is on.
-    followButton.disabled = track.active;
-    followButton.title = track.active ? t.trackSetsPace : `${t.dontWait}: ${t.dontWaitHint}`;
+    // What doesn't apply is hidden: the repeated top note on a song, "Don't wait" when a backing track sets the pace
+    // anyway, and Tempo, which smooths the move after a hit, when the lanes don't wait for one.
+    repeatTopButton.hidden = !scale;
+    followButton.hidden = track.active;
+    tempoSwitch.label.hidden = settings.followOn || track.active;
     bpmControl.hidden = track.active;
     track.speedControl.hidden = !track.active;
     patternRow.hidden = !scale;
@@ -109,7 +108,6 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
   }
   showView();
   const followButton = modeButton("followOn", t.dontWait, DONT_WAIT_ICON, `${t.dontWait}: ${t.dontWaitHint}`, () => {
-    tempoSwitch.input.disabled = settings.followOn;
     showModes();
     clearStats();
     render();

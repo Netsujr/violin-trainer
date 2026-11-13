@@ -247,7 +247,12 @@ for (const [label, bpm, late, expected] of [
   check("metronome: the audio is running", clicks.every((click) => click.state === "running"));
   const count = clicks.length;
   await sleep(1500);
-  check("metronome: stops with the session", (await s.page.evaluate(() => window.clicks.length)) === count);
+  check("metronome: keeps going after the session, until it's switched off", (await s.page.evaluate(() => window.clicks.length)) > count);
+  await s.page.locator('.options label:has-text("Metronome") input').uncheck();
+  await sleep(300);
+  const off = await s.page.evaluate(() => window.clicks.length);
+  await sleep(1500);
+  check("metronome: switched off, it stops", (await s.page.evaluate(() => window.clicks.length)) === off);
   await s.close();
 }
 {

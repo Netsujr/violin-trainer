@@ -28,7 +28,7 @@ const hint = await dontWait().getAttribute("title");
 check("explains itself", hint?.includes("score"), hint);
 await dontWait().click(); await sleep(300);
 check("turns green when on", (await color()) === "rgb(76, 208, 125)", await color());
-check("saved, and Tempo no longer applies", (await savedSettings(page)).followOn === true && (await page.locator('.options label:has-text("Tempo") input').isDisabled()));
+check("saved, and Tempo no longer applies", (await savedSettings(page)).followOn === true && (await page.locator('.options label:has-text("Tempo")').isHidden()));
 
 // Silence: the lanes wait on the first note, with no count-in
 await freshPractice(page, 120);
@@ -124,7 +124,7 @@ check("a BPM change applies straight away", Math.abs(slowSpeed - BEAT_PX) < 8, `
 await page.locator(".bpm input").fill("120");
 const before = (await savedLog(page)).length;
 await dontWait().click(); await sleep(300);
-check("switching it off ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await savedLog(page)).length === before + 1 && !(await page.locator('.options label:has-text("Tempo") input').isDisabled()));
+check("switching it off ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await savedLog(page)).length === before + 1 && (await page.locator('.options label:has-text("Tempo")').isVisible()));
 check("back to waiting, on the first note", (await progress(page)) === "Note 1 of 15", await progress(page));
 await freshPractice(page, 120); // Ends the synthetic player, which would play the first note again.
 await begin(page); await sleep(3200); // Past the count-in.

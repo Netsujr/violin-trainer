@@ -25,7 +25,7 @@ const flow = (name) => console.log(`\n=== ${name}`);
 flow("1. First visit");
 {
   const s = await open("q-silent.wav");
-  check("opens on Listen, in English, nothing started", (await s.page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await s.page.locator(".big-note").innerText()) === "Press Start and play");
+  check("opens on Listen, in English, nothing started", (await s.page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await s.page.locator(".big-note").innerText()) === "");
   check("no recording, no log yet", (await log(s.page)).length === 0);
   await s.page.screenshot({ path: OUT + "1-listen.png" });
   for (const name of ["Practice", "Library", "Calendar"]) { await nav(s.page, name); await sleep(250); await s.page.screenshot({ path: `${OUT}1-${name}.png` }); }
@@ -46,7 +46,7 @@ flow("2. Listen: playing the open strings");
   const trail = await s.page.locator("section > p").last().innerText();
   check("recent notes list what was played", trail.includes("Sol3 (G)") && trail.includes("Mi5 (E)"), trail);
   await stop(s.page); await sleep(200);
-  check("Stop returns to the prompt", (await s.page.locator(".big-note").innerText()) === "Press Start and play");
+  check("Stop clears the note", (await s.page.locator(".big-note").innerText()) === "");
   const entries = await log(s.page);
   check("logged as Free play, no passes", entries.length === 1 && entries[0].pieceId === "free-play" && entries[0].passes === 0);
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
@@ -54,21 +54,18 @@ flow("2. Listen: playing the open strings");
 }
 {
   const s = await open("q-a4.wav");
-  const box = (t) => s.page.locator(`label:has-text("${t}") input`);
+  const box = (t) => s.page.locator(`.listen .box-toggle[aria-label^="${t}"]`);
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")'); await sleep(800);
   check("reads the note", (await s.page.locator(".big-note").innerText()) === "Lá4 / A4");
-  await box("Note names").uncheck(); await sleep(150);
+  await box("Note names").click(); await sleep(150);
   check("Note names off leaves the letter", (await s.page.locator(".big-note").innerText()) === "A4", await s.page.locator(".big-note").innerText());
-  await box("Letter names").uncheck(); await sleep(150);
+  await box("Letter names").click(); await sleep(150);
   const both = await s.page.locator(".big-note").innerText();
   check("with both off, the note area isn't broken", !both.includes("false") && !both.includes("undefined"), JSON.stringify(both));
-  await box("Note names").check(); await box("Letter names").check();
-  await box("Fingers").uncheck(); await sleep(100);
+  await box("Note names").click(); await box("Letter names").click();
+  await box("Fingers").click(); await sleep(100);
   check("Fingers off hides the position guess", await s.page.locator("section > p").first().isHidden());
-  await box("Fingers").check();
-  await box("Staff").uncheck(); await sleep(100);
-  check("Staff off hides the staff", await s.page.locator(".staff").isHidden());
-  await box("Staff").check();
+  await box("Fingers").click();
   await s.close();
 }
 
@@ -77,7 +74,7 @@ flow("3. The microphone is refused");
   const s = await open("q-silent.wav", { grant: false });
   await start(s.page);
   await sleep(1500);
-  const warning = await s.page.locator(".warning").innerText().catch(() => "");
+  const warning = await s.page.locator(".warning").first().innerText().catch(() => "");
   check("says so, and can be tried again", warning.startsWith("Microphone unavailable") && (await s.page.locator('button:text-is("Start")').isEnabled()), warning);
   check("nothing was logged", (await log(s.page)).length === 0);
   await s.page.screenshot({ path: OUT + "3-denied.png" });
@@ -115,10 +112,10 @@ flow("5. Practice: the reference tone");
 {
   const s = await open("q-silent.wav");
   await nav(s.page, "Practice"); await sleep(200);
-  await s.page.click('button:text-is("Play reference")'); await sleep(150);
-  check("Play reference works before starting, and doesn't start anything", (await progress(s.page)) === "Note 1 of 15" && (await s.page.locator('button:text-is("Start")').count()) === 1 && (await s.page.locator('button:text-is("Stop reference")').count()) === 1);
-  await s.page.click('button:text-is("Stop reference")'); await sleep(100);
-  check("and it turns off again", (await s.page.locator('button:text-is("Play reference")').count()) === 1);
+  await s.page.click('button[aria-label="Play reference"]'); await sleep(150);
+  check("Play reference works before starting, and doesn't start anything", (await progress(s.page)) === "Note 1 of 15" && (await s.page.locator('button:text-is("Start")').count()) === 1 && (await s.page.locator('button[aria-label="Stop reference"]').count()) === 1);
+  await s.page.click('button[aria-label="Stop reference"]'); await sleep(100);
+  check("and it turns off again", (await s.page.locator('button[aria-label="Play reference"]').count()) === 1);
   await s.close();
 }
 

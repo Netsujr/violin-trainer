@@ -190,6 +190,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       const { previousMidi } = loopAt;
       loopAt = null;
       loopAgain(session, previousMidi);
+      renderNotes();
     }
     // While the lanes move, the current note's progress. Moving on to the next resets it first.
     if (countIn.active) {

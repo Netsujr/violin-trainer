@@ -21,7 +21,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   // Options
   const options = page.locator(".options");
   check("options: no drawer, boxed right above the lanes", (await options.evaluate((panel) => panel.tagName)) === "DIV" && (await page.locator(".options + .timeline-section").count()) === 1);
-  const text = await options.innerText();
+  const text = (await options.innerText()) + " " + (await options.locator("[aria-label]").evaluateAll((elements) => elements.map((element) => element.ariaLabel).join(" ")));
   check("options: holds Tempo, Metronome, the count-in and BPM", ["Tempo", "Metronome", "count-in", "BPM"].every((word) => text.includes(word)) && !text.includes("Record"), text.replaceAll("\n", " ").slice(0, 80));
   check("options: the display switches moved out", !["Fingers", "Note names", "Grid"].some((word) => text.includes(word)));
   const rowOf = (selector) => page.locator(selector).evaluate((element) => Math.round(element.getBoundingClientRect().top + element.getBoundingClientRect().height / 2));
