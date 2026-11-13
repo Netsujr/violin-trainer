@@ -37,6 +37,7 @@ export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdM
       const verdict = judge.update(isMuted(now) ? null : frequency, now);
       showProgress(glide.pending ? 1 : verdict.progress);
       staff.showPlayed(session.index, verdict.cents, verdict.inTune);
+      session.heard(verdict.cents);
       if (verdict.hit && !glide.pending) {
         if (settings.tempoOn && session.index < endIndex() - 1) {
           glide.glide(session, verdict.averageCents, now, holdMs());

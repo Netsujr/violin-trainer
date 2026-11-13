@@ -15,6 +15,7 @@ export const STAFF_ICON = svgIcon('<path d="M3 6h18M3 10h18M3 14h18M3 18h18"/><e
 export const DONT_WAIT_ICON = svgIcon('<path d="m5 5 7 7-7 7M13 5l7 7-7 7"/>');
 export const TRASH_ICON = svgIcon('<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6M10 11v6M14 11v6"/>');
 export const PLAY_ICON = svgIcon('<path d="M7 4v16l13-8z"/>');
+export const CHART_ICON = svgIcon('<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>');
 export const PAUSE_ICON = svgIcon('<path d="M8 5v14M16 5v14"/>');
 export const DOWNLOAD_ICON = svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>');
 export const EAR_ICON = svgIcon('<path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/>');

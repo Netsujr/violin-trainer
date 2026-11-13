@@ -44,6 +44,7 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
     const inTune = cents !== null && Math.abs(cents) <= settings.toleranceCents;
     waiting.inTuneSince = inTune ? (waiting.inTuneSince ?? now) : null;
     staff.showPlayed(session.index, cents, inTune);
+    session.heard(cents);
     if (waiting.inTuneSince === null || now - waiting.inTuneSince < settings.holdMs) return;
 
     current.waiting = null;
@@ -92,6 +93,7 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
         waitForFirstNote(session, frequency, now);
         return null;
       }
+      session.bpm = Math.round(60000 / beatMs());
       const trackBeat = track.active ? track.beat(now) : null;
       const stepBeats = trackBeat === null ? (now - current.at) / beatMs() : Math.max(0, trackBeat - current.beat);
       current.at = now;
@@ -117,6 +119,7 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
       const cents = frequency === null ? null : centsToTarget(frequency, session.currentMidi);
       const played = heard === null || current.beat < current.tracker.startBeat ? null : cents;
       staff.showPlayed(session.index, played, played !== null && Math.abs(played) <= settings.toleranceCents);
+      session.heard(played);
       return current.tracker.progress;
     },
   };

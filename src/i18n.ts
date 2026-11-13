@@ -178,6 +178,19 @@ const en = {
   recordedAt: (time: string) => `Recorded at ${time}`,
   centsOff: (cents: number) => `${centsText(cents)} off`,
   slowestLower: (notes: string) => `slowest ${notes}`,
+  progressOf: (group: string) => `${group}: progress`,
+  days: (count: number) => plural(count, "day", "days"),
+  lastPractised: (day: string) => `Last: ${day}`,
+  scoreChart: "Score",
+  tempoChart: "Tempo (bpm)",
+  noScoresYet: "Play it with Don't wait to see its score over time.",
+  outOfTune: "Out of tune",
+  sharpBy: (cents: number) => `${centsText(cents)} sharp`,
+  flatBy: (cents: number) => `${centsText(cents)} flat`,
+  onString: (string: string, finger: string) => (finger === "0" ? `open ${string} string` : `${string} string, finger ${finger}`),
+  allInTune: "In tune: every note within 8 cents, on average.",
+  tuningNeedsMore: "Play it a little more to see which notes drift.",
+  notPractisedYet: (titles: string) => `Not practised yet: ${titles}`,
 };
 
 type Strings = typeof en;
@@ -378,6 +391,19 @@ const pt: Strings = {
   recordedAt: (time) => `Gravado às ${time}`,
   centsOff: (cents) => `${centsText(cents)} de desvio`,
   slowestLower: (notes) => `mais lentas: ${notes}`,
+  progressOf: (group) => `${group}: progresso`,
+  days: (count) => plural(count, "dia", "dias"),
+  lastPractised: (day) => `Último: ${day}`,
+  scoreChart: "Pontuação",
+  tempoChart: "Andamento (bpm)",
+  noScoresYet: "Toque Sem esperar para ver a pontuação ao longo do tempo.",
+  outOfTune: "Desafinadas",
+  sharpBy: (cents) => `${centsText(cents)} acima`,
+  flatBy: (cents) => `${centsText(cents)} abaixo`,
+  onString: (string, finger) => (finger === "0" ? `corda ${string} solta` : `corda ${string}, dedo ${finger}`),
+  allInTune: "Afinado: todas as notas a menos de 8 cents, em média.",
+  tuningNeedsMore: "Toque um pouco mais para ver quais notas desafinam.",
+  notPractisedYet: (titles) => `Ainda não praticadas: ${titles}`,
 };
 
 const STRINGS: Record<Language, Strings> = { en, pt };

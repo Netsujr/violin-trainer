@@ -2,6 +2,9 @@ import { midiOf, type Piece, type PieceNote } from "../music/notes";
 
 type NoteHit = { pitch: string; ms: number; cents: number; at: number };
 
+// Further off than this, it's nearer the next note than the one being played, so it's a wrong note, not an out-of-tune one.
+export const NEAR_CENTS = 50;
+
 export class Session {
   readonly piece: Piece;
   readonly startedAt: number;
@@ -14,6 +17,10 @@ export class Session {
   lastRunSeconds = 0;
   // The lanes set the pace, so a run's length says nothing about the playing and it isn't a timed pass.
   following = false;
+  // The tempo the lanes moved at, for "Don't wait".
+  bpm?: number;
+  // How each pitch sounded, from every reading near it, in tune or a near miss: cents added up (sharp above 0), and how many.
+  tuning = new Map<string, { cents: number; readings: number }>();
   private noteStart: number;
   private passStart: number;
   private wholePass = true;
@@ -42,6 +49,13 @@ export class Session {
   hit(cents: number, now: number, nextStartsAt = now) {
     this.hits.push({ pitch: this.current.pitch, ms: now - this.noteStart, cents, at: now });
     this.advance(nextStartsAt);
+  }
+
+  // What the mic heard against the current note, in cents, if anything.
+  heard(cents: number | null) {
+    if (cents === null || Math.abs(cents) > NEAR_CENTS || this.finished) return;
+    const sounded = this.tuning.get(this.current.pitch) ?? { cents: 0, readings: 0 };
+    this.tuning.set(this.current.pitch, { cents: sounded.cents + cents, readings: sounded.readings + 1 });
   }
 
   miss(now: number) {

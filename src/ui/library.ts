@@ -7,13 +7,14 @@ import { h, type Screen } from "./dom";
 import { createCardTracks } from "./libraryTracks";
 import { createPieceEditor } from "./pieceEditor";
 import { downloadSheet } from "./sheetPdf";
-import { DOWNLOAD_ICON, PENCIL_ICON, PLAY_ICON, TRASH_ICON } from "./toggles";
+import type { GroupKey } from "./progress";
+import { CHART_ICON, DOWNLOAD_ICON, PENCIL_ICON, PLAY_ICON, TRASH_ICON } from "./toggles";
 
 const SHOWN_PIECES = 3;
 
 const editableNote = (note: Piece["notes"][number]) => ({ ...note, beats: note.beats ?? 1 });
 
-export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (pieceId: string) => void): Screen {
+export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (pieceId: string) => void, goProgress: (group: GroupKey) => void): Screen {
   const settings = getSettings();
   const list = h("div", { className: "library" });
   const draft = loadDraft();
@@ -115,7 +116,9 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
             ...rest.map(pieceRow),
           );
           const heading = selected ? `${t[key]} (${t.selectedCount(selected)})` : t[key];
-          return h("div", {}, h("h3", {}, heading), ...group.slice(0, SHOWN_PIECES).map(pieceRow), ...(rest.length ? [drawer] : []));
+          const label = t.progressOf(t[key]);
+          const chart = h("button", { type: "button", className: "secondary outline icon-button", innerHTML: CHART_ICON, title: label, ariaLabel: label, onclick: () => goProgress(key) });
+          return h("div", {}, h("div", { className: "group-head" }, h("h3", {}, heading), chart), ...group.slice(0, SHOWN_PIECES).map(pieceRow), ...(rest.length ? [drawer] : []));
         }),
     );
   }

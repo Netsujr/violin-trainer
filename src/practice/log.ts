@@ -17,6 +17,10 @@ export type LogEntry = {
   score?: number;
   // A play-along with nothing heard: only its minutes count.
   playedAlong?: true;
+  // The tempo of a "Don't wait" run.
+  bpm?: number;
+  // Each pitch's average cents off, sharp above 0, and how many readings that's from. Older entries have none.
+  tuning?: Record<string, [cents: number, readings: number]>;
 };
 
 export const scorePercent = (hit: number, total: number) => (total === 0 ? 0 : Math.round((hit / total) * 100));
@@ -43,6 +47,9 @@ export function buildEntry(session: Session, now: number, recordingId?: string):
           .slice(0, 3)
           .map((hit) => ({ pitch: hit.pitch, seconds: hit.ms / 1000 })),
     recordingId,
-    ...(session.following && { score: scorePercent(session.hits.length, session.hits.length + session.missed) }),
+    ...(session.following && { score: scorePercent(session.hits.length, session.hits.length + session.missed), bpm: session.bpm }),
+    ...(session.tuning.size > 0 && {
+      tuning: Object.fromEntries([...session.tuning].map(([pitch, { cents, readings }]) => [pitch, [Math.round((cents / readings) * 10) / 10, readings]])),
+    }),
   };
 }

@@ -7,10 +7,12 @@ import { libraryScreen } from "./ui/library";
 import { listenScreen } from "./ui/listen";
 import { calendarScreen } from "./ui/calendar";
 import { practiceScreen } from "./ui/practice";
+import { progressScreen, type GroupKey } from "./ui/progress";
 import { createSettingsPanel } from "./ui/settings";
 
 const SCREEN_NAMES = ["Listen", "Practice", "Library", "Calendar"] as const;
-type ScreenName = (typeof SCREEN_NAMES)[number];
+// Progress isn't in the menu: it opens from a Library group, for that group.
+type ScreenName = (typeof SCREEN_NAMES)[number] | "Progress";
 
 const LANGUAGES: [Language, string][] = [
   ["en", "EN"],
@@ -23,20 +25,25 @@ let navButtons: HTMLButtonElement[] = [];
 let currentName: ScreenName = "Listen";
 let current: Screen | undefined;
 
-function build(name: ScreenName, pieceId?: string, aligning = false) {
+// id is the piece for Practice, and the group for Progress.
+function build(name: ScreenName, id?: string, aligning = false) {
   if (name === "Listen") return listenScreen();
-  if (name === "Practice") return practiceScreen(pieceId, aligning ? () => show("Library") : undefined);
-  if (name === "Library") return libraryScreen((id) => show("Practice", id), (id) => show("Practice", id, true));
+  if (name === "Progress") return progressScreen(id as GroupKey, () => show("Library"));
+  if (name === "Practice") return practiceScreen(id, aligning ? () => show("Library") : undefined);
+  if (name === "Library") return libraryScreen((piece) => show("Practice", piece), (piece) => show("Practice", piece, true), (group) => show("Progress", group));
   return calendarScreen();
 }
 
 // aligning opens Practice to line up the piece's backing track.
-async function show(name: ScreenName, pieceId?: string, aligning = false) {
+async function show(name: ScreenName, id?: string, aligning = false) {
   await current?.leave();
   currentName = name;
-  current = build(name, pieceId, aligning);
+  current = build(name, id, aligning);
   main.replaceChildren(current.element);
-  navButtons.forEach((button, index) => (button.ariaCurrent = SCREEN_NAMES[index] === name ? "page" : null));
+  // Progress opens from a Library group, which can be far down the page.
+  if (name === "Progress") scrollTo(0, 0);
+  const menuName = name === "Progress" ? "Library" : name;
+  navButtons.forEach((button, index) => (button.ariaCurrent = SCREEN_NAMES[index] === menuName ? "page" : null));
 }
 
 function renderHeader() {
@@ -67,7 +74,7 @@ function changeLanguage(language: Language) {
   saveSettings();
   setLanguage(language);
   renderHeader();
-  return show(currentName);
+  return show(currentName === "Progress" ? "Library" : currentName);
 }
 
 setLanguage(getSettings().language);
