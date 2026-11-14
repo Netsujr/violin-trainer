@@ -1,6 +1,6 @@
 // Portuguese across the app, including what only appears with data in it.
 import { wav, note } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, seed, heard, OUT } from "./lib.mjs";
 
 wav(OUT + "l-a4.wav", [note(69, 4)]);
 const today = new Date().toISOString();
@@ -45,10 +45,8 @@ await sleep(150);
 await page.locator('.listen button:text-is("Iniciar")').click();
 await page.waitForSelector('button:text-is("Parar")');
 await sleep(800);
-const big = await page.locator(".big-note").innerText();
-check("pt: Listen shows Portuguese names", big === "Lá4 / A4", big);
-const position = await page.locator("section > p").first().innerText();
-check("pt: the string is named in Portuguese", position === "Provavelmente corda Lá, dedo 0", position);
+const shown = await heard(page);
+check("pt: Listen names the note on the staff", shown === "0 Lá A", shown);
 const hertz = await page.locator("section").innerText();
 check("pt: a decimal comma", /\d+,\d Hz/.test(hertz));
 await page.click('.language button:text-is("EN")');

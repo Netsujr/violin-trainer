@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn } from "./lib.mjs";
+import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -85,7 +85,7 @@ await page.goto("http://localhost:5199/");
 await page.waitForSelector("nav button");
 
 flow("1. First visit");
-check("opens on Listen, ready to start", (await page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await page.locator(".big-note").innerText()) === "");
+check("opens on Listen, ready to start", (await page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await heard(page)) === "");
 check(`reports a ${touch ? "finger" : "mouse"}`, (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) === touch);
 await auditCheck(page, "Listen");
 await shot("1-listen");
@@ -94,24 +94,23 @@ flow("2. Listen");
 await toneMic();
 await startRun();
 await sleep(400);
-check("says it's listening", (await page.locator(".big-note").innerText()) === "Listening…", await page.locator(".big-note").innerText());
+check("shows no note before one is played", (await heard(page)) === "", await heard(page));
 await page.evaluate(() => window.playTone(69));
 await sleep(700);
-check("names an A", (await page.locator(".big-note").innerText()) === "Lá4 / A4", await page.locator(".big-note").innerText());
+check("names an A on the staff, with its finger", (await heard(page)) === "0 Lá A", await heard(page));
 const section = await page.locator("section").innerText();
-check("gives its string and pitch", section.includes("A string, finger 0") && /440\.\d Hz/.test(section), section.replaceAll("\n", " | ").slice(0, 120));
+check("gives its pitch", /440\.\d Hz/.test(section), section.replaceAll("\n", " | ").slice(0, 120));
 check("shows it on the staff", (await page.locator(".staff .vf-stavenote").count()) === 1);
 await shot("2-listen-note");
 await page.evaluate(() => window.playTone(62));
 await sleep(700);
-check("follows to a D", (await page.locator(".big-note").innerText()) === "Ré4 / D4");
+check("follows to a D", (await heard(page)) === "0 Ré D", await heard(page));
 await press(page.locator('.listen .box-toggle[aria-label^="Letter names"]')); await sleep(100);
-check("a switch changes what shows", (await page.locator(".big-note").innerText()) === "Ré4", await page.locator(".big-note").innerText());
+check("a switch changes what shows", (await heard(page)) === "0 Ré", await heard(page));
 await press(page.locator('.listen .box-toggle[aria-label^="Letter names"]')); await sleep(100);
 await page.evaluate(() => window.playTone(0));
 await sleep(600);
-check("goes quiet in silence", (await page.locator(".big-note").innerText()) === "Listening…");
-check("keeps a trail of recent notes", (await page.locator("section > p").last().innerText()).includes("Lá4 (A)"));
+check("goes quiet in silence", (await heard(page)) === "", await heard(page));
 await stopRun();
 check("logged as free play", (await savedLog(page)).at(-1).pieceId === "free-play");
 

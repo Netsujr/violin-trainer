@@ -1,7 +1,7 @@
 // The Options panel, the section bars, the staff's labels and its two modes, and the needle's zones.
 import { readFileSync, writeFileSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, sleep, check, seed, progress, OUT, pickPiece } from "./lib.mjs";
+import { open, nav, start, sleep, check, seed, progress, OUT, pickPiece, heard } from "./lib.mjs";
 
 wav(OUT + "s-silent.wav", [rest(3)]);
 const detuned = (cents) => 440 * 2 ** (cents / 1200);
@@ -170,14 +170,14 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   header.writeUInt32LE(36 + data.length, 4);
   header.writeUInt32LE(data.length, 40);
   writeFileSync(OUT + "s-quiet.wav", Buffer.concat([header, data]));
-  for (const [minRms, expected] of [[0.01, "Lá4 / A4"], [0.05, "Listening…"]]) {
+  for (const [minRms, expected] of [[0.01, "0 Lá A"], [0.05, ""]]) {
     const s = await open(OUT + "s-quiet.wav");
     await seed(s.page, { settings: { minRms } });
     await start(s.page);
     await s.page.waitForSelector('button:text-is("Stop")');
     await sleep(1200);
-    const big = await s.page.locator(".big-note").innerText();
-    check(`gate ${minRms}: a quiet note reads ${expected}`, big === expected, big);
+    const shown = await heard(s.page);
+    check(`gate ${minRms}: a quiet note reads ${expected || "nothing"}`, shown === expected, shown);
     await s.close();
   }
 }

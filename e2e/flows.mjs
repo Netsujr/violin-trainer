@@ -1,7 +1,7 @@
 // Each user flow on a computer, from start to finish, as a person would do it.
 import { chromium } from "playwright-core";
 import { wav, note, rest } from "./wav.mjs";
-import { laneScore, setRecord, begin, nav, start, stop, sleep, check, skipCountIn, trackNotes, progress, D_MAJOR as D, OUT, answer, saveStaff, staffNotes } from "./lib.mjs";
+import { laneScore, setRecord, begin, nav, start, stop, sleep, check, skipCountIn, trackNotes, progress, D_MAJOR as D, OUT, answer, saveStaff, staffNotes, heard } from "./lib.mjs";
 wav(OUT + "q-scale.wav", [...D.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);
 wav(OUT + "q-a4.wav", [note(69, 5)]);
 wav(OUT + "q-silent.wav", [rest(3)]);
@@ -25,7 +25,7 @@ const flow = (name) => console.log(`\n=== ${name}`);
 flow("1. First visit");
 {
   const s = await open("q-silent.wav");
-  check("opens on Listen, in English, nothing started", (await s.page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await s.page.locator(".big-note").innerText()) === "");
+  check("opens on Listen, in English, nothing started", (await s.page.locator('nav button[aria-current="page"]').innerText()) === "Listen" && (await heard(s.page)) === "");
   check("no recording, no log yet", (await log(s.page)).length === 0);
   await s.page.screenshot({ path: OUT + "1-listen.png" });
   for (const name of ["Practice", "Library", "Calendar"]) { await nav(s.page, name); await sleep(250); await s.page.screenshot({ path: `${OUT}1-${name}.png` }); }
@@ -41,12 +41,10 @@ flow("2. Listen: playing the open strings");
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   const seen = []; const t0 = Date.now();
-  while (Date.now() - t0 < 7800) { const big = await s.page.locator(".big-note").innerText(); if (seen.at(-1) !== big) seen.push(big); await sleep(20); }
-  check("each string shows, with silence between", ["Sol3 / G3", "Ré4 / D4", "Lá4 / A4", "Mi5 / E5"].every((n) => seen.includes(n)) && seen.includes("Listening…"), seen.join(" > "));
-  const trail = await s.page.locator("section > p").last().innerText();
-  check("recent notes list what was played", trail.includes("Sol3 (G)") && trail.includes("Mi5 (E)"), trail);
+  while (Date.now() - t0 < 7800) { const shown = await heard(s.page); if (seen.at(-1) !== shown) seen.push(shown); await sleep(20); }
+  check("each string shows on the staff, with silence between", ["0 Sol G", "0 Ré D", "0 Lá A", "0 Mi E"].every((n) => seen.includes(n)) && seen.includes(""), seen.join(" > "));
   await stop(s.page); await sleep(200);
-  check("Stop clears the note", (await s.page.locator(".big-note").innerText()) === "");
+  check("Stop clears the note", (await heard(s.page)) === "");
   const entries = await log(s.page);
   check("logged as Free play, no passes", entries.length === 1 && entries[0].pieceId === "free-play" && entries[0].passes === 0);
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
@@ -56,15 +54,14 @@ flow("2. Listen: playing the open strings");
   const s = await open("q-a4.wav");
   const box = (t) => s.page.locator(`.listen .box-toggle[aria-label^="${t}"]`);
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")'); await sleep(800);
-  check("reads the note", (await s.page.locator(".big-note").innerText()) === "Lá4 / A4");
+  check("reads the note, with its finger, name and letter", (await heard(s.page)) === "0 Lá A", await heard(s.page));
   await box("Note names").click(); await sleep(150);
-  check("Note names off leaves the letter", (await s.page.locator(".big-note").innerText()) === "A4", await s.page.locator(".big-note").innerText());
+  check("Note names off leaves the finger and letter", (await heard(s.page)) === "0 A", await heard(s.page));
   await box("Letter names").click(); await sleep(150);
-  const both = await s.page.locator(".big-note").innerText();
-  check("with both off, the note area isn't broken", !both.includes("false") && !both.includes("undefined"), JSON.stringify(both));
+  check("with both off, only the finger shows", (await heard(s.page)) === "0", await heard(s.page));
   await box("Note names").click(); await box("Letter names").click();
   await box("Fingers").click(); await sleep(100);
-  check("Fingers off hides the position guess", await s.page.locator("section > p").first().isHidden());
+  check("Fingers off takes the finger away", (await heard(s.page)) === "Lá A", await heard(s.page));
   await box("Fingers").click();
   await s.close();
 }
