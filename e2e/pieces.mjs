@@ -174,6 +174,31 @@ flow("The space notes take, and the bar lines");
   await s.close();
 }
 
+flow("Hearing a line of the staff");
+{
+  const s = await open(WAV);
+  const { page } = s;
+  await library(page);
+  check("an empty staff has no play button", (await page.locator(".editor-play").count()) === 0);
+
+  await library(page, { draft: { title: "", notes: lengths(...Array.from({ length: 32 }, () => 0.5)) } });
+  const lines = await page.$$eval(".editor-row", (rows) => rows.map((row) => `${row.querySelectorAll(".editor-column[data-index]").length > 0}:${row.querySelectorAll(".editor-clef .editor-play").length}`));
+  check("each line with notes has a play button under its clef", lines.filter((line) => line === "true:1").length > 1 && lines.every((line) => line === "true:1" || line === "false:0"), lines.join());
+
+  // Two beats at 120 BPM: a second.
+  await library(page, { draft: { title: "", notes: lengths(1, 1) }, settings: { bpm: 120 } });
+  const play = page.locator(".editor-play");
+  await play.click();
+  check("pressing it plays the line, and it becomes Stop", (await play.getAttribute("title")) === "Stop");
+  await sleep(1500);
+  check("it goes back once the line has played", (await play.getAttribute("title")) === "Hear this line");
+  await play.click();
+  await play.click();
+  check("pressing Stop stops it", (await play.getAttribute("title")) === "Hear this line");
+  notProblems(s);
+  await s.close();
+}
+
 flow("The question before anything is lost");
 {
   const s = await open(WAV);

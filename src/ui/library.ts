@@ -189,6 +189,6 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
       editor.element,
       h("div", { className: "row" }, saveButton, clearButton),
     ),
-    leave() {},
+    leave: editor.stopPlaying,
   };
 }

@@ -5,6 +5,7 @@ import { HIGHEST_MIDI, LOWEST_MIDI } from "../music/fingering";
 import { BAR_BEATS, barMarks, BEAT_LABELS, BEAT_LENGTHS, midiOf, noteLabels, type PieceNote } from "../music/notes";
 import { h } from "./dom";
 import { contentWidth } from "./layout";
+import { createLinePlayer } from "./linePlayer";
 import { toStaveNote } from "./staff";
 import { TRASH_ICON } from "./toggles";
 
@@ -113,6 +114,7 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
   let dragging = false;
   const rows = h("div", { className: "editor-rows" });
   const warning = h("p", { className: "warning" });
+  const player = createLinePlayer();
   const ghost = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
   ghost.setAttribute("rx", "7");
   ghost.setAttribute("ry", "5");
@@ -261,7 +263,9 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     return rowList;
   }
 
+  // A line playing stops, because its button is drawn again.
   function render() {
+    player.stop();
     const measured = measure();
     beatPx = measured.beatPx;
     fitted = `${measured.beatPx}:${measured.beatsPerRow}`;
@@ -273,6 +277,9 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
       ...toRows(list, measured.beatsPerRow).map((row) => {
         const clef = h("div", { className: "editor-sheet editor-clef" });
         drawSheet(clef, CLEF_WIDTH, { clef: true });
+        // A line with notes has a play button, under its clef.
+        const lineNotes = row.flatMap(({ noteIndex }) => (noteIndex === undefined ? [] : [noteIndex]));
+        if (lineNotes.length) clef.append(player.button(() => lineNotes.map((index) => notes[index])));
         const columns = row.map((segment) => (segment.noteIndex !== undefined ? noteColumn(segment) : segment.spill ? spillColumn(segment) : blankColumn(segment)));
         return h("div", { className: "editor-row" }, clef, ...columns);
       }),
@@ -362,5 +369,6 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     notes: () => notes,
     crossesBar,
     setNotes: (newNotes: PieceNote[]) => change(() => (notes = newNotes)),
+    stopPlaying: player.stop,
   };
 }

@@ -1000,8 +1000,10 @@ button.editor-name:is(:hover, :active, :focus) {
   box-shadow: none;
 }
 
-/* In a strip of the sheet below the lowest note, so it stays put as the note moves. */
-.editor-delete {
+/* In a strip of the sheet below the lowest note, so it stays put as the note moves. A line's play button sits in the
+   same strip, under the clef. */
+.editor-delete,
+.editor-play {
   position: absolute;
   bottom: 0.125rem;
   left: 0.625rem;
@@ -1019,7 +1021,8 @@ button.editor-name:is(:hover, :active, :focus) {
   box-shadow: none;
 }
 
-.editor-delete:is(:hover, :active, :focus) {
+.editor-delete:is(:hover, :active, :focus),
+.editor-play:is(:hover, :active, :focus) {
   background: none;
   box-shadow: none;
 }
@@ -1031,7 +1034,8 @@ button.editor-name:is(:hover, :active, :focus) {
   }
 }
 
-.editor-delete svg {
+.editor-delete svg,
+.editor-play svg {
   width: 1rem;
   height: 1rem;
 }
