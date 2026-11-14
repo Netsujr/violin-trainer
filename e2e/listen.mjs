@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, open, seed, nav, start, stop, sleep, check, OUT } from "./lib.mjs";
+import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, heard, OUT } from "./lib.mjs";
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
@@ -18,17 +18,17 @@ wav(OUT + "a440.wav", [{ hz: 440, seconds: 5, wave: "sine" }]);
   }
   const min = Math.min(...readings), max = Math.max(...readings);
   check("A440 reads 440 Hz ±1", min >= 439 && max <= 441, `min ${min} max ${max} n=${readings.length}`);
-  const big = await s.page.locator(".big-note").innerText();
-  check("A440 shows Lá4 / A4", big === "Lá4 / A4", big);
-  const pos = await s.page.locator("section > p").first().innerText();
-  check("A4 string guess is open A", pos.includes("A string, finger 0"), pos);
+  const shown = await heard(s.page);
+  check("A440 shows on the staff as finger 0, Lá, A", shown === "0 Lá A", shown);
+  const staff = await s.page.locator(".listen .staff svg").boundingBox();
+  check("the staff is a fifth larger than its 300-unit sheet", staff.width >= 360, `${staff.width}px`);
   await s.page.screenshot({ path: OUT + "listen-a440.png" });
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
 // Open strings, sawtooth so overtones are present
-const OPEN = [[55, "Sol3 / G3"], [62, "Ré4 / D4"], [69, "Lá4 / A4"], [76, "Mi5 / E5"]];
+const OPEN = [[55, "0 Sol G"], [62, "0 Ré D"], [69, "0 Lá A"], [76, "0 Mi E"]];
 wav(OUT + "open.wav", OPEN.flatMap(([m]) => [note(m, 1.5), rest(0.5)]));
 {
   const s = await open(OUT + "open.wav");
@@ -36,14 +36,14 @@ wav(OUT + "open.wav", OPEN.flatMap(([m]) => [note(m, 1.5), rest(0.5)]));
   const seen = [];
   const t0 = Date.now();
   while (Date.now() - t0 < 9000) {
-    const big = await s.page.locator(".big-note").innerText();
+    const big = await heard(s.page);
     if (seen.at(-1)?.big !== big) seen.push({ big, t: Date.now() - t0 });
     await sleep(15);
   }
   const names = seen.map((x) => x.big);
   console.log("  timeline:", seen.map((x) => `${x.big}@${x.t}`).join("  "));
   check("every open string shows", OPEN.every(([, label]) => names.includes(label)));
-  check("only the open strings or Listening ever show", names.slice(1).every((n) => n === "Listening…" || OPEN.some(([, l]) => l === n)), names.join(", "));
+  check("only the open strings or nothing ever show", names.slice(1).every((n) => n === "" || OPEN.some(([, l]) => l === n)), names.join(", "));
   await s.page.screenshot({ path: OUT + "listen-open.png" });
   await s.close();
 }
@@ -54,8 +54,8 @@ wav(OUT + "silence.wav", [rest(4)]);
   const s = await open(OUT + "silence.wav");
   await start(s.page);
   const seen = new Set();
-  for (let i = 0; i < 60; i++) { seen.add(await s.page.locator(".big-note").innerText()); await sleep(25); }
-  seen.delete(""); check("silence shows Listening…", seen.size === 1 && seen.has("Listening…"), [...seen].join(","));
+  for (let i = 0; i < 60; i++) { seen.add(await heard(s.page)); await sleep(25); }
+  check("silence shows no note", seen.size === 1 && seen.has(""), [...seen].join(","));
   await s.close();
 }
 
@@ -73,8 +73,8 @@ wav(OUT + "silence.wav", [rest(4)]);
     await start(s.page);
     await sleep(300);
     const seen = new Set();
-    for (let i = 0; i < 100; i++) { seen.add(await s.page.locator(".big-note").innerText()); await sleep(25); }
-    check(`${name}: no random notes`, seen.size === 1 && seen.has("Listening…"), [...seen].join(","));
+    for (let i = 0; i < 100; i++) { seen.add(await heard(s.page)); await sleep(25); }
+    check(`${name}: no random notes`, seen.size === 1 && seen.has(""), [...seen].join(","));
     await s.close();
   }
 }
@@ -105,32 +105,47 @@ wav(OUT + "silence.wav", [rest(4)]);
   await s.close();
 }
 
-// Note guesser: with a written A4 to play, A440 gets it right, which ends the game and the run.
+// Note guesser: random notes, made predictable here. Loading and Start each deal a round, D4 then A4, so A440 plays it right.
+const dealDThenA = () => {
+  let calls = 0;
+  Math.random = () => (calls++ % 2 ? 0.5 : 0);
+};
 {
   const s = await open(OUT + "a440.wav");
-  await seed(s.page, { settings: { countInOn: false, guesserOn: true, guesserWrittenOn: true, guesserNotes: [{ pitch: "A4", beats: 1 }] } });
+  await s.page.addInitScript(dealDThenA);
+  await seed(s.page, { settings: { countInOn: false, guesserOn: true, toggles: { fingers: false, noteNames: false, letterNames: false } } });
+  const score = () => s.page.locator(".guess-score").innerText();
   const staffTop = async () => (await s.page.locator(".listen > .staff").boundingBox()).y;
   const before = await staffTop();
   await start(s.page);
-  check("a game of written notes is the list, played once", (await s.page.locator(".guess-score").innerText()) === "0 of 1");
-  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Done!"), null, { timeout: 8000 });
-  await s.page.waitForSelector('button:text-is("Start")', { timeout: 3000 });
-  check("playing it right finishes the game and stops the run", true);
-  check("its note shows with no name, and the staff stays put as notes start", (await s.page.locator(".listen .staff text[font-family^=system-ui]").count()) === 0 && Math.abs((await staffTop()) - before) < 1, `${before} → ${await staffTop()}`);
+  check("a game is 10 notes", (await score()) === "0 of 10", await score());
+  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Right! Next in 5"), null, { timeout: 8000 });
+  const t0 = Date.now();
+  check("with the toggles off, its note shows unnamed, and the staff stays put as notes start", (await s.page.locator(".listen .staff text[font-family^=system-ui]").count()) === 0 && Math.abs((await staffTop()) - before) < 1, `${before} → ${await staffTop()}`);
+  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent === "1 of 10", null, { timeout: 9000 });
+  const waited = Date.now() - t0;
+  check("the next note comes 5 seconds after one played right", waited >= 4500 && waited < 7000, `${waited} ms`);
   await s.page.screenshot({ path: OUT + "listen-guesser.png" });
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-// After a note played right, the next waits 5 seconds.
+// The level: one button stepping through Easy, Medium and Hard, and kept. The toggles label the notes to play, or not.
 {
   const s = await open(OUT + "a440.wav");
-  await seed(s.page, { settings: { countInOn: false, guesserOn: true, guesserWrittenOn: true, guesserNotes: [{ pitch: "A4", beats: 1 }, { pitch: "A4", beats: 1 }] } });
-  await start(s.page);
-  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Right! Next in 5"), null, { timeout: 8000 });
-  const t0 = Date.now();
-  await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Done!"), null, { timeout: 9000 });
-  const waited = Date.now() - t0;
-  check("the next note comes 5 seconds after one played right", waited >= 4500 && waited < 7000, `${waited} ms`);
+  await seed(s.page, { settings: { guesserOn: true, toggles: { fingers: false, noteNames: false, letterNames: false } } });
+  const level = s.page.locator(".guess-level");
+  check("the level starts on Easy", (await level.innerText()) === "Easy");
+  await level.click();
+  await level.click();
+  check("pressing it steps through Medium to Hard, kept", (await level.innerText()) === "Hard" && (await savedSettings(s.page)).guesserLevel === "hard");
+  await level.click();
+  check("and round to Easy again", (await level.innerText()) === "Easy");
+  const labels = () => s.page.locator(".listen .staff text[font-family^=system-ui]").allTextContents();
+  check("with the toggles off, the note to play has no labels", (await labels()).length === 0);
+  for (const toggle of ["Fingers", "Note names", "Letter names"]) await s.page.click(`.listen button[aria-label^="${toggle}"]`);
+  const shown = await labels();
+  check("the toggles put its finger, name and letter on it", shown.length === 2 && /^[0-4]$/.test(shown[0]) && / [A-G]/.test(shown[1]), shown.join(" | "));
+  check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

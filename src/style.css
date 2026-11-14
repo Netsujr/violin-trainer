@@ -343,7 +343,10 @@ section > ul > li {
   margin-inline: auto;
 }
 
+/* The staff is Listen's main view: a fifth larger than its 300-unit sheet, and narrower only to fit a small screen. */
 .listen .staff {
+  width: calc(360px + 1rem);
+  max-width: 100%;
   margin: 1rem auto;
 }
 
@@ -366,29 +369,13 @@ section > ul > li {
   gap: 0.75rem;
 }
 
-.guess-hint {
+/* The level: one small button, stepping through them. */
+.guesser .guess-level {
+  width: auto;
+  min-width: 4.5rem;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
   font-size: 0.875rem;
-  color: var(--pico-muted-color);
-}
-
-.guess-writer {
-  text-align: left;
-}
-
-.big-note {
-  margin-block: 1.5rem 0.5rem;
-  font-size: clamp(3rem, 9vw, 5.5rem);
-  font-weight: 800;
-  line-height: 1.1;
-  color: #f3ead9;
-}
-
-.big-note.idle {
-  font-size: 2rem;
-  font-weight: 400;
-  /* The same height as a note's name, at every width. */
-  line-height: calc(clamp(3rem, 9vw, 5.5rem) * 1.1);
-  color: var(--pico-muted-color);
 }
 
 /* With room to spare, everything on Listen is drawn larger, to read from a music stand. */
@@ -1342,16 +1329,6 @@ a[download] {
   .listen .row:has(> .needle) {
     width: 100%;
     margin-inline: 0;
-  }
-
-  .big-note {
-    margin-block: 0.25rem;
-    font-size: 2.5rem;
-  }
-
-  .big-note.idle {
-    font-size: 1.5rem;
-    line-height: 2.75rem;
   }
 }
 

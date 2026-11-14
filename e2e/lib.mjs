@@ -166,6 +166,8 @@ export const freshPractice = async (page, bpm) => {
   await sleep(250);
   if (bpm) await page.locator(".bpm input").fill(String(bpm));
 };
+// What Listen's staff says about the note heard in free play: its finger, name and letter, or "" when nothing is heard.
+export const heard = async (page) => (await page.locator(".listen .staff text[font-family^=system-ui]").allTextContents()).join(" ");
 export const savedLog = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("log") ?? "[]"));
 export const savedSettings = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
 export const canvasHasColor = (page, r, g, b) =>

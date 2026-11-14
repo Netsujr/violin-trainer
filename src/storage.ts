@@ -37,12 +37,13 @@ export type Settings = {
   lastTargets: Record<string, number>;
   // The piece Practice had open last, to open on again.
   lastPieceId?: string;
-  // Listen's note guesser: on or off, notes shown at a time, and the user's own notes to draw from instead of random ones.
+  // Listen's note guesser: on or off, the level of its random notes, and notes shown at a time.
   guesserOn: boolean;
+  guesserLevel: GuesserLevel;
   guesserCount: number;
-  guesserWrittenOn: boolean;
-  guesserNotes: PieceNote[];
 };
+
+export type GuesserLevel = "easy" | "medium" | "hard";
 
 // view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
 export type RecordingView = "lanes" | "bigStaff" | "staffOnly";
@@ -74,9 +75,8 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   planTargets: {},
   lastTargets: {},
   guesserOn: false,
+  guesserLevel: "easy",
   guesserCount: 1,
-  guesserWrittenOn: false,
-  guesserNotes: [],
 };
 
 const read = <T>(key: string, fallback: T): T => {

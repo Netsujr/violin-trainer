@@ -6,7 +6,8 @@ import type { Section } from "./highway";
 import { createTrace } from "./staffTrace";
 
 type StaffNote = { pitch: string; beats?: number; finger?: string };
-export type StaffLabels = { names: boolean; fingers: boolean };
+// letters adds each note's letter to its name, as the note guesser does. Practice shows names only.
+export type StaffLabels = { names: boolean; fingers: boolean; letters?: boolean };
 type WriteLabel = (text: string, x: number, y: number, fill: string, fontSize: number) => void;
 
 const TOP = 30;
@@ -143,7 +144,9 @@ export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[]
       const color = note.finger.startsWith("L") ? LOW_FINGER_COLOR : FINGER_COLOR;
       writeLabel(note.finger.replace("L", ""), x, fingerRow, color, 13);
     }
-    if (labels.names) writeLabel(noteLabels(note.pitch).solfege, x, nameRow, NAME_COLOR, 11);
+    const { solfege, letter } = noteLabels(note.pitch);
+    const name = [labels.names && solfege, labels.letters && letter].filter(Boolean).join(" ");
+    if (name) writeLabel(name, x, nameRow, NAME_COLOR, 11);
   });
   return drawn;
 }
@@ -265,7 +268,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     element.replaceChildren();
     element.classList.toggle("collapsed", collapsed);
     const totalBeats = beatsIn(notes);
-    const labelled = labels.names || labels.fingers;
+    const labelled = labels.names || labels.fingers || labels.letters;
     const top = labelled ? LABELLED_TOP : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
     const sheetWidth = !collapsed && fitHeight ? fittedWidth(notes, top, bottom) : width;
@@ -369,7 +372,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     draw(notes: StaffNote[], current = 0, newLabels: StaffLabels = labels, newSection: Section | null = null) {
       labels = newLabels;
       section = newSection;
-      const key = [labels.names, labels.fingers, section?.first, section?.last, ...notes.map((note) => `${note.pitch}:${note.beats}:${note.finger}`)].join();
+      const key = [labels.names, labels.fingers, labels.letters, section?.first, section?.last, ...notes.map((note) => `${note.pitch}:${note.beats}:${note.finger}`)].join();
       if (key !== shown) {
         shown = key;
         render(notes);
