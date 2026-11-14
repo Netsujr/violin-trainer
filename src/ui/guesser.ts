@@ -4,6 +4,7 @@ import { centsFrom, midiOf, pitchOf } from "../music/notes";
 import { getSettings, saveSettings, type GuesserLevel } from "../storage";
 import { h } from "./dom";
 import type { createStaff } from "./staff";
+import { chipGroup } from "./toggles";
 
 export const GUESS_COUNTS = [1, 2, 4];
 export const LEVELS: GuesserLevel[] = ["easy", "medium", "hard"];
@@ -91,24 +92,16 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, onDone: () 
   };
   showLevel();
 
-  const countButtons = GUESS_COUNTS.map((count) =>
-    h("button", {
-      type: "button",
-      textContent: String(count),
-      ariaPressed: String(count === settings.guesserCount),
-      onclick() {
-        settings.guesserCount = count;
-        saveSettings();
-        countButtons.forEach((button, at) => (button.ariaPressed = String(GUESS_COUNTS[at] === count)));
-        newRound();
-      },
-    }),
-  );
+  const counts = chipGroup(t.notesAtATime, GUESS_COUNTS, String, () => settings.guesserCount, (count) => {
+    settings.guesserCount = count;
+    saveSettings();
+    newRound();
+  });
 
   const panel = h(
     "div",
     { className: "guesser" },
-    h("div", { className: "row" }, levelButton, t.notesAtATime, h("div", { role: "group", ariaLabel: t.notesAtATime }, ...countButtons), score),
+    h("div", { className: "row" }, levelButton, t.notesAtATime, counts, score),
   );
 
   return {

@@ -12,7 +12,7 @@ export type Run = Awaited<ReturnType<typeof startRun>>;
 export async function startRun(
   piece: Piece,
   record: boolean,
-  onReading: (frequency: number | null, now: number) => void,
+  onReading: (frequency: number | null, now: number, rms: number) => void,
   listen = true,
   logged = true,
 ) {
@@ -47,10 +47,10 @@ export async function startRun(
   };
 }
 
-function silentRun(piece: Piece, onReading: (frequency: number | null, now: number) => void, logged: boolean) {
+function silentRun(piece: Piece, onReading: (frequency: number | null, now: number, rms: number) => void, logged: boolean) {
   const session = new Session(piece, performance.now());
   let animationFrame = requestAnimationFrame(function tick(now) {
-    onReading(null, now);
+    onReading(null, now, 0);
     animationFrame = requestAnimationFrame(tick);
   });
   return {

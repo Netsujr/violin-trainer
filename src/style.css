@@ -369,6 +369,39 @@ section > ul > li {
   gap: 0.75rem;
 }
 
+/* Technique's choices, each a caption and its chips, kept together as the row wraps. */
+.technique .row {
+  gap: 0.5rem 1rem;
+}
+
+.chip-choice {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* What the round is doing, then how it went. Each keeps its line, so nothing jumps as a round starts and ends. */
+.technique-status {
+  min-height: 1lh;
+  margin-block: 0.5rem;
+}
+
+.technique .chip-row {
+  justify-content: center;
+  min-height: 1.75rem;
+}
+
+/* How loud the playing is, under the needle. */
+.volume-curve {
+  display: block;
+  width: 100%;
+  max-width: 36rem;
+  height: 2rem;
+  margin: 0 auto;
+  color: var(--pico-primary);
+}
+
 /* The level: one small button, stepping through them. */
 .guesser .guess-level {
   width: auto;
@@ -470,7 +503,8 @@ section > ul > li {
   cursor: pointer;
 }
 
-.toggles .icon-switch input {
+.toggles .icon-switch input,
+.technique .icon-switch input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -486,7 +520,8 @@ section > ul > li {
   height: 1.125rem;
 }
 
-.options .icon-switch:has(input:checked) {
+.options .icon-switch:has(input:checked),
+.technique .icon-switch:has(input:checked) {
   color: var(--pico-primary);
   background: color-mix(in srgb, var(--pico-primary) 18%, transparent);
   border-color: var(--pico-primary);
@@ -1307,10 +1342,11 @@ a[download] {
     gap: 0.375rem;
   }
 
-  /* Listen: the note and needle on the left, the staff beside them. */
+  /* Listen: the needle and the controls on the left, the staff beside them. The controls keep room for the three
+     modes side by side, and the staff narrows to fit. */
   .listen {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(17rem, 1fr) minmax(0, auto);
     column-gap: 1rem;
     align-items: center;
   }

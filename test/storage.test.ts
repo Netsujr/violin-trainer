@@ -28,6 +28,14 @@ describe("count-in", () => {
   });
 });
 
+describe("Listen's mode", () => {
+  it("opens on free play, and on the note guesser when it was switched on before Listen had three modes", async () => {
+    expect((await settingsWith(null)).getSettings().listenMode).toBe("free");
+    expect((await settingsWith({ guesserOn: true })).getSettings().listenMode).toBe("guesser");
+    expect((await settingsWith({ guesserOn: true, listenMode: "technique" })).getSettings().listenMode).toBe("technique");
+  });
+});
+
 describe("highlighted pieces", () => {
   it("keeps pieces that had a target day marked", async () => {
     const { getSettings } = await settingsWith({ targetDays: { "twinkle-twinkle": 2 } });

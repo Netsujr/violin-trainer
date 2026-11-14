@@ -1,15 +1,18 @@
 import { centsText, localNumber, t } from "../i18n";
 import { fillFingering } from "../music/fingering";
 import { centsFrom, nearestMidi, pitchOf } from "../music/notes";
-import { getSettings, saveSettings } from "../storage";
+import { getSettings, saveSettings, type ListenMode } from "../storage";
 import { h, type Screen } from "./dom";
 import { createGuesser, toggleLabels } from "./guesser";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
+import { createTechnique } from "./technique";
 import { createIconToggle } from "./toggles";
+import { createVolumeCurve } from "./volumeCurve";
 
 const SILENCE_MS = 300;
 const FREE_PLAY = { id: "free-play", title: "Free play", source: "listen", notes: [] };
+const MODES: ListenMode[] = ["free", "guesser", "technique"];
 
 export function createNeedle() {
   const mark = h("i");
@@ -33,32 +36,45 @@ export function listenScreen(): Screen {
   const settings = getSettings();
   const hertz = h("p");
   const needle = createNeedle();
+  const volume = createVolumeCurve();
   const staff = createStaff();
   let midi: number | null = null;
   let lastHeard = 0;
   const guesser = createGuesser(staff, () => controls.finish(() => true));
-  const modeButtons = [false, true].map((guessing) =>
-    h("button", { type: "button", textContent: guessing ? t.noteGuesser : t.freePlay, onclick: () => setMode(guessing) }),
-  );
+  const technique = createTechnique(staff, () => controls.finish(() => true));
+  const modeNames = { free: t.freePlay, guesser: t.noteGuesser, technique: t.technique };
+  const modeButtons = MODES.map((mode) => h("button", { type: "button", textContent: modeNames[mode], onclick: () => setMode(mode) }));
 
-  function setMode(guessing: boolean) {
-    settings.guesserOn = guessing;
+  // Each mode has its own row of choices under the buttons, hidden in the others. Technique also shows how loud the
+  // playing is, under the needle.
+  function setMode(mode: ListenMode) {
+    settings.listenMode = mode;
     saveSettings();
-    modeButtons.forEach((button, index) => (button.ariaPressed = String(Boolean(index) === guessing)));
-    guesser.panel.hidden = !guessing;
+    modeButtons.forEach((button, index) => (button.ariaPressed = String(MODES[index] === mode)));
+    guesser.panel.hidden = mode !== "guesser";
+    technique.panel.hidden = mode !== "technique";
+    volume.element.hidden = mode !== "technique";
     staff.hidePlayed();
-    if (guessing) guesser.start();
+    staff.clearTrace();
+    // Ends a technique round, before the mode picked draws its own notes.
+    technique.stop();
+    if (mode === "guesser") guesser.start();
+    if (mode === "technique") technique.start();
     renderNote();
   }
 
-  // Free play draws the note heard on the staff, with its finger, name and letter as the toggles say. The guesser
-  // draws its own notes.
+  // Free play draws the note heard on the staff, with its finger, name and letter as the toggles say. The other modes
+  // draw their own notes.
   function renderNote() {
-    if (!settings.guesserOn) staff.draw(midi === null ? [] : [fillFingering({ pitch: pitchOf(midi) })], 0, toggleLabels());
+    if (settings.listenMode === "free") staff.draw(midi === null ? [] : [fillFingering({ pitch: pitchOf(midi) })], 0, toggleLabels());
   }
 
   // A toggle changed: the notes drawn again with the labels now on.
-  const relabel = () => (settings.guesserOn ? guesser.relabel() : renderNote());
+  function relabel() {
+    if (settings.listenMode === "guesser") guesser.relabel();
+    else if (settings.listenMode === "technique") technique.relabel();
+    else renderNote();
+  }
 
   function hear(frequency: number, now: number) {
     const heardMidi = nearestMidi(frequency);
@@ -82,19 +98,30 @@ export function listenScreen(): Screen {
 
   const controls = createRunControls({
     piece: () => FREE_PLAY,
-    onReading(frequency, now) {
+    onReading(frequency, now, rms) {
       if (frequency !== null) hear(frequency, now);
       else if (midi !== null && now - lastHeard > SILENCE_MS) goQuiet();
-      if (settings.guesserOn) guesser.read(frequency, now);
+      if (settings.listenMode === "guesser") guesser.read(frequency, now);
+      if (settings.listenMode === "technique") {
+        volume.add(rms, settings.minRms);
+        technique.read(frequency, now, rms);
+      }
     },
     onStart() {
-      if (settings.guesserOn) guesser.start();
+      if (settings.listenMode === "guesser") guesser.start();
+      if (settings.listenMode === "technique") {
+        volume.clear();
+        technique.start();
+      }
       renderNote();
     },
-    onStop: goQuiet,
+    onStop() {
+      if (settings.listenMode === "technique") technique.stop();
+      goQuiet();
+    },
   });
 
-  setMode(settings.guesserOn);
+  setMode(settings.listenMode);
   goQuiet();
 
   return {
@@ -104,6 +131,7 @@ export function listenScreen(): Screen {
       // The staff comes first, with how in tune under it.
       staff.element,
       needle.element,
+      volume.element,
       hertz,
       h(
         "div",
@@ -115,6 +143,7 @@ export function listenScreen(): Screen {
         controls.message,
       ),
       guesser.panel,
+      technique.panel,
     ),
     leave: controls.leave,
   };

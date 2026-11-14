@@ -43,7 +43,7 @@ function drawPage(title: string, lines: ReturnType<typeof openLines>, labels: St
   lines.forEach(({ line, formatWidth }, index) => {
     const stave = new Stave(0, LINES_TOP + index * LINE_SPACING, SHEET_WIDTH - 1).addClef("treble");
     if (index === 0 && meter) addTime(stave, meter);
-    drawLine(context, stave, line, formatWidth, labels, writeText);
+    drawLine(context, stave, line, formatWidth, labels, (text, x, y, fill, fontSize) => writeText(text, x, y, fill, fontSize));
   });
 
   const encoded = atob(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);

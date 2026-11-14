@@ -2,7 +2,7 @@ import { del, get, getMany, keys, set } from "idb-keyval";
 import scales from "./content/scales.json";
 import { fillFingering } from "./music/fingering";
 import type { Language } from "./i18n";
-import type { Piece, PieceNote } from "./music/notes";
+import type { Piece, PieceNote, StringName } from "./music/notes";
 import type { LogEntry } from "./practice/log";
 
 export type Settings = {
@@ -37,12 +37,18 @@ export type Settings = {
   lastTargets: Record<string, number>;
   // The piece Practice had open last, to open on again.
   lastPieceId?: string;
-  // Listen's note guesser: on or off, the level of its random notes, and notes shown at a time.
-  guesserOn: boolean;
+  // What Listen does: show the note heard, the note guesser, or technique exercises.
+  listenMode: ListenMode;
+  // The note guesser: the level of its random notes, and notes shown at a time.
   guesserLevel: GuesserLevel;
   guesserCount: number;
+  // Technique: the notes played in one bow (one is a long bow, more are slurs), the string, and the beats each note lasts.
+  bowNotes: number;
+  bowString: StringName;
+  bowBeats: number;
 };
 
+export type ListenMode = "free" | "guesser" | "technique";
 export type GuesserLevel = "easy" | "medium" | "hard";
 
 // view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
@@ -74,9 +80,12 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   todayPlanOpen: true,
   planTargets: {},
   lastTargets: {},
-  guesserOn: false,
+  listenMode: "free",
   guesserLevel: "easy",
   guesserCount: 1,
+  bowNotes: 1,
+  bowString: "A",
+  bowBeats: 4,
 };
 
 const read = <T>(key: string, fallback: T): T => {
@@ -100,6 +109,8 @@ export function getSettings() {
       countInBeats: COUNT_IN_CHOICES.find((beats) => beats >= (stored.countInBeats ?? DEFAULT_SETTINGS.countInBeats)) ?? COUNT_IN_CHOICES.at(-1)!,
       // Pieces given a target day before highlighting replaced it stay marked.
       highlighted: stored.highlighted ?? Object.keys((stored as { targetDays?: object }).targetDays ?? {}),
+      // The note guesser was a switch before Listen had three modes.
+      listenMode: stored.listenMode ?? ((stored as { guesserOn?: boolean }).guesserOn ? "guesser" : "free"),
     };
   }
   return settings;

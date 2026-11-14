@@ -9,7 +9,8 @@ const FINISH_TAIL_MS = 1000;
 
 export function createRunControls(options: {
   piece: () => Piece;
-  onReading: (frequency: number | null, now: number) => void;
+  // Each reading from the mic: the pitch heard, if any, and how loud it was.
+  onReading: (frequency: number | null, now: number, rms: number) => void;
   // Whether the mic listens. Off is a play-along: nothing heard, and only its minutes logged, unless it's lining a
   // track up, which isn't practice.
   listen?: () => boolean;

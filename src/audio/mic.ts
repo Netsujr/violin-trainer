@@ -1,10 +1,11 @@
-import { createDetector } from "./detector";
+import { createDetector, rootMeanSquare } from "./detector";
 
 const FRAME_SIZE = 2048;
 
 export async function startMic(
   minRms: () => number,
-  onReading: (frequency: number | null, now: number) => void,
+  // Each frame's pitch, if it has a clear one, and how loud it was.
+  onReading: (frequency: number | null, now: number, rms: number) => void,
 ) {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
@@ -22,7 +23,8 @@ export async function startMic(
   let animationFrame = 0;
   const tick = (now: number) => {
     analyser.getFloatTimeDomainData(frame);
-    onReading(detect(frame, minRms()), now);
+    const rms = rootMeanSquare(frame);
+    onReading(detect(frame, minRms(), rms), now, rms);
     animationFrame = requestAnimationFrame(tick);
   };
   animationFrame = requestAnimationFrame(tick);

@@ -3,12 +3,15 @@ import { BAR_BEATS, centsFrom, COMMON_TIME, midiOf, noteLabels, staffStepsFrom, 
 import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice, type RenderContext } from "vexflow/bravura";
 import { h } from "./dom";
 import type { Section } from "./highway";
+import { drawSlurs } from "./slurs";
 import { createTrace } from "./staffTrace";
 
-type StaffNote = { pitch: string; beats?: number; finger?: string };
+// bow marks a note down bow or up bow, and slur joins it to the next note in one bow, as Listen's technique exercises do.
+type StaffNote = { pitch: string; beats?: number; finger?: string; bow?: "down" | "up"; slur?: boolean };
 // letters adds each note's letter to its name, as the note guesser does. Practice shows names only.
 export type StaffLabels = { names: boolean; fingers: boolean; letters?: boolean };
-type WriteLabel = (text: string, x: number, y: number, fill: string, fontSize: number) => void;
+// font is for a symbol from the music font. Labels are otherwise in the system's.
+type WriteLabel = (text: string, x: number, y: number, fill: string, fontSize: number, font?: string) => void;
 
 const TOP = 30;
 export const LINE_HEIGHT = 130;
@@ -22,6 +25,15 @@ const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h",
 // How far a line's rows of fingers and names sit outside the staff and its notes, measured to the text's baseline.
 const FINGER_GAP = 5;
 const NAME_GAP = 14;
+// Above the notes, from the bottom up: fingers, slurs, then bow marks, each row this far above the last. A bow mark
+// is the music font's, at the size that makes it a staff space tall.
+const ROW_GAP = 14;
+const SLUR_ROOM = 12;
+const BOW_MARKS = { down: "\uE610", up: "\uE612" };
+const MUSIC_FONT = "Bravura";
+const BOW_MARK_SIZE = 40;
+// Above labels, bow marks and slurs need more room than the top of the sheet otherwise leaves.
+const BOW_ROOM = 14;
 // The furthest those rows go from a stave's y, which keeps them inside its line and off the next line's labels.
 const HIGHEST_FINGER_ROW = 10;
 const LOWEST_NAME_ROW = 126;
@@ -138,12 +150,18 @@ export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[]
   });
   const fingerRow = Math.max(stave.getY() + HIGHEST_FINGER_ROW, Math.min(stave.getYForLine(0), ...reaches) - FINGER_GAP);
   const nameRow = Math.min(stave.getY() + LOWEST_NAME_ROW, Math.max(stave.getYForLine(4), ...reaches) + NAME_GAP);
+  const slurRow = labels.fingers ? fingerRow - ROW_GAP : fingerRow;
+  const slurred = lineNotes.some((note) => note.slur);
+  const bowRow = slurred ? slurRow - SLUR_ROOM : slurRow;
+  const xs = drawn.map((note) => note.getAbsoluteX() + NOTEHEAD_CENTER);
+  if (slurred) drawSlurs(context.setFillStyle(FINGER_COLOR), lineNotes.map((note) => Boolean(note.slur)), xs, slurRow);
   lineNotes.forEach((note, index) => {
-    const x = drawn[index].getAbsoluteX() + NOTEHEAD_CENTER;
+    const x = xs[index];
     if (labels.fingers && note.finger) {
       const color = note.finger.startsWith("L") ? LOW_FINGER_COLOR : FINGER_COLOR;
       writeLabel(note.finger.replace("L", ""), x, fingerRow, color, 13);
     }
+    if (note.bow) writeLabel(BOW_MARKS[note.bow], x, bowRow, FINGER_COLOR, BOW_MARK_SIZE, MUSIC_FONT);
     const { solfege, letter } = noteLabels(note.pitch);
     const name = [labels.names && solfege, labels.letters && letter].filter(Boolean).join(" ");
     if (name) writeLabel(name, x, nameRow, NAME_COLOR, 11);
@@ -151,7 +169,7 @@ export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[]
   return drawn;
 }
 
-function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: string, fontSize: number) {
+function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: string, fontSize: number, font?: string) {
   const element = document.createElementNS("http://www.w3.org/2000/svg", "text");
   element.textContent = text;
   element.setAttribute("x", String(x));
@@ -159,8 +177,8 @@ function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: s
   element.setAttribute("fill", fill);
   element.setAttribute("stroke", "none");
   element.setAttribute("font-size", String(fontSize));
-  element.setAttribute("font-weight", "700");
-  element.setAttribute("font-family", "system-ui, sans-serif");
+  element.setAttribute("font-weight", font ? "400" : "700");
+  element.setAttribute("font-family", font ?? "system-ui, sans-serif");
   element.setAttribute("text-anchor", "middle");
   svg.append(element);
 }
@@ -269,7 +287,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     element.classList.toggle("collapsed", collapsed);
     const totalBeats = beatsIn(notes);
     const labelled = labels.names || labels.fingers || labels.letters;
-    const top = labelled ? LABELLED_TOP : TOP;
+    const top = labelled ? LABELLED_TOP + (notes.some((note) => note.bow) ? BOW_ROOM : 0) + (notes.some((note) => note.slur) ? SLUR_ROOM : 0) : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
     const sheetWidth = !collapsed && fitHeight ? fittedWidth(notes, top, bottom) : width;
     const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter);
@@ -372,7 +390,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     draw(notes: StaffNote[], current = 0, newLabels: StaffLabels = labels, newSection: Section | null = null) {
       labels = newLabels;
       section = newSection;
-      const key = [labels.names, labels.fingers, labels.letters, section?.first, section?.last, ...notes.map((note) => `${note.pitch}:${note.beats}:${note.finger}`)].join();
+      const key = [labels.names, labels.fingers, labels.letters, section?.first, section?.last, ...notes.map((note) => `${note.pitch}:${note.beats}:${note.finger}:${note.bow}:${note.slur}`)].join();
       if (key !== shown) {
         shown = key;
         render(notes);

@@ -60,6 +60,23 @@ export function boxToggle(icon: Node, label: string, on: boolean, onToggle: (on:
   return button;
 }
 
+// A choice as a row of small buttons, with the one picked pressed. label names the group for screen readers.
+export function chipGroup<T>(label: string, values: T[], name: (value: T) => string, current: () => T, pick: (value: T) => void) {
+  const buttons = values.map((value) =>
+    h("button", {
+      type: "button",
+      textContent: name(value),
+      onclick() {
+        pick(value);
+        show();
+      },
+    }),
+  );
+  const show = () => buttons.forEach((button, at) => (button.ariaPressed = String(values[at] === current())));
+  show();
+  return h("div", { role: "group", ariaLabel: label }, ...buttons);
+}
+
 export function createIconToggle(key: keyof Settings["toggles"], onChange: () => void) {
   const { toggles } = getSettings();
   return boxToggle(iconFor(key), t.toggles[key], toggles[key], (on) => {
