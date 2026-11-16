@@ -154,7 +154,7 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, onDone: (
         drawStaff();
         status.textContent = `${t.noteOf(index + 1, notes.length)} · ${notes[index].bow === "down" ? t.downBow : t.upBow}`;
       }
-      const cents = frequency === null ? null : centsFrom(frequency, midiOf(notes[index].pitch));
+      const cents = frequency === null ? null : centsFrom(frequency, midiOf(notes[index].pitch!));
       const drawnBeat = (beat * Math.min(settings.bowBeats, LONGEST_DRAWN_BEATS)) / settings.bowBeats;
       staff.tracePlayed(drawnBeat, frequency, cents, cents !== null && Math.abs(cents) <= settings.toleranceCents);
     },

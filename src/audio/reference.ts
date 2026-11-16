@@ -14,14 +14,14 @@ export function sharedAudioContext() {
   return context;
 }
 
-// A triangle tone starting on the note given, silent until its volume is raised. Stopping it fades it out quickly, so
-// it doesn't click.
-function createTone(midi: number) {
+// A triangle tone, starting on the note given if any, silent until its volume is raised. Stopping it fades it out
+// quickly, so it doesn't click.
+function createTone(midi?: number) {
   const context = sharedAudioContext();
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   oscillator.type = "triangle";
-  oscillator.frequency.value = frequencyOf(midi);
+  if (midi !== undefined) oscillator.frequency.value = frequencyOf(midi);
   gain.gain.setValueAtTime(0, context.currentTime);
   oscillator.connect(gain).connect(context.destination);
   oscillator.start();
@@ -52,18 +52,20 @@ export function startReference(midi: number) {
   };
 }
 
-// Plays notes one after another, each for its beats. Returns how to stop early, and calls onEnd once it has stopped,
-// at the end or early.
+// Plays notes one after another, each for its beats, with a rest silent for its own. Returns how to stop early, and
+// calls onEnd once it has stopped, at the end or early.
 export function playNotes(notes: PieceNote[], beatMs: number, onEnd: () => void) {
-  const { context, oscillator, volume, stop } = createTone(midiOf(notes[0].pitch));
+  const { context, oscillator, volume, stop } = createTone();
   let at = context.currentTime;
   for (const note of notes) {
     const end = at + (note.beats! * beatMs) / 1000;
-    oscillator.frequency.setValueAtTime(frequencyOf(midiOf(note.pitch)), at);
-    volume.setValueAtTime(0, at);
-    volume.linearRampToValueAtTime(VOLUME, at + FADE_SECONDS);
-    volume.setValueAtTime(VOLUME, end - NOTE_GAP_SECONDS - FADE_SECONDS);
-    volume.linearRampToValueAtTime(0, end - NOTE_GAP_SECONDS);
+    if (note.pitch) {
+      oscillator.frequency.setValueAtTime(frequencyOf(midiOf(note.pitch)), at);
+      volume.setValueAtTime(0, at);
+      volume.linearRampToValueAtTime(VOLUME, at + FADE_SECONDS);
+      volume.setValueAtTime(VOLUME, end - NOTE_GAP_SECONDS - FADE_SECONDS);
+      volume.linearRampToValueAtTime(0, end - NOTE_GAP_SECONDS);
+    }
     at = end;
   }
   oscillator.onended = onEnd;

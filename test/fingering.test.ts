@@ -20,6 +20,10 @@ describe("first-position fingering", () => {
     expect(fillFingering({ pitch: "C6" }).finger).toBeUndefined();
   });
 
+  it("gives a rest no string or finger", () => {
+    expect(fillFingering({ beats: 2 })).toEqual({ beats: 2 });
+  });
+
   it("keeps an explicit string and finger", () => {
     expect(fillFingering({ pitch: "A4", string: "D", finger: "4" })).toEqual({ pitch: "A4", string: "D", finger: "4" });
   });

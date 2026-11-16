@@ -27,6 +27,7 @@ const BEAT_NUMBER_Y = 12;
 const BEAT_LINE_COLOR = "#cdbfa8";
 const BEAT_NUMBER_COLOR = "#9a8b72";
 const GHOST_COLOR = "#6b3a1e";
+const QUARTER_REST = "\uE4E5"; // In the music font.
 // Staff positions counted from the bottom line, E4. The violin's first position runs from G3 to B5.
 const LETTERS = "CDEFGAB";
 const BOTTOM_LINE_POSITION = 4 * 7 + LETTERS.indexOf("E");
@@ -115,6 +116,13 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
   const rows = h("div", { className: "editor-rows" });
   const warning = h("p", { className: "warning" });
   const player = createLinePlayer();
+  const restButton = h("button", {
+    className: "editor-rest",
+    textContent: QUARTER_REST,
+    title: t.addRest,
+    ariaLabel: t.addRest,
+    onclick: () => change(() => notes.push({ beats: newBeats() })),
+  });
   const ghost = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
   ghost.setAttribute("rx", "7");
   ghost.setAttribute("ry", "5");
@@ -124,6 +132,8 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
 
   const crossesBar = () => barMarks(notes).some((mark) => mark.crossesBar);
   const totalBeats = () => notes.reduce((sum, note) => sum + note.beats!, 0);
+  // A new note or rest starts at 1 beat, or at what's left of the bar if that's less.
+  const newBeats = () => Math.min(1, BAR_BEATS - (totalBeats() % BAR_BEATS));
   const beatWidth = () => beatPx / SCALE;
 
   // A beat is narrowed only as far as it takes to fit an evenly spaced bar on a small phone.
@@ -166,7 +176,7 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
 
   // Steps through natural, sharp and flat, past any that would leave the violin's range.
   function nextAccidental(index: number) {
-    const { letter, acc, oct } = Note.get(notes[index].pitch);
+    const { letter, acc, oct } = Note.get(notes[index].pitch!);
     const from = ACCIDENTALS.indexOf(acc);
     const options = [1, 2].map((offset) => `${letter}${ACCIDENTALS[(from + offset) % ACCIDENTALS.length]}${oct}`);
     const pitch = options.find((option) => midiOf(option) >= LOWEST_MIDI && midiOf(option) <= HIGHEST_MIDI);
@@ -187,7 +197,7 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
   function noteColumn(segment: Segment) {
     const index = segment.noteIndex!;
     const note = notes[index];
-    const { solfege } = noteLabels(note.pitch);
+    const solfege = note.pitch && noteLabels(note.pitch).solfege;
     const sheet = h("div", { className: "editor-sheet" });
     drawSheet(sheet, widthOf(segment) * beatWidth(), { note, start: segment.start, beats: segment.beats, beatWidth: beatWidth() });
     sheet.append(
@@ -199,17 +209,14 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
         onclick: () => change(() => notes.splice(index, 1)),
       }),
     );
+    // A rest has no sharp or flat, and can't be dragged up or down.
     const column = h(
       "div",
-      { className: `editor-column${segment.crossesBar ? " crosses-bar" : ""}` },
+      { className: `editor-column${segment.crossesBar ? " crosses-bar" : ""}${solfege ? "" : " rest"}` },
       sheet,
-      h("button", {
-        className: "editor-name",
-        textContent: solfege,
-        title: t.sharpOrFlat,
-        ariaLabel: `${solfege}: ${t.sharpOrFlat}`,
-        onclick: () => nextAccidental(index),
-      }),
+      solfege
+        ? h("button", { className: "editor-name", textContent: solfege, title: t.sharpOrFlat, ariaLabel: `${solfege}: ${t.sharpOrFlat}`, onclick: () => nextAccidental(index) })
+        : h("div", { className: "editor-name", textContent: t.rest }),
       beatPicker(index, segment.start),
     );
     column.dataset.index = String(index);
@@ -277,13 +284,15 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
       ...toRows(list, measured.beatsPerRow).map((row) => {
         const clef = h("div", { className: "editor-sheet editor-clef" });
         drawSheet(clef, CLEF_WIDTH, { clef: true });
-        // A line with notes has a play button, under its clef.
+        // A line with a note to hear has a play button, under its clef.
         const lineNotes = row.flatMap(({ noteIndex }) => (noteIndex === undefined ? [] : [noteIndex]));
-        if (lineNotes.length) clef.append(player.button(() => lineNotes.map((index) => notes[index])));
+        if (lineNotes.some((index) => notes[index].pitch)) clef.append(player.button(() => lineNotes.map((index) => notes[index])));
         const columns = row.map((segment) => (segment.noteIndex !== undefined ? noteColumn(segment) : segment.spill ? spillColumn(segment) : blankColumn(segment)));
         return h("div", { className: "editor-row" }, clef, ...columns);
       }),
     );
+    // The next note's place also has a button for a rest.
+    rows.querySelector(".editor-column.blank .editor-sheet")!.append(restButton);
     warning.textContent = crossesBar() ? t.crossesBar : "";
   }
 
@@ -293,7 +302,7 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     const move = (event: PointerEvent) => {
       const column = rows.querySelector(`[data-index="${index}"]`)!;
       const step = stepAt(event.clientY, column.querySelector(".editor-sheet")!);
-      if (step === stepOf(notes[index].pitch)) return;
+      if (step === stepOf(notes[index].pitch!)) return;
 
       notes[index] = withPitch(notes[index], pitchAt(step));
       column.replaceWith(noteColumn(segmentOf[index]));
@@ -328,15 +337,14 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     rows.setPointerCapture(event.pointerId);
     if (column.classList.contains("blank")) {
       hideGhost();
-      // A note starts at 1 beat, or at what's left of the bar if that's less.
-      const room = BAR_BEATS - (totalBeats() % BAR_BEATS);
-      notes.push({ pitch: pitchAt(step), beats: Math.min(1, room) });
+      notes.push({ pitch: pitchAt(step), beats: newBeats() });
       render();
       onChange();
       dragNote(notes.length - 1);
     } else {
       const index = Number(column.dataset.index);
-      if (Math.abs(step - stepOf(notes[index].pitch)) <= GRAB_STEPS) dragNote(index);
+      const { pitch } = notes[index];
+      if (pitch && Math.abs(step - stepOf(pitch)) <= GRAB_STEPS) dragNote(index);
     }
   });
 
@@ -346,7 +354,7 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
 
     const over = (event.target as Element).closest(".editor-column.blank .editor-sheet");
     const next = rows.querySelector(".editor-column.blank");
-    if (!over || !next) return hideGhost();
+    if (!over || !next || (event.target as Element).closest("button")) return hideGhost();
 
     const step = stepAt(event.clientY, over);
     ghost.setAttribute("cx", String(NOTEHEAD_CENTER));

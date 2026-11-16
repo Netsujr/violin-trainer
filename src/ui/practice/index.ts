@@ -1,7 +1,7 @@
 import { createMetronome } from "../../audio/metronome";
 import { sharedAudioContext } from "../../audio/reference";
 import { t } from "../../i18n";
-import { meterOf, midiOf } from "../../music/notes";
+import { countNotes, meterOf, midiOf } from "../../music/notes";
 import { withPattern, withRepeatedTop } from "../../music/patterns";
 import { createJudge } from "../../practice/judge";
 import type { Session } from "../../practice/session";
@@ -103,10 +103,13 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     const index = shownIndex();
     const note = finished ? undefined : piece.notes[index];
     staff.draw(piece.notes, index, { names: settings.toggles.noteNames, fingers: settings.toggles.fingers }, selection.section);
-    const noteText = note ? t.noteOf(index + 1, piece.notes.length) : t.allDone(selection.section ? selection.section.last - selection.section.first + 1 : piece.notes.length);
+    // Rests aren't counted, and a rest shows the number of the note after it, where a run from it starts.
+    const section = selection.section;
+    const done = countNotes(section ? piece.notes.slice(section.first, section.last + 1) : piece.notes);
+    const noteText = note ? t.noteOf(countNotes(piece.notes.slice(0, index)) + 1, countNotes(piece.notes)) : t.allDone(done);
     progress.textContent = withLoopNumber(countIn.active ? t.startsIn(countIn.beats) : noteText);
     if (!countIn.active) countIn.hideOverlay();
-    if (note) tone.setNote(midiOf(note.pitch));
+    if (note?.pitch) tone.setNote(midiOf(note.pitch));
     else tone.stop();
     highway.draw(piece.notes, index, holdProgress);
   }

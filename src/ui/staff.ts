@@ -7,7 +7,8 @@ import { drawSlurs } from "./slurs";
 import { createTrace } from "./staffTrace";
 
 // bow marks a note down bow or up bow, and slur joins it to the next note in one bow, as Listen's technique exercises do.
-type StaffNote = { pitch: string; beats?: number; finger?: string; bow?: "down" | "up"; slur?: boolean };
+// A note with no pitch is a rest.
+type StaffNote = { pitch?: string; beats?: number; finger?: string; bow?: "down" | "up"; slur?: boolean };
 // letters adds each note's letter to its name, as the note guesser does. Practice shows names only.
 export type StaffLabels = { names: boolean; fingers: boolean; letters?: boolean };
 // font is for a symbol from the music font. Labels are otherwise in the system's.
@@ -60,9 +61,10 @@ const PLAYED_IN_TUNE_COLOR = "#14914a";
 const NOTE_LEAD = 20;
 const NOTE_TAIL = 40;
 
+// A rest sits where printed music puts it: a whole rest hangs from the fourth line, and the others sit on the middle one.
 export function toStaveNote({ pitch, beats = 1 }: StaffNote, showAccidental: boolean) {
-  const { letter, acc, oct } = Note.get(pitch);
-  const note = new StaveNote({ keys: [`${letter.toLowerCase()}${acc}/${oct}`], duration: DURATIONS[beats], autoStem: true });
+  const { letter, acc, oct } = Note.get(pitch ?? (beats === 4 ? "D5" : "B4"));
+  const note = new StaveNote({ keys: [`${letter.toLowerCase()}${acc}/${oct}`], duration: DURATIONS[beats] + (pitch ? "" : "r"), autoStem: true });
   if (acc && showAccidental) note.addModifier(new Accidental(acc));
   if (beats === 1.5 || beats === 3) Dot.buildAndAttach([note], { all: true });
   return note;
@@ -76,7 +78,8 @@ function beamEighths(bar: StaffNote[], staveNotes: StaveNote[]) {
     run = [];
   };
   bar.forEach((note, index) => {
-    if (note.beats === 0.5) run.push(staveNotes[index]);
+    // A rest breaks the beam.
+    if (note.beats === 0.5 && note.pitch) run.push(staveNotes[index]);
     else closeRun();
   });
   closeRun();
@@ -128,7 +131,7 @@ export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[]
   const beams: Beam[] = [];
   const tickables = line.flatMap((bar, barIndex) => {
     // In a bar, an accidental is only written the first time.
-    const written = new Set<string>();
+    const written = new Set<string | undefined>();
     const staveNotes = bar.map((note) => {
       const staveNote = toStaveNote(note, !written.has(note.pitch));
       written.add(note.pitch);
@@ -162,6 +165,7 @@ export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[]
       writeLabel(note.finger.replace("L", ""), x, fingerRow, color, 13);
     }
     if (note.bow) writeLabel(BOW_MARKS[note.bow], x, bowRow, FINGER_COLOR, BOW_MARK_SIZE, MUSIC_FONT);
+    if (!note.pitch) return;
     const { solfege, letter } = noteLabels(note.pitch);
     const name = [labels.names && solfege, labels.letters && letter].filter(Boolean).join(" ");
     if (name) writeLabel(name, x, nameRow, NAME_COLOR, 11);
@@ -256,7 +260,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const y = ((event.clientY - box.top) * sheet.height) / box.height;
     const line = Math.max(0, Math.min(noteLines.at(-1) ?? 0, Math.floor((y - sheet.top) / LINE_HEIGHT)));
     // The nearest note on that line, so closely packed notes are each easy to hit, but nothing before the first or past the last.
-    const onLine = noteXs.flatMap((_, index) => (noteLines[index] === line ? [index] : []));
+    // A rest can't be played, so it isn't picked.
+    const onLine = noteXs.flatMap((_, index) => (noteLines[index] === line && shownNotes[index].pitch ? [index] : []));
     if (onLine.length === 0 || x < noteXs[onLine[0]] - NOTE_LEAD || x > noteXs[onLine.at(-1)!] + NOTE_TAIL) return -1;
     const distance = (index: number) => Math.abs(noteXs[index] + NOTEHEAD_CENTER - x);
     return onLine.reduce((nearest, index) => (distance(index) < distance(nearest) ? index : nearest));
@@ -330,10 +335,11 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   }
 
   // Where a reading at a beat goes: across with the beat, on its note's line of the sheet, and up or down from that note by
-  // how far the pitch is from it, to the nearest octave, so in tune lands on the middle of its notehead.
+  // how far the pitch is from it, to the nearest octave, so in tune lands on the middle of its notehead. Over a rest, nowhere.
   function placeAt(beat: number, frequency: number) {
     const index = Math.max(0, noteBeats.findLastIndex((start) => start <= beat));
     const note = shownNotes[index];
+    if (!note.pitch) return null;
     const sameLine = noteLines[index + 1] === noteLines[index];
     const nextX = sameLine ? noteXs[index + 1] : noteXs[index] + (collapsed ? beatsOf(note) * COLLAPSED_BEAT_WIDTH : NOTE_TAIL);
     const between = Math.max(0, Math.min(1, (beat - noteBeats[index]) / beatsOf(note)));
@@ -404,7 +410,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     // Shows what's being played against the note at index, or nothing with cents null.
     showPlayed(index: number, cents: number | null, inTune: boolean) {
       const note = shownNotes[index];
-      if (cents === null || !note) {
+      if (cents === null || !note?.pitch) {
         played.group.remove();
         return;
       }

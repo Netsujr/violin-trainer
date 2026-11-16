@@ -11,7 +11,9 @@ export const stringFor = (midi: number) =>
 
 export const fingerOn = (string: StringName, midi: number) => FINGERS[midi - OPEN_STRINGS[string]];
 
+// A rest has no string or finger.
 export function fillFingering(note: PieceNote): PieceNote {
+  if (!note.pitch) return note;
   const midi = midiOf(note.pitch);
   const string = note.string ?? stringFor(midi);
   return { ...note, string, finger: note.finger ?? fingerOn(string, midi) };

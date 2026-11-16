@@ -3,8 +3,9 @@ import { t } from "../i18n";
 
 export type StringName = "G" | "D" | "A" | "E";
 
+// A note with no pitch is a rest, silent for its beats.
 export type PieceNote = {
-  pitch: string;
+  pitch?: string;
   string?: StringName;
   finger?: string;
   beats?: number;
@@ -31,6 +32,8 @@ export const nearestMidi = (frequency: number) => Math.round(69 + 12 * Math.log2
 export const BEAT_LENGTHS = [0.5, 1, 1.5, 2, 3, 4];
 export const BEAT_LABELS: Record<number, string> = { 0.5: "½", 1: "1", 1.5: "1½", 2: "2", 3: "3", 4: "4" };
 export const BAR_BEATS = 4;
+// How many notes there are to play, not counting rests.
+export const countNotes = (notes: PieceNote[]) => notes.filter((note) => note.pitch).length;
 
 // How a piece is counted in bars.
 export type Meter = { beatsPerBar: number; pickup: number };

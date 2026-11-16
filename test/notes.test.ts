@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barMarks, staffStepsFrom } from "../src/music/notes";
+import { barMarks, countNotes, staffStepsFrom } from "../src/music/notes";
 
 describe("bars", () => {
   const lengths = (...beats: (number | undefined)[]) => barMarks(beats.map((length) => ({ pitch: "D4", beats: length })));
@@ -16,6 +16,12 @@ describe("bars", () => {
 
   it("counts a note with no written length as one beat", () => {
     expect(lengths(undefined, undefined, undefined, undefined).at(-1)!.endsBar).toBe(true);
+  });
+
+  it("fills a bar with a rest's beats, but doesn't count the rest as a note", () => {
+    const withRest = [{ pitch: "D4", beats: 3 }, { beats: 1 }, { pitch: "E4" }];
+    expect(barMarks(withRest).map((mark) => mark.endsBar)).toEqual([false, true, false]);
+    expect(countNotes(withRest)).toBe(2);
   });
 });
 

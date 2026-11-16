@@ -966,7 +966,8 @@ html:not(.fullscreen) .stats {
   cursor: pointer;
 }
 
-.editor-column.spill .editor-sheet {
+.editor-column.spill .editor-sheet,
+.editor-column.rest .editor-sheet {
   cursor: default;
 }
 
@@ -1001,9 +1002,10 @@ button.editor-name:is(:hover, :active, :focus) {
 }
 
 /* In a strip of the sheet below the lowest note, so it stays put as the note moves. A line's play button sits in the
-   same strip, under the clef. */
+   same strip, under the clef, and so does the button for a rest, under the next note's place. */
 .editor-delete,
-.editor-play {
+.editor-play,
+.editor-rest {
   position: absolute;
   bottom: 0.125rem;
   left: 0.625rem;
@@ -1022,7 +1024,8 @@ button.editor-name:is(:hover, :active, :focus) {
 }
 
 .editor-delete:is(:hover, :active, :focus),
-.editor-play:is(:hover, :active, :focus) {
+.editor-play:is(:hover, :active, :focus),
+.editor-rest:is(:hover, :active, :focus) {
   background: none;
   box-shadow: none;
 }
@@ -1038,6 +1041,13 @@ button.editor-name:is(:hover, :active, :focus) {
 .editor-play svg {
   width: 1rem;
   height: 1rem;
+}
+
+/* The music font's quarter rest. */
+.editor-rest {
+  font-family: Bravura, serif;
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
 .beat-picker {

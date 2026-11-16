@@ -3,12 +3,12 @@ const SVG = "http://www.w3.org/2000/svg";
 const MEDIAN_OF = 3;
 
 type Reading = { beat: number; frequency: number };
-type Place = (beat: number, frequency: number) => { x: number; y: number; line: number };
+type Place = (beat: number, frequency: number) => { x: number; y: number; line: number } | null;
 
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 // The pitch played, drawn through the staff as it's played, like karaoke: right with the beat, up and down with the
-// pitch, crossing the middle of a notehead when in tune. Silence breaks it, and so does going on to the sheet's next line.
+// pitch, crossing the middle of a notehead when in tune. Silence breaks it, and so do a rest and going on to the sheet's next line.
 // place says where a reading goes on the sheet as it's drawn now.
 export function createTrace(place: Place) {
   let readings: (Reading | null)[] = [];
@@ -17,11 +17,11 @@ export function createTrace(place: Place) {
   let segment: { line: SVGPolylineElement; sheetLine: number } | null = null;
 
   function draw(reading: Reading | null) {
-    if (!group || !reading) {
+    const point = group && reading && place(reading.beat, reading.frequency);
+    if (!group || !point) {
       segment = null;
       return null;
     }
-    const point = place(reading.beat, reading.frequency);
     if (segment?.sheetLine !== point.line) {
       segment = { line: document.createElementNS(SVG, "polyline"), sheetLine: point.line };
       group.append(segment.line);

@@ -29,8 +29,10 @@ export function createTempoGlide(
     resetBeat() {
       lastBeat = null;
     },
+    // Any rests after the note are waited out too, so the next note comes in on its beat.
     glide(session: Session, cents: number, now: number, holdMs: number) {
-      const noteMs = (session.current.beats ?? 1) * beatMs();
+      const next = session.nextIndex;
+      const noteMs = session.piece.notes.slice(session.index, next).reduce((sum, note) => sum + (note.beats ?? 1), 0) * beatMs();
       const gridMs = Math.min(noteMs, beatMs());
       // With the metronome on, the first note joins its beat instead of setting one.
       const attack = now - holdMs;
@@ -39,7 +41,7 @@ export function createTempoGlide(
       lastBeat = due + Math.max(0, Math.ceil((now + MIN_GLIDE_BEATS * gridMs - due) / gridMs)) * gridMs;
       pending = { cents, at: now, arrivesAt: lastBeat };
       judge.setTarget(session.currentMidi, session.currentMidi);
-      highway.glideTo(session.index + 1, lastBeat - now);
+      highway.glideTo(next, lastBeat - now);
     },
     // The waiting hit, once its beat has come.
     arrived(now: number) {

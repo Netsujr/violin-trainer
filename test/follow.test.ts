@@ -54,6 +54,16 @@ describe("following along", () => {
     expect(hits(play([{ pitch: "A4" }], () => frequencyOf(A4 + 12)))).toEqual([true]);
   });
 
+  it("lets a rest pass in time, neither hit nor missed", () => {
+    const withRest: PieceNote[] = [{ pitch: "A4" }, { beats: 1 }, { pitch: "B4" }];
+    const results = play(withRest, (beat) => (beat < 1 ? frequencyOf(A4) : beat >= 2 ? frequencyOf(A4 + 2) : null));
+    expect(results.map(({ index, hit }) => [index, hit])).toEqual([[0, true], [2, true]]);
+  });
+
+  it("starts on the first note after a rest", () => {
+    expect(createFollow([{ beats: 2 }, { pitch: "A4" }], 0, () => 40).startBeat).toBe(2);
+  });
+
   it("needs no break between repeated notes", () => {
     expect(hits(play([{ pitch: "A4" }, { pitch: "A4" }], () => frequencyOf(A4)))).toEqual([true, true]);
   });

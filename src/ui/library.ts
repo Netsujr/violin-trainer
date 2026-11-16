@@ -1,7 +1,7 @@
 import { localTitle, t } from "../i18n";
 import { fillFingering } from "../music/fingering";
 import { allPieces, deletePiece, getSettings, isHighlighted, isScale, loadDraft, pieceGroups, saveDraft, savePiece, toggleHighlighted, updatePiece } from "../storage";
-import { meterOf, type Piece } from "../music/notes";
+import { countNotes, meterOf, type Piece } from "../music/notes";
 import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
 import { createCardTracks } from "./libraryTracks";
@@ -35,7 +35,7 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
   const heading = h("h2");
 
   const tracks = createCardTracks(goAlign, () => renderList());
-  const subtitle = (piece: Piece) => t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(piece.notes.length);
+  const subtitle = (piece: Piece) => t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(countNotes(piece.notes));
 
   // Clicking a card, anywhere but its buttons, marks it for practice or clears the mark.
   const pieceRow = (piece: Piece) =>
@@ -156,7 +156,8 @@ export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (p
   function refreshForms() {
     const hasTitle = title.value.trim() !== "";
     saveDraft({ title: title.value, notes: editor.notes(), editingId: editing?.id });
-    saveButton.disabled = !hasTitle || editor.notes().length === 0 || editor.crossesBar();
+    // A piece needs a note to play, not just rests.
+    saveButton.disabled = !hasTitle || countNotes(editor.notes()) === 0 || editor.crossesBar();
     clearButton.disabled = !editing && editor.notes().length === 0;
     clearButton.textContent = editing ? t.cancel : t.clearStaff;
     heading.textContent = editing ? t.editPiece : t.addPiece;

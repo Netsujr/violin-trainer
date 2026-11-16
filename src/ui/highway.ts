@@ -68,8 +68,10 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
         scroller.style.cursor = noteAt(event) === null ? "" : "pointer";
       },
       onkeydown(event) {
-        // A little past the line, so a view that rounded just short of a note still picks it.
-        if (event.key === "Enter") onPick(Math.min(noteAtBeat(position() + 0.02), notes.length - 1), event.shiftKey);
+        if (event.key !== "Enter") return;
+        // A little past the line, so a view that rounded just short of a note still picks it. Over a rest, the note before it.
+        const beat = position() + 0.02;
+        onPick(Math.max(0, notes.findLastIndex((note, index) => note.pitch && starts[index] <= beat)), event.shiftKey);
       },
     },
     track,
@@ -152,7 +154,7 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
 
     // Labels stay at the front of a long tile, the end that reaches the hit line first.
     const textX = x + Math.min(width, BEAT_WIDTH - TILE_GAP) / 2;
-    const { solfege, letter } = noteLabels(note.pitch);
+    const { solfege, letter } = noteLabels(note.pitch!);
     if (toggles.fingers) {
       context.fillStyle = note.finger?.startsWith("L") ? LOW_FINGER_COLOR : "#111";
       context.font = "bold 22px system-ui";
@@ -202,7 +204,8 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
     drawSection();
     notes.forEach((note, noteIndex) => {
       const x = tileX(noteIndex);
-      if (x + tileWidth(note) < 0 || x > viewWidth) return;
+      // A rest leaves the lanes empty.
+      if (!note.pitch || x + tileWidth(note) < 0 || x > viewWidth) return;
 
       drawTile(note, x, results?.get(noteIndex));
       if (noteIndex !== currentIndex) return;

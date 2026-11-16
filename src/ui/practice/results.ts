@@ -1,5 +1,5 @@
 import { localNumber, t } from "../../i18n";
-import { noteLabels, type Meter, type PieceNote } from "../../music/notes";
+import { countNotes, noteLabels, type Meter, type PieceNote } from "../../music/notes";
 import { buildEntry, scorePercent } from "../../practice/log";
 import type { Session } from "../../practice/session";
 import { spotScore, troubleSpots, type TroubleSpot } from "../../practice/trouble";
@@ -43,7 +43,7 @@ function summary(session: Session, run: Run) {
   const entry = buildEntry(session, performance.now());
   const seconds = localNumber(session.lastRunSeconds, 0);
   return {
-    done: runSummary(entry.passes, seconds, run),
+    done: runSummary(entry.passes, seconds, session.piece.notes, run),
     totals: t.summary(t.hitSkipped(entry.notesHit, 0), Math.round(entry.averageCents ?? 0)),
     slowest: t.slowest(entry.slowest.map((note) => `${noteLabels(note.pitch).solfege} (${localNumber(note.seconds, 1)} s)`).join(", ")),
   };
@@ -119,8 +119,10 @@ export function createResults(board: { showScore(text: string): void }, onPlayAg
   };
 }
 
-function runSummary(passes: number, seconds: string, { section, pattern, startIndex }: { section: Section | null; pattern?: number; startIndex: number }) {
-  if (section) return t.sectionDone(section.first + 1, section.last + 1, seconds);
+// Notes are numbered without rests, and a section starting on a rest starts at the note after it.
+function runSummary(passes: number, seconds: string, notes: PieceNote[], { section, pattern, startIndex }: { section: Section | null; pattern?: number; startIndex: number }) {
+  const numberOf = (index: number) => countNotes(notes.slice(0, index)) + 1;
+  if (section) return t.sectionDone(numberOf(section.first), countNotes(notes.slice(0, section.last + 1)), seconds);
   if (pattern) return t.patternDone(pattern + 1, seconds);
-  return startIndex === 0 ? t.passDone(passes, seconds) : t.partialDone(startIndex + 1, seconds);
+  return startIndex === 0 ? t.passDone(passes, seconds) : t.partialDone(numberOf(startIndex), seconds);
 }

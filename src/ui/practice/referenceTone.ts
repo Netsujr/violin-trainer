@@ -22,7 +22,7 @@ export function createReferenceTone(currentNote: () => PieceNote | undefined) {
     onclick() {
       const note = currentNote();
       if (tone) stop();
-      else if (note) {
+      else if (note?.pitch) {
         tone = startReference(midiOf(note.pitch));
         button.title = button.ariaLabel = t.stopReference;
         button.ariaPressed = "true";

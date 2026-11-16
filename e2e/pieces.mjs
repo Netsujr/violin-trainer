@@ -199,6 +199,40 @@ flow("Hearing a line of the staff");
   await s.close();
 }
 
+flow("Rests");
+{
+  const s = await open(WAV);
+  const { page } = s;
+  const t = tools(page);
+  await library(page, { draft: { title: "Breath", notes: [] } });
+  const addRest = page.locator(".editor-rest");
+  check("the next note's place has a button for a rest", (await addRest.count()) === 1 && (await addRest.getAttribute("title")) === "Add a rest");
+  await addRest.click();
+  await sleep(100);
+  const rest = page.locator(".editor-column.rest");
+  check("it adds a rest of one beat, named as one, with its length to pick", (await rest.count()) === 1 && (await rest.locator(".editor-name").textContent()) === "Rest" && (await t.beats()) === "1", await t.beats());
+  check("drawn with the rest sign", (await rest.locator(".vf-stavenote").textContent()).includes("\uE4E5"));
+  check("rests alone can't be saved, and their line has nothing to hear", (await t.save.isDisabled()) && (await page.locator(".editor-play").count()) === 0);
+  await t.blank().click({ position: { x: 20, y: G4_Y } });
+  await sleep(100);
+  check("after a note they can, and the line plays", !(await t.save.isDisabled()) && (await page.locator(".editor-play").count()) === 1);
+  await t.save.click();
+  await sleep(200);
+  const saved = (await t.stored()).find((piece) => piece.title === "Breath");
+  check("the rest is kept with no pitch, string or finger", JSON.stringify(saved?.notes) === JSON.stringify([{ beats: 1 }, note("G4", 1, { string: "D", finger: "3" })]), JSON.stringify(saved?.notes));
+  check("and isn't counted as a note", (await t.row("Breath").textContent()).includes("1 note"));
+
+  await seed(page, { pieces: [custom("breath", "Breath", [note("D4", 3, { string: "D", finger: "0" }), { beats: 1 }, note("E4", 4, { string: "D", finger: "1" })])] });
+  await nav(page, "Practice");
+  await sleep(300);
+  await pickPiece(page, "breath");
+  await sleep(200);
+  check("Practice draws the rest on the staff", (await page.locator(".staff .vf-stavenote").nth(1).textContent()).includes("\uE4E5"));
+  check("and counts only the notes", (await progress(page)) === "Note 1 of 2", await progress(page));
+  notProblems(s);
+  await s.close();
+}
+
 flow("The question before anything is lost");
 {
   const s = await open(WAV);

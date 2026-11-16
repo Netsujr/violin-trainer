@@ -52,7 +52,7 @@ export function scoreLongBow(notes: PieceNote[], readings: TechniqueReading[], {
   const spreads: number[] = [];
   const steadiness: number[] = [];
   for (const { note, readings: noteReadings } of heard) {
-    const cents = noteReadings.flatMap(({ frequency }) => (frequency === null ? [] : [centsFrom(frequency, midiOf(note.pitch))]));
+    const cents = noteReadings.flatMap(({ frequency }) => (frequency === null ? [] : [centsFrom(frequency, midiOf(note.pitch!))]));
     if (cents.length > 1) spreads.push(spread(cents));
     const loudness = noteReadings.flatMap(({ rms }) => (rms >= minRms ? [rms] : []));
     if (loudness.length > 1) steadiness.push(Math.max(0, 1 - spread(loudness) / mean(loudness)));
@@ -103,7 +103,7 @@ export function scoreSlurs(
     return readings.filter(({ beat }) => beat >= start + attack && beat < end - attack);
   });
   return {
-    inTune: heard.filter(({ note, readings: noteReadings }) => playedInTune(midiOf(note.pitch), noteReadings, options)).length,
+    inTune: heard.filter(({ note, readings: noteReadings }) => playedInTune(midiOf(note.pitch!), noteReadings, options)).length,
     notes: notes.length,
     smooth: bows.filter((bow) => smoothBow(bow, options.minRms)).length,
     bows: bows.length,

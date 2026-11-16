@@ -23,6 +23,19 @@ describe("session and log entry", () => {
     expect(session.passSeconds).toEqual([]);
   });
 
+  it("goes past rests, which are neither hit nor missed, and finishes on the last note before a rest", () => {
+    const session = new Session({ ...piece, notes: [{ beats: 1 }, { pitch: "D4" }, { beats: 2 }, { pitch: "E4" }, { beats: 1 }] }, 0);
+    session.jumpTo(0, 0);
+    expect(session.index).toBe(1);
+    expect(session.nextIndex).toBe(3);
+    session.hit(10, 1000);
+    expect(session.current.pitch).toBe("E4");
+    session.hit(10, 2000);
+    expect(session.finished).toBe(true);
+    expect(session.hits.map((hit) => hit.pitch)).toEqual(["D4", "E4"]);
+    expect(session.missed).toBe(0);
+  });
+
   it("jumps without counting a hit or a miss, and times a partial run but not as a pass", () => {
     const session = new Session(piece, 0);
     session.hit(10, 1000);

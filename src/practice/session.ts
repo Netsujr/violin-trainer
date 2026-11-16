@@ -42,20 +42,25 @@ export class Session {
   }
 
   get currentMidi() {
-    return midiOf(this.current.pitch);
+    return midiOf(this.current.pitch!);
+  }
+
+  // The next note to play after the current one, past any rests, or the end.
+  get nextIndex() {
+    return this.playable(this.index + 1);
   }
 
   // With tempo on, the next note only starts on the beat, some time after the hit itself.
   hit(cents: number, now: number, nextStartsAt = now) {
-    this.hits.push({ pitch: this.current.pitch, ms: now - this.noteStart, cents, at: now });
+    this.hits.push({ pitch: this.current.pitch!, ms: now - this.noteStart, cents, at: now });
     this.advance(nextStartsAt);
   }
 
   // What the mic heard against the current note, in cents, if anything.
   heard(cents: number | null) {
     if (cents === null || Math.abs(cents) > NEAR_CENTS || this.finished) return;
-    const sounded = this.tuning.get(this.current.pitch) ?? { cents: 0, readings: 0 };
-    this.tuning.set(this.current.pitch, { cents: sounded.cents + cents, readings: sounded.readings + 1 });
+    const sounded = this.tuning.get(this.current.pitch!) ?? { cents: 0, readings: 0 };
+    this.tuning.set(this.current.pitch!, { cents: sounded.cents + cents, readings: sounded.readings + 1 });
   }
 
   miss(now: number) {
@@ -65,18 +70,24 @@ export class Session {
 
   // A jump is neither a hit nor a miss. Only a whole run with no rhythm pattern counts as a timed pass, so pass times stay comparable.
   jumpTo(index: number, now: number, end = this.piece.notes.length) {
-    this.index = index;
     this.end = end;
+    this.index = this.playable(index);
     this.noteStart = this.passStart = now;
     this.wholePass = index === 0 && end === this.piece.notes.length && !this.piece.pattern && !this.following;
   }
 
   private advance(now: number) {
-    this.index++;
+    this.index = this.nextIndex;
     this.noteStart = now;
     if (!this.finished) return;
 
     this.lastRunSeconds = (now - this.passStart) / 1000;
     if (this.wholePass) this.passSeconds.push(this.lastRunSeconds);
+  }
+
+  // A rest is never the note being played: the run goes on to the first note from index on, or to the end.
+  private playable(index: number) {
+    while (index < this.end && !this.piece.notes[index].pitch) index++;
+    return index;
   }
 }
