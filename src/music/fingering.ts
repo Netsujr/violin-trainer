@@ -1,6 +1,6 @@
 import { midiOf, type PieceNote, type StringName } from "./notes";
 
-const OPEN_STRINGS: Record<StringName, number> = { E: 76, A: 69, D: 62, G: 55 };
+export const OPEN_STRINGS: Record<StringName, number> = { E: 76, A: 69, D: 62, G: 55 };
 const FINGERS = ["0", "L1", "1", "L2", "2", "3", "H3", "4"];
 
 export const LOWEST_MIDI = OPEN_STRINGS.G;

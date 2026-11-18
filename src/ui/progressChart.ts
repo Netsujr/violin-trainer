@@ -1,18 +1,10 @@
-import { h } from "./dom";
+import { h, svg } from "./dom";
 
 const HEIGHT = 96;
 const PAD = { left: 40, right: 44, top: 10, bottom: 20 };
-const SVG = "http://www.w3.org/2000/svg";
 
 type Point = { label: string; value: number | null };
 type Options = { title: string; min: number; max: number; format: (value: number) => string };
-
-function svg<Tag extends keyof SVGElementTagNameMap>(tag: Tag, attributes: Record<string, string | number>, ...children: Node[]) {
-  const element = document.createElementNS(SVG, tag);
-  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, String(value));
-  element.append(...children);
-  return element;
-}
 
 const title = (text: string) => svg("title", {}, document.createTextNode(text));
 const text = (content: string, attributes: Record<string, string | number>) => svg("text", { class: "chart-text", ...attributes }, document.createTextNode(content));

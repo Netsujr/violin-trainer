@@ -5,9 +5,9 @@ import { h } from "../dom";
 import type { Section } from "../highway";
 import type { createRunControls } from "../runControls";
 import type { createBackingTrack } from "./backingTrack";
-import { COUNT_IN_ICON, DONT_WAIT_ICON, LOOP_ICON, METRONOME_ICON, PITCH_LINE_ICON, SHEET_ICON, STAFF_ICON, TEMPO_ICON } from "../toggles";
+import { COUNT_IN_ICON, DONT_WAIT_ICON, LOOP_ICON, SHEET_ICON, STAFF_ICON, TEMPO_ICON } from "../toggles";
 import { createFullscreen } from "./fullscreen";
-import { createBpmControl, createCountInButton, createPatternRow, iconSwitch, ICON_BUTTON, modeButton } from "./options";
+import { createCountInButton, createPatternRow, iconSwitch, ICON_BUTTON, modeButton } from "./options";
 import { createPieceMenu } from "./pieceMenu";
 import { createTodayPlan } from "./todayPlan";
 import type { createStaffSection } from "./staffSection";
@@ -27,33 +27,31 @@ type Deps = {
   onPick: (piece: Piece) => void;
   loadPiece: () => void;
   render: () => void;
-  resetBeat: () => void;
   clearStats: () => void;
 };
 
 // Everything that sets how a run goes: the Options panel, the mode buttons beside Start with the line saying
 // what's on, fullscreen, and the rhythm patterns.
-export function createPracticeControls({ run, pieces, piece, section, board, track, referenceButton, onPick, loadPiece, render, resetBeat, clearStats }: Deps) {
+export function createPracticeControls({ run, pieces, piece, section, board, track, referenceButton, onPick, loadPiece, render, clearStats }: Deps) {
   const settings = getSettings();
   const stopRun = () => run.stop();
 
-  // Options: the switches and the BPM, in a box above the lanes. The piece and the backing track are on the lanes' bar, and recording is by Start.
+  // The switches that set how a run goes, Tempo and the count-in, go first on the lanes' bar, with a backing track's
+  // speed after the score when there's one. The piece and the backing track are on the bar too.
   const pieceMenu = createPieceMenu(pieces, piece(), onPick);
   // Picking from today's plan is picking from the menu.
   const todayPlan = createTodayPlan(pieces, piece, (picked) => {
     pieceMenu.button.textContent = localTitle(picked.id, picked.title);
     onPick(picked);
   });
-  const bpmControl = createBpmControl(resetBeat);
-  const tempoSwitch = iconSwitch("tempoOn", t.tempo, TEMPO_ICON);
-  const metronomeSwitch = iconSwitch("metronomeOn", t.metronome, METRONOME_ICON, t.metronome, resetBeat);
+  const tempoSwitch = iconSwitch("tempoOn", t.tempo, TEMPO_ICON, `${t.tempo}: ${t.tempoHint}`);
   const countInButton = createCountInButton(COUNT_IN_ICON, render);
-  // With a backing track on, its speed stands in for the BPM, which it sets.
-  const tempo = h("div", { className: "tempo" }, bpmControl, track.speedControl);
+  // They join the bar's label switches, which move beside the buttons in fullscreen.
+  board.labels.prepend(tempoSwitch.label, countInButton);
+  // With a backing track on, its speed stands in for the header's BPM, which it sets.
+  const tempo = h("div", { className: "tempo" }, track.speedControl);
   board.addFirst(pieceMenu.button, pieceMenu.menu);
-  // The switches sit in front of the BPM. In fullscreen, both move out to the buttons.
-  const optionToggles = h("div", { className: "row toggles" }, tempoSwitch.label, metronomeSwitch.label, countInButton);
-  const optionsPanel = h("div", { className: "options row" }, optionToggles, tempo);
+  board.addToggle(tempo);
 
   const modeNote = h("div", { className: "mode-note" });
   function showModes() {
@@ -61,15 +59,16 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     const current = section();
     const scale = isScale(piece());
     // What doesn't apply is hidden: the repeated top note on a song, "Don't wait" when a backing track sets the pace
-    // anyway, Tempo, which smooths the move after a hit, when the lanes don't wait for one, and the pitch line unless
-    // they don't wait and the staff is the moving line.
-    const pitchLine = (settings.followOn || track.active) && board.staff.collapsed;
-    pitchLineButton.hidden = !pitchLine;
-    if (!pitchLine) board.staff.clearTrace();
+    // anyway, and Tempo, which smooths the move after a hit, when the lanes don't wait for one. The pitch line goes
+    // when the staff isn't the moving line or the lanes wait.
+    if (!((settings.followOn || track.active) && board.staff.collapsed)) board.staff.clearTrace();
     repeatTopButton.hidden = !scale;
     followButton.hidden = track.active;
     tempoSwitch.label.hidden = settings.followOn || track.active;
-    bpmControl.hidden = track.active;
+    // A count-in only comes before notes that wait for the player.
+    countInButton.hidden = settings.followOn || track.active;
+    // A backing track sets the pace, so the header's metronome and BPM don't apply.
+    document.documentElement.classList.toggle("track-tempo", track.active);
     track.speedControl.hidden = !track.active;
     patternRow.hidden = !scale;
     modeNote.textContent = [
@@ -113,30 +112,26 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
   }
   showView();
   board.whenViewChanges(showModes);
-  const pitchLineButton = modeButton("pitchLineOn", t.pitchLine, PITCH_LINE_ICON, `${t.pitchLine}: ${t.pitchLineHint}`, () => {
-    board.staff.clearTrace();
-    render();
-  });
-  const followButton = modeButton("followOn", t.dontWait, DONT_WAIT_ICON, `${t.dontWait}: ${t.dontWaitHint}`, () => {
+  // Don't wait draws the pitch line through the moving staff too.
+  const followButton = modeButton("followOn", t.dontWait, DONT_WAIT_ICON, `${t.dontWait}: ${t.dontWaitHint} ${t.pitchLineHint}`, () => {
     showModes();
     clearStats();
     render();
   }, stopRun);
-  // In fullscreen the switches and BPM move in beside the buttons, since Options and the lanes' bar are out of sight.
-  // The label switches get their own little group, before the mode buttons.
+  // In fullscreen the bar's switches and the speed move in beside the buttons, since the lanes' bar is out of sight,
+  // in their own little group before the mode buttons.
   const fullscreen = createFullscreen((on) => {
-    if (on) loopButton.before(optionToggles, tempo, board.labels);
+    if (on) loopButton.before(tempo, board.labels);
     else {
-      optionsPanel.append(optionToggles, tempo);
+      board.addToggle(tempo);
       board.returnLabels();
     }
     applyView();
   });
-  const actions = h("div", { className: "row actions" }, run.recordToggle, run.startButton, referenceButton, run.message, loopButton, repeatTopButton, followButton, pitchLineButton, viewButton, fullscreen.button);
+  const actions = h("div", { className: "row actions" }, run.startButton, referenceButton, run.message, loopButton, repeatTopButton, followButton, viewButton, fullscreen.button);
   const patternRow = createPatternRow(stopRun, loadPiece);
 
   return {
-    optionsPanel,
     todayPlan: todayPlan.element,
     actions,
     modeNote,
@@ -145,7 +140,7 @@ export function createPracticeControls({ run, pieces, piece, section, board, tra
     // Loop on or off, as if its button were pressed.
     leave() {
       fullscreen.leave();
-      document.documentElement.classList.remove("staff-only");
+      document.documentElement.classList.remove("staff-only", "track-tempo");
     },
   };
 }

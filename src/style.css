@@ -1,6 +1,8 @@
 /* Pico, imported first in main.ts, styles the native elements. This file sets the palette and the layout. */
 :root {
   --pico-font-size: 100%; /* Pico grows text with the viewport, which pushes the highway below the fold. */
+  /* Room for the scrollbar is kept, so the page doesn't shift sideways as a screen grows past the window. */
+  scrollbar-gutter: stable;
   --pico-form-element-spacing-vertical: 0.5rem;
   --pico-form-element-spacing-horizontal: 0.875rem;
 }
@@ -66,12 +68,72 @@ nav [role="group"] button {
   --pico-form-element-spacing-horizontal: 1.25rem;
 }
 
-header .language {
-  margin-left: auto;
+/* Record, and the metronome with its BPM, on the right by Settings. */
+.header-tools {
+  gap: 0.375rem;
+  margin: 0 0 0 auto;
+  flex-wrap: nowrap;
 }
 
-header .language button {
+.header-tools .box-toggle {
+  min-width: 2.5rem;
+  height: 2.5rem;
+}
+
+.header-tools .box-toggle .icon svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+/* The metronome: slid sideways for its BPM, so a touch doesn't scroll the page. Its BPM is a small tag in the top
+   right corner. */
+.metronome-button {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+
+.bpm-badge {
+  position: absolute;
+  top: -0.4375rem;
+  right: -0.5rem;
+  padding: 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1rem;
+  font-variant-numeric: tabular-nums;
+  /* The theme's text and page colours swapped, the strongest contrast in light or dark; on, a button's colours. */
+  color: var(--pico-background-color);
+  background: var(--pico-color);
+  border-radius: 0.5rem;
+}
+
+.metronome-button[aria-pressed="true"] .bpm-badge {
+  color: var(--pico-primary-inverse);
+  background: var(--pico-primary-background);
+}
+
+/* Record when off: a light red, ready. On, it's red and pulsing, as below. */
+header .record-toggle {
+  color: rgb(229 72 77 / 0.65);
+  border-color: rgb(229 72 77 / 0.35);
+}
+
+/* A backing track sets Practice's pace, so the metronome and BPM don't apply; they keep their room. */
+.track-tempo .header-tools > :not(.record-toggle) {
+  visibility: hidden;
+}
+
+/* The language, in Settings: its name, and the two buttons on the right. */
+.language-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.language button {
   --pico-form-element-spacing-horizontal: 0.625rem;
+  --pico-form-element-spacing-vertical: 0.25rem;
   font-size: 0.875rem;
 }
 
@@ -117,6 +179,47 @@ header details[open] > summary {
 
 .setting + .setting {
   margin-top: 0.75rem;
+}
+
+/* The needle's zones: a box in each one's colour, as on the needle, with its slider beside it. */
+.zone-setting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zone-setting input {
+  flex: 1;
+  margin: 0;
+}
+
+.zone-setting output {
+  min-width: 4.5em;
+  text-align: right;
+}
+
+.zone {
+  flex: none;
+  width: 1.75rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+}
+
+.zone.green {
+  background: #1f6e42;
+}
+
+.zone.yellow {
+  background: #6e5c1c;
+}
+
+/* Yellow off: an empty outline, and only green counts. */
+.zone.yellow[aria-pressed="false"] {
+  background: none;
+  border-color: var(--pico-muted-border-color);
 }
 
 /* Shared */
@@ -244,14 +347,14 @@ section > ul > li {
   min-width: 120px;
   height: 12px;
   border-radius: 6px;
-  /* One cent is 1% of the track. Green is 10 cents either way; --tolerance comes from Settings, and yellow runs out to it. */
+  /* One cent is 1% of the track. Settings sets --green and --tolerance, and yellow runs from one to the other. */
   background: linear-gradient(var(--pico-color), var(--pico-color)) center / 2px 100% no-repeat,
     linear-gradient(
       to right,
       var(--pico-muted-border-color) calc(50% - var(--tolerance)),
-      #6e5c1c calc(50% - var(--tolerance)) 40%,
-      #1f6e42 40% 60%,
-      #6e5c1c 60% calc(50% + var(--tolerance)),
+      #6e5c1c calc(50% - var(--tolerance)) calc(50% - var(--green)),
+      #1f6e42 calc(50% - var(--green)) calc(50% + var(--green)),
+      #6e5c1c calc(50% + var(--green)) calc(50% + var(--tolerance)),
       var(--pico-muted-border-color) calc(50% + var(--tolerance))
     );
 }
@@ -288,8 +391,11 @@ section > ul > li {
   border-radius: var(--pico-border-radius);
 }
 
+/* Open, the sheet fills its box. Collapsed, staff.ts sets its size to keep the timeline's scale. */
 .staff svg {
   display: block;
+  width: 100%;
+  height: auto;
 }
 
 .staff .current text {
@@ -352,13 +458,56 @@ section > ul > li {
   height: 1px;
 }
 
-/* Listen */
+/* Listen. Nothing on it moves as toggles and modes change: the stage keeps one height, each mode's parts keep their
+   room in the others, and the modes' own rows share one place. */
 .listen {
   text-align: center;
+  container-type: inline-size;
+  /* The stage's height: the tallest sheet, 170 units, a fifth larger, or less to fit a narrow screen. */
+  --stage-height: min(12.75rem, 55cqi);
+}
+
+.listen:not([data-mode="guesser"]) .guesser,
+.listen:not([data-mode="technique"]) .technique,
+.listen:not([data-mode="technique"]) .volume-curve,
+.listen[data-mode="free"] .listen-progress {
+  visibility: hidden;
+}
+
+.listen:not([data-mode="guesser"]) .fingerboard,
+.listen[data-view="staff"] .fingerboard,
+.listen[data-mode="guesser"][data-view="board"] .stage-sheet,
+.listen:not([data-mode="guesser"]) .guess-banner {
+  display: none;
+}
+
+.listen-panels {
+  display: grid;
+}
+
+.listen-panels > * {
+  grid-area: 1 / 1;
+}
+
+/* Stop is as wide as Start, so the buttons beside it stay put. */
+.listen-start {
+  min-width: 5.5rem;
 }
 
 .listen .row {
   justify-content: center;
+}
+
+/* Fullscreen and Progress, a little smaller than elsewhere, and level: Pico puts a margin under a type="button". */
+.listen .icon-button {
+  width: 2.125rem;
+  height: 2.125rem;
+  margin: 0;
+}
+
+.listen .icon-button svg {
+  width: 1.0625rem;
+  height: 1.0625rem;
 }
 
 .listen .row:has(> .needle) {
@@ -366,12 +515,164 @@ section > ul > li {
   margin-inline: auto;
 }
 
-/* The staff is Listen's main view: a fifth larger than its sheet, 300 units wide or wider for Technique (--sheet), and
-   narrower only to fit a small screen. */
-.listen .staff {
-  width: calc(var(--sheet, 300) * 1.2px + 1rem);
-  max-width: 100%;
+/* The stage: the staff, Listen's main view, with the guesser's fingerboard beside it, both the stage's height. The
+   staff's box is as wide as its sheet (--sheet, 300 units, or 480 for Technique) at that height, and narrower only
+   to fit a small screen, where its sheet shrinks inside it. */
+.listen-stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.75rem;
   margin: 1rem auto;
+}
+
+/* The staff with its corner toggles, which sit on its corners however wide the stage. */
+.stage-sheet {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.listen .staff {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The labels' toggles, small in the staff's top left corner, and Technique's pause switch in its top right: bare
+   icons, grey when off and in the theme's colour when on. */
+.stage-labels,
+.stage-pause {
+  position: absolute;
+  top: 0.25rem;
+  margin: 0;
+}
+
+.stage-labels {
+  left: 0.25rem;
+  gap: 0.25rem;
+}
+
+.stage-pause {
+  right: 0.25rem;
+}
+
+.stage-labels .box-toggle,
+.stage-pause .box-toggle {
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.25rem;
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+  background: none;
+  border: 0;
+}
+
+.stage-labels .box-toggle[aria-pressed="true"],
+.stage-pause .box-toggle[aria-pressed="true"] {
+  color: var(--pico-primary);
+  background: none;
+}
+
+.stage-labels .box-toggle .icon svg,
+.stage-pause .box-toggle .icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.listen:not([data-mode="technique"]) .stage-pause,
+.listen[data-mode="guesser"][data-view="board"] .stage-labels {
+  display: none;
+}
+
+/* As wide as its sheet at the stage's height, set outright: the svg's own width attribute would win over a ratio. */
+.listen .staff svg {
+  width: calc(var(--stage-height) * var(--sheet, 300) / 170);
+  max-width: 100%;
+  height: var(--stage-height);
+}
+
+/* The fingerboard, with its picture and word in one box, and its head, the tapes switch, a bare button over it. */
+.fingerboard,
+.fingerboard > [role="img"] {
+  position: relative;
+  flex: none;
+}
+
+/* The stage's height, but never wider than about a third of the room, so the staff stays the biggest thing. */
+.fingerboard [role="img"] svg {
+  display: block;
+  width: auto;
+  height: min(var(--stage-height), 60cqi);
+  aspect-ratio: 160 / 320;
+}
+
+.fingerboard-head-button {
+  all: unset;
+  position: absolute;
+  top: 0;
+  left: 33%;
+  width: 34%;
+  height: 14.5%;
+  cursor: pointer;
+}
+
+.fingerboard-head-button:focus-visible {
+  outline: 2px solid var(--pico-primary);
+  border-radius: 0.5rem;
+}
+
+/* The head glows while the tapes are on. */
+.fingerboard-head {
+  transition: filter 0.2s;
+}
+
+.fingerboard-head.lit {
+  filter: brightness(1.7) drop-shadow(0 0 3px #ffc94d);
+}
+
+/* Which way to move the finger, over the bottom of the fingerboard. */
+.fingerboard-hint {
+  position: absolute;
+  bottom: 0.25rem;
+  left: 50%;
+  translate: -50% 0;
+  margin: 0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fff;
+  background: rgb(0 0 0 / 0.72);
+}
+
+/* A round played right, and when the next comes, over the top of the stage. */
+.guess-banner {
+  position: absolute;
+  top: 0.25rem;
+  left: 50%;
+  z-index: 1;
+  translate: -50% 0;
+  margin: 0;
+  padding: 0.25rem 0.875rem;
+  border-radius: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fff;
+  background: #14914a;
+  pointer-events: none;
+}
+
+.fullscreen .guess-banner {
+  font-size: 1.5rem;
+}
+
+/* The score keeps its width as it counts, so the row doesn't reflow. */
+.guess-score {
+  min-width: 4.5em;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Lines that come and go keep their height, so the staff below doesn't jump as notes start and stop. */
@@ -512,28 +813,9 @@ section > ul > li {
   height: 1.25rem;
 }
 
-/* Tempo, metronome and count-in as icons, in front of the BPM, boxed just above the lanes. */
-.options {
-  padding: 0.25rem 0.875rem;
-  margin-bottom: 0.5rem;
-  border: 1px solid var(--pico-muted-border-color);
-  border-radius: var(--pico-border-radius);
-}
-
-/* One line at any width: the slider shrinks beside the icons rather than dropping below them. */
-.options {
-  flex-wrap: nowrap;
-}
-
-.options .bpm,
-.options .speed {
+/* A backing track's speed on the lanes' bar shrinks to fit beside the switches. */
+.section-bar .speed {
   min-width: 0;
-}
-
-.options > .toggles {
-  flex: none;
-  gap: 0.375rem;
-  margin: 0;
 }
 
 /* A checkbox laid invisibly over its icon, so the whole box is the switch. */
@@ -553,8 +835,7 @@ section > ul > li {
   cursor: pointer;
 }
 
-.toggles .icon-switch input,
-.technique .icon-switch input {
+.icon-switch input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -570,8 +851,8 @@ section > ul > li {
   height: 1.125rem;
 }
 
-.options .icon-switch:has(input:checked),
-.technique .icon-switch:has(input:checked) {
+.label-toggles .icon-switch:has(input:checked),
+header .icon-switch:has(input:checked) {
   color: var(--pico-primary);
   background: color-mix(in srgb, var(--pico-primary) 18%, transparent);
   border-color: var(--pico-primary);
@@ -604,7 +885,6 @@ section > ul > li {
   --pico-form-element-spacing-horizontal: 1rem;
 }
 
-.bpm,
 .speed {
   display: flex;
   flex: 1;
@@ -614,14 +894,12 @@ section > ul > li {
   font-variant-numeric: tabular-nums;
 }
 
-.bpm input,
 .speed input {
   flex: 1;
   min-width: 0;
   margin: 0;
 }
 
-.bpm output,
 .speed output {
   white-space: nowrap;
 }
@@ -1265,7 +1543,7 @@ a[download] {
     width: 100%;
   }
 
-  header .language {
+  header .header-tools {
     margin-left: 0;
   }
 
@@ -1344,7 +1622,7 @@ a[download] {
     min-width: 0;
   }
 
-  header .language {
+  header .header-tools {
     margin-left: auto;
   }
 
@@ -1353,14 +1631,8 @@ a[download] {
     --pico-form-element-spacing-vertical: 0.25rem;
   }
 
-  header .language button,
   .actions button {
     --pico-form-element-spacing-vertical: 0.25rem;
-  }
-
-  .options {
-    padding-block: 0.25rem;
-    margin-bottom: 0.25rem;
   }
 
   .practice > p {
@@ -1420,7 +1692,7 @@ a[download] {
     min-width: 0;
   }
 
-  .listen > .staff {
+  .listen > .listen-stage {
     grid-column: 2;
     grid-row: 1 / span 6;
     margin: 0;
@@ -1492,7 +1764,6 @@ a[download] {
     min-height: 2.25rem;
   }
 
-  .bpm input,
   .speed input,
   .setting input {
     height: 2.25rem;
@@ -1524,7 +1795,6 @@ a[download] {
 }
 
 .fullscreen header,
-.fullscreen .options,
 .fullscreen .reference,
 .fullscreen .mode-note,
 .fullscreen .patterns,
@@ -1538,16 +1808,61 @@ a[download] {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
-/* Listen in fullscreen: the staff as large as fits, a 300-unit sheet about twice as wide as it's tall and a wider one
-   wider still, with room under it for the needle and the controls. On a phone on its side the controls sit beside it,
-   so it takes the whole height. */
-.fullscreen .listen .staff {
-  width: calc((100dvh - 12rem) * 1.75 * var(--sheet, 300) / 300);
+/* Listen in fullscreen: all of it on one screen, the stage taking whatever height the needle and the controls leave,
+   and the staff and fingerboard as tall as the stage (100cqh). Not zoomed, as the zoom would scale it past the
+   screen. On a phone on its side the controls sit beside the stage, so it takes the whole height. */
+@media (min-height: 501px) {
+  .fullscreen .listen {
+    zoom: 1;
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 1rem);
+    margin: 0;
+    --stage-height: 100cqh;
+  }
+
+  /* The staff no taller than its width allows, so a narrow screen has no empty sheet above it: the stage's width, less
+     the fingerboard's third when it's beside it, and the staff's padding. */
+  .fullscreen .listen .staff svg {
+    height: min(var(--stage-height), calc((var(--staff-room, 100cqi) - 1rem) * 170 / var(--sheet, 300)));
+  }
+
+  .fullscreen .listen[data-mode="guesser"][data-view="both"] {
+    --staff-room: calc(70cqi - 0.75rem);
+  }
+
+  /* Only the stage grows: the needle's row keeps its own height here, and spans the screen, thicker, to read from
+     the stand. */
+  .fullscreen .listen > .row:has(> .needle) {
+    flex: none;
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .fullscreen .listen .needle {
+    height: 20px;
+    border-radius: 10px;
+  }
+
+  .fullscreen .listen .needle i {
+    top: -5px;
+    width: 8px;
+    height: 30px;
+    margin-left: -4px;
+  }
+
+  .fullscreen .listen > .listen-stage {
+    flex: 1;
+    min-height: 0;
+    margin: 0 0 0.5rem;
+    container-type: size;
+  }
 }
 
 @media (max-height: 500px) {
-  .fullscreen .listen .staff {
-    width: calc((100dvh - 2rem) * 1.75 * var(--sheet, 300) / 300);
+  .fullscreen .listen {
+    --stage-height: min(calc(100dvh - 2rem), 55cqi);
   }
 }
 
@@ -1652,7 +1967,6 @@ a[download] {
 
 /* Phones, and small ones in landscape: the note counter takes its own row, leaving the buttons the whole width. */
 @media (max-width: 600px), (max-height: 500px) and (max-width: 700px) {
-  .fullscreen .bpm,
   .fullscreen .speed {
     min-width: 7rem;
   }
@@ -1669,7 +1983,6 @@ a[download] {
 }
 
 @media (max-height: 500px) {
-  .fullscreen .bpm,
   .fullscreen .speed {
     min-width: 7rem;
   }
@@ -1847,14 +2160,6 @@ a[download] {
   cursor: grabbing;
 }
 
-.options .track:not(:empty) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
-}
-
 /* The lanes' switches: an icon in a box that lights up when on. */
 .box-toggle {
   display: inline-flex;
@@ -1884,12 +2189,11 @@ a[download] {
   border-color: var(--pico-primary);
 }
 
-/* The BPM, or a backing track's speed in its place: whichever shows sits in the row as if on its own. */
+/* A backing track's speed sits in the row as if on its own. */
 .tempo {
   display: contents;
 }
 
-.bpm[hidden],
 .speed[hidden] {
   display: none;
 }
@@ -2164,8 +2468,7 @@ a[download] {
 
 /* Record, when on: red and pulsing. It stays at full strength though it can't be switched mid-run. */
 .record-toggle[aria-pressed="true"],
-.actions .record-toggle[aria-pressed="true"],
-.actions .record-toggle[aria-pressed="true"]:disabled {
+.record-toggle[aria-pressed="true"]:disabled {
   color: #e5484d;
   background: rgb(229 72 77 / 0.15);
   border-color: #e5484d;

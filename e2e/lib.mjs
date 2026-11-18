@@ -164,8 +164,15 @@ export const freshPractice = async (page, bpm) => {
   await page.waitForSelector("nav button");
   await nav(page, "Practice");
   await sleep(250);
-  if (bpm) await page.locator(".bpm input").fill(String(bpm));
+  if (bpm) await setBpm(page, bpm);
 };
+// Sets the header's BPM, a step at a time with the arrow keys on the metronome, as a keyboard can.
+export async function setBpm(page, bpm) {
+  const button = page.locator("header .metronome-button");
+  const now = Number(await button.locator(".bpm-badge").innerText());
+  await button.focus();
+  for (let step = 0; step < Math.abs(bpm - now); step++) await page.keyboard.press(bpm > now ? "ArrowRight" : "ArrowLeft");
+}
 // What Listen's staff says about the note heard in free play: its finger, name and letter, or "" when nothing is heard.
 export const heard = async (page) => (await page.locator(".listen .staff text[font-family^=system-ui]").allTextContents()).join(" ");
 export const savedLog = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("log") ?? "[]"));

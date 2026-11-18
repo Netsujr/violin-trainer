@@ -185,7 +185,7 @@ flow("8. Calendar: recordings");
   await nav(s.page, "Practice"); await sleep(200);
   await setRecord(s.page, true);
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")');
-  check("Record locks during a session", await s.page.locator('.actions button[aria-label="Record"]').isDisabled());
+  check("Record locks during a session", await s.page.locator('header button[aria-label="Record"]').isDisabled());
   await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 25000 });
   await stop(s.page);
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');

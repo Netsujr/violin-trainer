@@ -18,6 +18,15 @@ async function settingsWith(stored: object | null, screen = { width: 1440, heigh
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("passCents", () => {
+  it("counts out to yellow's edge, or only green with yellow off or set inside green", async () => {
+    const { passCents } = await import("../src/storage");
+    expect(passCents({ greenCents: 10, toleranceCents: 40, yellowOn: true })).toBe(40);
+    expect(passCents({ greenCents: 10, toleranceCents: 40, yellowOn: false })).toBe(10);
+    expect(passCents({ greenCents: 20, toleranceCents: 15, yellowOn: true })).toBe(20);
+  });
+});
+
 describe("count-in", () => {
   it("defaults to one bar, and moves a count no longer offered up to the next choice", async () => {
     expect((await settingsWith(null)).getSettings().countInBeats).toBe(4);

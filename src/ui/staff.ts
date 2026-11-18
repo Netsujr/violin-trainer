@@ -306,9 +306,12 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const context = renderer.getContext();
     const svg = element.querySelector("svg")!;
     svg.setAttribute("viewBox", `0 0 ${fullWidth} ${height}`);
-    // Open, the sheet fills the page. Collapsed, it keeps the timeline's scale and scrolls.
-    svg.style.width = collapsed ? `${fullWidth * scale}px` : "100%";
-    svg.style.height = collapsed ? `${height * scale}px` : "auto";
+    // In a box taller than the sheet, as Listen keeps, the sheet sits at the bottom, so its staff barely moves as
+    // labels come and go.
+    svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
+    // Open, the sheet fills the page, as the CSS says. Collapsed, it keeps the timeline's scale and scrolls.
+    svg.style.width = collapsed ? `${fullWidth * scale}px` : "";
+    svg.style.height = collapsed ? `${height * scale}px` : "";
 
     const allNotes: StaveNote[] = [];
     lines.forEach(({ line, formatWidth }, lineIndex) => {

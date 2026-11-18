@@ -18,18 +18,17 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await nav(page, "Practice");
   await sleep(250);
 
-  // Options
-  const options = page.locator(".options");
-  check("options: no drawer, boxed right above the lanes", (await options.evaluate((panel) => panel.tagName)) === "DIV" && (await page.locator(".options + .timeline-section").count()) === 1);
-  const text = (await options.innerText()) + " " + (await options.locator("[aria-label]").evaluateAll((elements) => elements.map((element) => element.ariaLabel).join(" ")));
-  check("options: holds Tempo, Metronome, the count-in and BPM", ["Tempo", "Metronome", "count-in", "BPM"].every((word) => text.includes(word)) && !text.includes("Record"), text.replaceAll("\n", " ").slice(0, 80));
-  check("options: the display switches moved out", !["Fingers", "Note names", "Grid"].some((word) => text.includes(word)));
+  // The run's switches, on the lanes' bar, with no box of their own
+  check("options: no box above the lanes", (await page.locator(".options").count()) === 0);
+  const bar = page.locator(".section-bar");
+  const text = (await bar.innerText()) + " " + (await bar.locator("[aria-label], [title]").evaluateAll((elements) => elements.map((element) => element.ariaLabel ?? element.title).join(" ")));
+  check("the lanes' bar holds Tempo and the count-in, with record and the metronome in the header", text.includes("Tempo") && text.includes("count-in") && !["Record", "Metronome"].some((word) => text.includes(word)), text.replaceAll("\n", " ").slice(0, 120));
   const rowOf = (selector) => page.locator(selector).evaluate((element) => Math.round(element.getBoundingClientRect().top + element.getBoundingClientRect().height / 2));
-  const record = await page.locator('.actions button[aria-label="Record"]').boundingBox(), startButton = await page.locator('button:text-is("Start")').boundingBox();
-  check("record sits just left of Start", record.x + record.width <= startButton.x && Math.abs((await rowOf('.actions button[aria-label="Record"]')) - (await rowOf('button:text-is("Start")'))) < 4);
-  check("options: the BPM slider is wide", (await page.locator(".bpm input").boundingBox()).width > 400);
-  check("run buttons are outside the panel", (await page.locator('.options button:text-is("Start")').count()) === 0);
-  const label = page.locator('.options label:has-text("Tempo")');
+  const record = await page.locator('header button[aria-label="Record"]').boundingBox(), metronome = await page.locator("header .metronome-button").boundingBox();
+  check("the header has record just left of the metronome, on one line", record.x + record.width <= metronome.x && Math.abs((await rowOf('header button[aria-label="Record"]')) - (await rowOf("header .metronome-button"))) < 4);
+  check("with its BPM in its corner", /^\d+$/.test(await page.locator("header .metronome-button .bpm-badge").innerText()));
+  check("run buttons are off the lanes' bar", (await page.locator('.section-bar button:text-is("Start")').count()) === 0);
+  const label = page.locator('.section-bar label:has-text("Tempo")');
   const color = () => label.evaluate((element) => getComputedStyle(element).color);
   const off = await color();
   check("options: an off switch is grey", off === "rgb(163, 154, 139)", off);
@@ -142,7 +141,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await nav(s.page, "Practice");
   await s.page.click("header summary");
   check("settings: opens", await isOpen());
-  await s.page.locator('label.setting:has-text("Tolerance") input').fill("30");
+  await s.page.locator('input[aria-label="Close enough"]').fill("30");
   check("settings: using a control keeps it open", await isOpen());
   const saved = await s.page.evaluate(() => JSON.parse(localStorage.getItem("settings")).toleranceCents);
   check("settings: saved as you slide", saved === 30, String(saved));
@@ -155,7 +154,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await s.page.click("header summary");
   check("settings: its own header still toggles it", !(await isOpen()));
   await s.page.click("header summary");
-  await s.page.click('.language button:text-is("PT")');
+  await s.page.click("header summary"); await s.page.click('.language button:text-is("PT")');
   await sleep(200);
   check("settings: closed when the language changes", !(await isOpen()));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
@@ -195,7 +194,7 @@ for (const [file, cents, zone] of [["s-green.wav", 8, "green"], ["s-yellow.wav",
 {
   const s = await open(OUT + "s-yellow.wav");
   await s.page.click("summary");
-  await s.page.locator('label.setting:has-text("Tolerance") input').fill("50");
+  await s.page.locator('input[aria-label="Close enough"]').fill("50");
   await s.page.click("summary");
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');

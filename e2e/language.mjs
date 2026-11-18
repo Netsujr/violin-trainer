@@ -11,7 +11,7 @@ const everyText = (page) => page.evaluate(() => [document.body.innerText, ...[..
 const s = await open(OUT + "l-a4.wav");
 const page = s.page;
 await seed(page, { log, settings: { targetDays: { "d-major-1oct": 0 }, staffOpen: true } });
-await page.click('.language button:text-is("PT")');
+await page.click("header summary"); await page.click('.language button:text-is("PT")');
 await sleep(250);
 
 check("pt: the page says so", (await page.evaluate(() => document.documentElement.lang)) === "pt-BR");
@@ -49,7 +49,7 @@ const shown = await heard(page);
 check("pt: Listen names the note on the staff", shown === "0 Lá A", shown);
 const hertz = await page.locator("section").innerText();
 check("pt: a decimal comma", /\d+,\d Hz/.test(hertz));
-await page.click('.language button:text-is("EN")');
+await page.click("header summary"); await page.click('.language button:text-is("EN")');
 await sleep(500);
 check("switching language ends a running session", (await page.locator('.listen button:text-is("Start")').count()) === 1);
 check("en: back to English", (await page.locator("nav button").first().innerText()) === "Listen");

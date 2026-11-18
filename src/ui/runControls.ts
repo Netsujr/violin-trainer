@@ -7,6 +7,15 @@ import { boxToggle, RECORD_ICON } from "./toggles";
 // A finished run ends this long after its last note counts, so a recording keeps the end of that note.
 const FINISH_TAIL_MS = 1000;
 
+// Record, in the header for every screen: when it's on, the next run records. It can't be switched mid-run.
+let recordOn = false;
+let recordToggle: HTMLButtonElement | null = null;
+export function createRecordToggle() {
+  recordToggle = boxToggle(h("span", { className: "icon", innerHTML: RECORD_ICON }), t.record, recordOn, (on) => (recordOn = on));
+  recordToggle.classList.add("record-toggle");
+  return recordToggle;
+}
+
 export function createRunControls(options: {
   piece: () => Piece;
   // Each reading from the mic: the pitch heard, if any, and how loud it was.
@@ -19,10 +28,6 @@ export function createRunControls(options: {
   onStop?: () => void;
 }) {
   const button = h("button", { textContent: t.start, onclick: () => (run ? stop() : start()) });
-  // Red and pulsing while it's on.
-  let recordOn = false;
-  const record = boxToggle(h("span", { className: "icon", innerHTML: RECORD_ICON }), t.record, false, (on) => (recordOn = on));
-  record.classList.add("record-toggle");
   const message = h("span", { className: "warning" });
   let run: Run | null = null;
   let saving: Promise<void> = Promise.resolve();
@@ -31,7 +36,7 @@ export function createRunControls(options: {
   const showRunning = () => {
     button.textContent = run ? t.stop : t.start;
     button.classList.toggle("secondary", run !== null);
-    record.disabled = run !== null;
+    if (recordToggle) recordToggle.disabled = run !== null;
   };
 
   async function start() {
@@ -71,7 +76,6 @@ export function createRunControls(options: {
 
   return {
     startButton: button,
-    recordToggle: record,
     message,
     stop,
     // Ends the run shortly, unless by then it's been stopped, another started, or it has carried on (stillDone false).

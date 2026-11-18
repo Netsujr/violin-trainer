@@ -83,7 +83,7 @@ await card().locator('button[aria-label="Practice"]').click(); await sleep(500);
 const playAlong = () => page.locator('.section-bar .box-toggle[title^="Play along with"]');
 const ear = () => page.locator('.section-bar .box-toggle[aria-label="Listen to my notes"]');
 check("Practice puts its switches on the lanes' bar: playing along on, the mic off", (await playAlong().isVisible()) && (await playAlong().getAttribute("aria-pressed")) === "true" && (await ear().getAttribute("aria-pressed")) === "false" && (await page.locator(".waveform").count()) === 0);
-check("and its speed stands in for the BPM", (await page.locator(".options .speed").isVisible()) && !(await page.locator(".options .bpm").isVisible()) && (await page.locator(".options .speed output").innerText()) === "Speed 100%");
+check("and its speed stands in for the header's BPM", (await page.locator(".section-bar .speed").isVisible()) && !(await page.locator("header .metronome-button").isVisible()) && (await page.locator(".options .speed output").innerText()) === "Speed 100%");
 check("the line says so", (await page.locator(".mode-note").innerText()).startsWith("Plays along with the track"), await page.locator(".mode-note").innerText());
 await page.click('button:text-is("Start")'); await sleep(3500);
 check("Start plays along, with the lanes moving", (await lanes()).left > 0 && !(await page.evaluate(() => window.trackAudio.paused)));
@@ -91,7 +91,7 @@ await page.click('button:text-is("Stop")'); await sleep(300);
 const along = await savedLog(page);
 check("a play-along with the mic off logs its minutes, as played along", along.length === 1 && along[0].playedAlong === true && along[0].minutes > 0 && along[0].score === undefined, JSON.stringify(along));
 await playAlong().click(); await sleep(150);
-check("switched off, the piece waits for each note again, with the BPM back", (await page.locator(".mode-note").innerText()).startsWith("Waits for each note") && (await page.locator(".options .bpm").isVisible()));
+check("switched off, the piece waits for each note again, with the BPM back", (await page.locator(".mode-note").innerText()).startsWith("Waits for each note") && (await page.locator("header .metronome-button").isVisible()));
 await playAlong().click(); await sleep(150);
 await page.locator(".piece-menu button[value='a-major-1oct']").evaluate((item) => item.click()); await sleep(400);
 check("a piece with no track has no switches for one", !(await playAlong().isVisible()) && !(await ear().isVisible()));
@@ -120,7 +120,7 @@ check("Remove takes it away, leaving the upload button", (await cardButtons()) =
 await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(300);
 check("for good", (await cardButtons()) === "Practice,Download PDF,Add a backing track");
 
-await page.click('.language button:text-is("PT")'); await sleep(250);
+await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
 check("pt: translated", (await card().locator("button.icon-button").last().getAttribute("aria-label")) === "Adicionar faixa de acompanhamento");
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

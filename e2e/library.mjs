@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveStaff, staffNotes, openDrawers } from "./lib.mjs";
+import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveStaff, staffNotes, openDrawers, setBpm } from "./lib.mjs";
 
 const profile = OUT + "profile";
 rmSync(profile, { recursive: true, force: true });
@@ -27,7 +27,7 @@ await page.screenshot({ path: OUT + "library.png" });
 
 // Settings and toggles survive reload
 await page.click("summary");
-await page.locator('label.setting:has-text("Tolerance") input').fill("25");
+await page.locator('input[aria-label="Close enough"]').fill("25");
 await page.click("summary");
 await nav(page, "Practice");
 const fingers = () => page.locator('.section-bar .box-toggle[aria-label="Fingers"]');
@@ -42,7 +42,7 @@ await page.screenshot({ path: OUT + "practice-toggled.png" });
 check("a saved bar switch comes back off", (await fingers().getAttribute("aria-pressed")) === "false");
 await fingers().click();
 await page.click("summary");
-await page.locator('label.setting:has-text("Tolerance") input').fill("40");
+await page.locator('input[aria-label="Close enough"]').fill("40");
 await page.click("summary");
 
 // Record a full practice pass
@@ -174,8 +174,8 @@ await s.close();
     await nav(page, "Library"); await sleep(150);
     await openDrawers(page);
     await page.locator(".piece", { hasText: title }).locator('button[aria-label="Practice"]').click(); await sleep(300);
-    await page.locator(".bpm input").fill(tempo ? "90" : "120");
-    if (tempo) await page.locator('.options label:has-text("Tempo") input').check();
+    await setBpm(page, tempo ? 90 : 120);
+    if (tempo) await page.locator('.section-bar label:has-text("Tempo") input').check();
     await followNotes(page, { midis, delayMs: 150 });
     await start(page); await page.waitForSelector('button:text-is("Stop")');
     await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 60000 }).catch(() => {});
@@ -187,9 +187,9 @@ await s.close();
   check("Hot Cross Buns plays through, with its repeated notes", buns.includes("17 hit"), buns.replaceAll("\n", " / "));
   const mary = await play("Mary Had a Little Lamb", [66, 64, 62, 64, 66, 66, 66, 64, 64, 64, 66, 69, 69, 66, 64, 62, 64, 66, 66, 66, 66, 64, 64, 66, 64, 62], true);
   check("Mary plays through with Tempo on", mary.includes("26 hit"), mary.replaceAll("\n", " / "));
-  await page.locator('.options label:has-text("Tempo") input').uncheck();
+  await page.locator('.section-bar label:has-text("Tempo") input').uncheck();
 
-  await page.click('.language button:text-is("PT")'); await sleep(200);
+  await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(200);
   await page.locator("nav button").nth(2).click(); await sleep(200);
   await openDrawers(page); await sleep(100);
   const text = await page.locator(".library").innerText();

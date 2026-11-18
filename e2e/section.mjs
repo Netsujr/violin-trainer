@@ -134,14 +134,14 @@ await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100)
 
 // Tempo
 await freshPractice(page);
-await page.locator('.options label:has-text("Tempo") input').check();
+await page.locator('.section-bar label:has-text("Tempo") input').check();
 await clickTile(0); await clickTile(2, true);
 await followNotes(page, { midis: D, delayMs: 150 });
 await begin(page);
 await waitForText(page, "All 3 notes done"); await sleep(150);
 check("Tempo stops at the section's end too, with no glide past it", (await stats()).includes("3 hit") && Math.abs((await scrollLeft()) - 2 * BEAT) <= 2, String(await scrollLeft()));
 await stop(page); await sleep(200);
-await page.locator('.options label:has-text("Tempo") input').uncheck();
+await page.locator('.section-bar label:has-text("Tempo") input').uncheck();
 
 // The staff
 await freshPractice(page);
@@ -190,11 +190,11 @@ await clickStaffNote(4, true);
 check("the staff can be clicked in fullscreen", (await bands()) === 3 && (await progress(page)) === "Note 3 of 15", await progress(page));
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(300);
 check("and the section survives leaving it", (await bands()) === 3);
-await page.click('.language button:text-is("PT")'); await sleep(250);
+await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
 await page.locator("nav button").nth(1).click(); await sleep(250);
 await clickTile(0); await clickTile(1, true);
 check("pt: translated", (await line()).startsWith("Trecho: notas 1 a 2"), await line());
-await page.click('.language button:text-is("EN")'); await sleep(200);
+await page.click("header summary"); await page.click('.language button:text-is("EN")'); await sleep(200);
 await nav(page, "Listen"); await sleep(200);
 const listenStaff = await page.locator(".staff").evaluate((staff) => getComputedStyle(staff).cursor);
 check("the staff on Listen isn't clickable", listenStaff !== "pointer", listenStaff);

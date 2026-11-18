@@ -1,6 +1,6 @@
 // Loop, repeating a scale's top note, the steady reference tone, and the line that says which of them is on.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn, setBpm } from "./lib.mjs";
 
 const D_TOP_TWICE = [62, 64, 66, 67, 69, 71, 73, 74, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "modes-silent.wav", [rest(3)]);
@@ -17,7 +17,7 @@ const GREEN = "rgb(76, 208, 125)";
 await nav(page, "Practice"); await sleep(250);
 check("there's no Skip", (await page.locator('button:text-is("Skip")').count()) === 0);
 const order = await page.locator(".actions button").evaluateAll((buttons) => buttons.map((button) => button.ariaLabel ?? button.textContent));
-check("the buttons sit together, Record first and Fullscreen last", order.join() === "Record,Start,Play reference,Loop,Repeat the top note,Don't wait,Pitch line,Lanes and staff,Fullscreen", order.join());
+check("the buttons sit together, Start first and Fullscreen last, Don't wait with no pitch line button of its own", order.join() === "Start,Play reference,Loop,Repeat the top note,Don't wait,Lanes and staff,Fullscreen", order.join());
 check("all off to begin with", !(await pressed(loop())) && !(await pressed(top())) && !(await pressed(dontWait())));
 check("the line beneath describes that", (await note_()) === "Waits for each note · Plays once · Top note once", await note_());
 const below = await page.evaluate(() => document.querySelector(".mode-note").getBoundingClientRect().top >= document.querySelector(".actions").getBoundingClientRect().bottom - 1);
@@ -150,7 +150,7 @@ await waitForText(page, "All 1 notes done");
 check("once it stops, it does", true);
 await stop(page); await sleep(200);
 
-await page.click('.language button:text-is("PT")'); await sleep(250);
+await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
 await page.locator("nav button").nth(1).click(); await sleep(200);
 const line = await note_();
 check("pt: the line and the buttons are translated", line.includes("Espera cada nota") && line.includes("Toca uma vez") && (await page.locator('button[aria-label="Ouvir referência"]').count()) === 1 && (await page.locator('button[aria-label="Repetir"]').count()) === 1, line);
@@ -161,7 +161,7 @@ await s.close();
 {
   const c = await open(OUT + "modes-silent.wav", undefined, { keepCountIn: true });
   const { page } = c;
-  const countIn = () => page.locator(".options .count-in");
+  const countIn = () => page.locator(".section-bar .count-in");
   const showing = () => page.evaluate(() => document.querySelector("section > p").textContent);
   // Logs the text the moment the app sets it. Anything later, even a MutationObserver, also counts the time to draw that frame.
   const watch = () => page.evaluate(() => {
@@ -180,8 +180,8 @@ await s.close();
     });
   });
   await nav(page, "Practice"); await sleep(250);
-  check("count-in: on by default, 4 beats, in Options", (await countIn().getAttribute("aria-pressed")) === "true" && (await countIn().getAttribute("aria-label")) === "Beat count-in: ×4");
-  await page.locator(".bpm input").fill("120");
+  check("count-in: on by default, 4 beats, on the lanes' bar", (await countIn().getAttribute("aria-pressed")) === "true" && (await countIn().getAttribute("aria-label")) === "Beat count-in: ×4");
+  await setBpm(page, 120);
   await page.evaluate(() => {
     window.clicks = [];
     const startNode = OscillatorNode.prototype.start;
@@ -190,7 +190,7 @@ await s.close();
       return startNode.call(this, when);
     };
   });
-  await page.locator('.options label:has-text("Metronome") input').check();
+  await page.locator('header .metronome-button').click();
   await followNotes(page, { midis: D });
   await watch();
   await begin(page);
@@ -210,7 +210,7 @@ await s.close();
   await page.mouse.click(box2.x + 130 + 5 * 120 - scroll + 40, box2.y + 1.5 * 84); await sleep(100);
   check("count-in: clicking a note mid-run doesn't pause again", (await showing()).startsWith("Note "), await showing());
   await stop(page); await sleep(200);
-  await page.locator('.options label:has-text("Metronome") input').uncheck();
+  await page.locator('header .metronome-button').click();
 
   await page.reload(); await page.waitForSelector("nav button");
   await nav(page, "Practice"); await sleep(250);
@@ -234,7 +234,7 @@ await s.close();
   await stop(page); await sleep(200);
   await setCountIn(page, 2);
   await page.click('button[aria-label="Don\'t wait"]'); await sleep(100);
-  await page.locator(".bpm input").fill("120");
+  await setBpm(page, 120);
   await watch();
   await begin(page); await sleep(1000);
   const lanes = await page.evaluate(() => window.seen.map((entry) => entry.text));

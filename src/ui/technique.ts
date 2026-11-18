@@ -1,24 +1,21 @@
-import { createMetronome } from "../audio/metronome";
+import { sharedMetronome as metronome } from "../audio/metronome";
 import { sharedAudioContext } from "../audio/reference";
 import { t } from "../i18n";
 import { fillFingering, stringFor } from "../music/fingering";
 import { centsFrom, countNotes, midiOf, type PieceNote, type StringName } from "../music/notes";
 import type { Session } from "../practice/session";
 import { noteChanges, noteStarts, ON_TIME_MS, roundScore, scoreLongBow, scoreSlurs, type NoteChange, type TechniqueReading } from "../practice/technique";
-import { getSettings, saveSettings } from "../storage";
+import { getSettings, passCents, saveSettings } from "../storage";
 import { h } from "./dom";
 import { levelNotes, toggleLabels } from "./guesser";
 import { createCountIn } from "./practice/countIn";
-import { iconSwitch } from "./practice/options";
 import { beatMs, MIC_DELAY_MS } from "./practice/timing";
 import type { createStaff } from "./staff";
-import { chipGroup, METRONOME_ICON, PAUSE_ICON } from "./toggles";
+import { boxToggle, chipGroup, PAUSE_ICON } from "./toggles";
 
 const NOTES_PER_BOW = [1, 2, 3, 4];
 const BOW_STRINGS: StringName[] = ["G", "D", "A", "E"];
 const BEATS_PER_NOTE = [1, 2, 4, 8];
-// The staff has no note longer than a whole one, so a longer note is drawn as a whole note.
-const LONGEST_DRAWN_BEATS = 4;
 // The fingers played with each number of notes to a bow: up the string and, where the bows need it, back down, so
 // every bow is full and a round ends on an up bow.
 const BOW_FINGERS: Record<number, number[]> = { 1: [0, 1, 2, 3], 2: [0, 1, 2, 3], 3: [0, 1, 2, 3, 2, 1], 4: [0, 1, 2, 3, 3, 2, 1, 0] };
@@ -55,7 +52,6 @@ function changeWords(changes: NoteChange[]) {
 // The round's score goes on the run's session, for the log. onDone ends the run once a round is played.
 export function createTechnique(staff: ReturnType<typeof createStaff>, session: () => Session | null, onDone: () => void) {
   const settings = getSettings();
-  const metronome = createMetronome();
   const status = h("p", { className: "technique-status" });
   const results = h("div", { className: "chip-row" });
   const countIn = createCountIn(metronome, (text) => (status.textContent = text));
@@ -65,11 +61,15 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
   // A round under way: it counts in on the run's first reading, then plays from when its first note began.
   let round: { firstNoteAt: number | null; readings: TechniqueReading[] } | null = null;
 
+  // The staff has no note longer than a whole one, and with more than four notes none longer than a half, so a round
+  // always fits one line of Listen's staff.
+  const longestDrawn = () => (countNotes(notes) > 4 ? 2 : 4);
+
   // Each bow is marked at its first note, with a slur over its notes.
   const drawn = () =>
     notes.map((note, index) => ({
       ...note,
-      beats: Math.min(note.beats!, LONGEST_DRAWN_BEATS),
+      beats: Math.min(note.beats!, longestDrawn()),
       bow: index % settings.bowNotes ? undefined : note.bow,
       slur: index % settings.bowNotes < settings.bowNotes - 1,
     }));
@@ -79,9 +79,9 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
   // Where a beat of the round falls on the staff, where a note longer than a whole one is drawn as a whole one.
   function drawnBeat(beat: number) {
     const index = Math.max(0, starts.findLastIndex((start) => start <= beat));
-    const drawnStart = notes.slice(0, index).reduce((sum, note) => sum + Math.min(note.beats!, LONGEST_DRAWN_BEATS), 0);
+    const drawnStart = notes.slice(0, index).reduce((sum, note) => sum + Math.min(note.beats!, longestDrawn()), 0);
     const note = notes[Math.min(index, notes.length - 1)];
-    return drawnStart + ((beat - starts[index]) * Math.min(note.beats!, LONGEST_DRAWN_BEATS)) / note.beats!;
+    return drawnStart + ((beat - starts[index]) * Math.min(note.beats!, longestDrawn())) / note.beats!;
   }
 
   // A new round of the exercise as the choices set it. It begins once the run is going.
@@ -95,9 +95,9 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
       return pausing() && index < fingers.length - 1 ? [note, { beats: 1 }] : [note];
     });
     starts = noteStarts(notes);
-    // The pause only fits a long bow, and sets the beats itself.
-    pauseSwitch.label.hidden = settings.bowNotes !== 1;
-    beatsChoice.hidden = pausing();
+    // The pause only fits a long bow, and sets the beats itself. The beats keep their room, so the row doesn't move.
+    pauseButton.hidden = settings.bowNotes !== 1;
+    beatsChoice.style.visibility = pausing() ? "hidden" : "";
     current = -1;
     round = { firstNoteAt: null, readings: [] };
     countIn.cancel();
@@ -132,7 +132,7 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
   // How the round went, in a few words each, and as a score out of 100: the average of its shares, of the notes in tune
   // and bows smooth for slurs, or how steady a long bow was, and of the beats held.
   function outcome(readings: TechniqueReading[]) {
-    const options = { beatMs: beatMs(), minRms: settings.minRms, toleranceCents: settings.toleranceCents, holdMs: settings.holdMs };
+    const options = { beatMs: beatMs(), minRms: settings.minRms, toleranceCents: passCents(), holdMs: settings.holdMs };
     if (!readings.some(({ rms }) => rms >= settings.minRms)) return { words: [t.nothingHeard], score: null, changes: [] };
     const changes = noteChanges(notes, settings.bowNotes, readings, options);
     const timing = changeWords(changes);
@@ -171,13 +171,16 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
     changed();
   });
   const beatsChoice = captioned(t.beats, beats);
-  const metronomeSwitch = iconSwitch("metronomeOn", t.metronome, METRONOME_ICON, t.metronome, start);
-  const pauseSwitch = iconSwitch("bowPause", t.pauseFirst, PAUSE_ICON, t.pauseFirstHint, start);
+  const pauseButton = boxToggle(h("span", { className: "icon", innerHTML: PAUSE_ICON }), t.pauseFirstHint, settings.bowPause, (on) => {
+    settings.bowPause = on;
+    saveSettings();
+    start();
+  });
 
   const panel = h(
     "div",
     { className: "technique" },
-    h("div", { className: "row" }, captioned(t.perBow, perBow), captioned(t.bowString, strings), beatsChoice, pauseSwitch.label, metronomeSwitch.label),
+    h("div", { className: "row" }, captioned(t.perBow, perBow), captioned(t.bowString, strings), beatsChoice),
     status,
     results,
     countIn.overlay,
@@ -185,6 +188,8 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
 
   return {
     panel,
+    // The pause switch, for Listen to put over the staff.
+    pause: pauseButton,
     start,
     stop,
     // Draws the notes again, after a toggle changes their labels.
@@ -215,7 +220,7 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
         status.textContent = note.pitch ? `${t.noteOf(countNotes(notes.slice(0, index + 1)), countNotes(notes))} · ${bow}` : t.placeNextFinger;
       }
       const cents = frequency === null || !note.pitch ? null : centsFrom(frequency, midiOf(note.pitch));
-      staff.tracePlayed(drawnBeat(beat), frequency, cents, cents !== null && Math.abs(cents) <= settings.toleranceCents);
+      staff.tracePlayed(drawnBeat(beat), frequency, cents, cents !== null && Math.abs(cents) <= passCents());
     },
   };
 }

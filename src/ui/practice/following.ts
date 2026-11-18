@@ -4,7 +4,7 @@ import { createFollow } from "../../practice/follow";
 import { centsToTarget } from "../../practice/judge";
 import { scorePercent } from "../../practice/log";
 import type { Session } from "../../practice/session";
-import { getSettings } from "../../storage";
+import { getSettings, passCents } from "../../storage";
 import type { createHighway } from "../highway";
 import type { createStaff } from "../staff";
 import type { createBackingTrack } from "./backingTrack";
@@ -41,7 +41,7 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
     const current = state!;
     const waiting = current.waiting!;
     const cents = frequency === null || isMuted(now) ? null : centsToTarget(frequency, session.currentMidi);
-    const inTune = cents !== null && Math.abs(cents) <= settings.toleranceCents;
+    const inTune = cents !== null && Math.abs(cents) <= passCents();
     waiting.inTuneSince = inTune ? (waiting.inTuneSince ?? now) : null;
     staff.showPlayed(session.index, cents, inTune);
     session.heard(cents);
@@ -74,7 +74,7 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
     },
     // A recording sets off by itself, and so does a run that's just been counted in, so neither waits for the first note.
     start(notes: PieceNote[], index: number, wait = !track.active) {
-      const tracker = createFollow(notes, index, () => settings.toleranceCents, endIndex());
+      const tracker = createFollow(notes, index, passCents, endIndex());
       const waiting = wait ? { inTuneSince: null } : null;
       state = { tracker, beat: tracker.startBeat, at: performance.now(), results: new Map(), waiting };
       metronome.reset();
@@ -122,9 +122,9 @@ export function createFollowing({ metronome, highway, staff, isMuted, endIndex, 
 
       const cents = frequency === null ? null : centsToTarget(frequency, session.currentMidi);
       const played = heard === null || current.beat < current.tracker.startBeat ? null : cents;
-      const inTune = played !== null && Math.abs(played) <= settings.toleranceCents;
-      // On the moving line, the pitch line, if it's on, drawn where the sound was played, a moment before the hit line.
-      if (settings.pitchLineOn && staff.collapsed) staff.tracePlayed(micBeat, played === null ? null : heard, played, inTune);
+      const inTune = played !== null && Math.abs(played) <= passCents();
+      // On the moving line, the pitch line, drawn where the sound was played, a moment before the hit line.
+      if (staff.collapsed) staff.tracePlayed(micBeat, played === null ? null : heard, played, inTune);
       else staff.showPlayed(session.index, played, inTune);
       session.heard(played);
       return current.tracker.progress;

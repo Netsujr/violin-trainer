@@ -1,9 +1,15 @@
+import { sharedAudioContext } from "../../audio/reference";
 import { t } from "../../i18n";
 import { PATTERNS } from "../../music/patterns";
 import { COUNT_IN_CHOICES, getSettings, saveSettings, type Settings } from "../../storage";
 import { h } from "../dom";
+import { METRONOME_ICON } from "../toggles";
 
 export const ICON_BUTTON = "secondary outline icon-button";
+const MIN_BPM = 30;
+const MAX_BPM = 120;
+// How far a slide on the metronome goes for one BPM, in pixels.
+const SLIDE_PX = 4;
 
 type OptionKey = { [Key in keyof Settings]-?: Settings[Key] extends boolean ? Key : never }[keyof Settings];
 // Ends a running session, before a change it can't carry on through.
@@ -45,28 +51,67 @@ export function modeButton(key: OptionKey, label: string, icon: string, title: s
   return button;
 }
 
-// The BPM slider and its reading.
-export function createBpmControl(onChange: () => void) {
+// The metronome as one button, its BPM small in the corner. A tap switches it on and off. Pressed and slid right the
+// BPM goes up, slid left down, a step every SLIDE_PX, without switching it. The mouse wheel and the arrow keys step it too.
+export function createMetronomeButton(onChange: () => void) {
   const settings = getSettings();
-  const value = h("output", { textContent: `${settings.bpm} BPM` });
-  return h(
-    "label",
-    { className: "bpm" },
-    h("input", {
-      type: "range",
-      min: "30",
-      max: "120",
-      step: "1",
-      value: String(settings.bpm),
-      oninput(event) {
-        settings.bpm = Number((event.target as HTMLInputElement).value);
-        value.textContent = `${settings.bpm} BPM`;
-        onChange();
-        saveSettings();
-      },
-    }),
-    value,
-  );
+  const badge = h("span", { className: "bpm-badge" });
+  const button = h("button", {
+    type: "button",
+    className: "box-toggle metronome-button",
+    title: `${t.metronome}: ${t.bpmHint}`,
+    onclick() {
+      // A slide ends in a click, which isn't a tap.
+      if (slid) return void (slid = false);
+      settings.metronomeOn = !settings.metronomeOn;
+      // The tap lets the browser start the sound, which it won't without one.
+      if (settings.metronomeOn) void sharedAudioContext().resume();
+      saveSettings();
+      show();
+      onChange();
+    },
+    onpointerdown(event) {
+      slide = { x: event.clientX, bpm: settings.bpm };
+      slid = false;
+      button.setPointerCapture(event.pointerId);
+    },
+    onpointermove(event) {
+      if (!slide) return;
+      const moved = event.clientX - slide.x;
+      if (Math.abs(moved) >= SLIDE_PX) slid = true;
+      if (slid) setBpm(slide.bpm + Math.trunc(moved / SLIDE_PX));
+    },
+    onpointerup: () => (slide = null),
+    onpointercancel: () => (slide = null),
+    onwheel(event) {
+      event.preventDefault();
+      setBpm(settings.bpm + (event.deltaY < 0 ? 1 : -1));
+    },
+    onkeydown(event) {
+      const step = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[event.key];
+      if (!step) return;
+      event.preventDefault();
+      setBpm(settings.bpm + step);
+    },
+  }, h("span", { className: "icon", innerHTML: METRONOME_ICON }), badge);
+  let slide: { x: number; bpm: number } | null = null;
+  let slid = false;
+
+  function setBpm(bpm: number) {
+    bpm = Math.min(MAX_BPM, Math.max(MIN_BPM, bpm));
+    if (bpm === settings.bpm) return;
+    settings.bpm = bpm;
+    saveSettings();
+    show();
+    onChange();
+  }
+  function show() {
+    badge.textContent = String(settings.bpm);
+    button.ariaPressed = String(settings.metronomeOn);
+    button.ariaLabel = `${t.metronome}, ${settings.bpm} BPM`;
+  }
+  show();
+  return button;
 }
 
 // The count-in as one button: each press steps through off, ×2, ×4 and on up to ×10, then back to off.

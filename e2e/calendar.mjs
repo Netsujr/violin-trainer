@@ -93,7 +93,7 @@ check("fullscreen leaves it out", await page.locator(".today-plan").isHidden());
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(200);
 await nav(page, "Calendar"); await sleep(250);
 
-await page.click('.language button:text-is("PT")'); await sleep(250);
+await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
 await page.locator("nav button").nth(3).click(); await sleep(250);
 check("pt: translated", (await page.locator(".plan-total").innerText()) === "20 de 40 min" && (await page.locator('button[aria-label="Copiar plano"]').count()) === 1);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));

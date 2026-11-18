@@ -15,15 +15,12 @@ await page.click(".staff-toggle"); await sleep(200);
 const before = await canvasWidth();
 await enter();
 check("uses the browser's own fullscreen", await page.evaluate(() => !!document.fullscreenElement));
-for (const hidden of ["header", ".options", ".patterns", ".section-bar", ".staff-toggle", ".reference"]) check(`hides ${hidden}`, await page.locator(hidden).first().isHidden());
-for (const shown of ['button:text-is("Start")', ".bpm input", '.actions .count-in', '.actions .box-toggle[aria-label="Fingers"]', "section > p", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
+for (const hidden of ["header", ".patterns", ".section-bar", ".staff-toggle", ".reference"]) check(`hides ${hidden}`, await page.locator(hidden).first().isHidden());
+for (const shown of ['button:text-is("Start")', '.actions .count-in', '.actions .box-toggle[aria-label="Fingers"]', "section > p", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
 check("the lanes grow past the normal width", before === 960 && (await canvasWidth()) === 1408, `${before} > ${await canvasWidth()}`);
 check("the staff is one moving line, and the saved choice stays open", (await page.locator(".staff.collapsed").count()) === 1 && (await savedSettings(page)).staffOpen === true);
 const lines = await page.evaluate(() => { const hit = 130 * Number(getComputedStyle(document.querySelector(".staff-panel")).getPropertyValue("--timeline-scale")), canvas = document.querySelector("canvas").getBoundingClientRect(); return { hit: Math.round(hit), scale: canvas.height / 336 }; });
 check("the staff's playhead follows the larger scale", Math.abs(lines.hit - 130 * lines.scale) < 2, JSON.stringify(lines));
-await page.locator(".bpm input").fill("90");
-check("BPM still works", (await savedSettings(page)).bpm === 90 && (await page.locator(".bpm output").innerText()) === "90 BPM");
-await page.locator(".bpm input").fill("60");
 
 // Playing, with a switch out and back in the middle
 await followNotes(page, { midis: D, delayMs: 300 });
@@ -50,7 +47,7 @@ await page.click('button:text-is("Stop")'); await sleep(200);
 await page.keyboard.press("Escape"); await sleep(300);
 check("Esc leaves fullscreen", !(await isFullscreen()) && !(await page.evaluate(() => document.fullscreenElement)));
 check("the header and page width are back", (await page.locator("header").isVisible()) && (await canvasWidth()) === 960);
-check("BPM is back in Options", (await page.locator(".options .bpm").count()) === 1 && (await page.locator(".actions .bpm").count()) === 0);
+check("the count-in is back on the lanes' bar", (await page.locator(".section-bar .count-in").count()) === 1 && (await page.locator(".actions .count-in").count()) === 0);
 check("the full sheet is back", (await page.locator(".staff.collapsed").count()) === 0);
 await enter();
 await page.evaluate(() => document.exitFullscreen()); await sleep(300);
@@ -66,7 +63,7 @@ check("and Esc still leaves it", !(await isFullscreen()) && (await page.locator(
 await page.reload(); await page.waitForSelector("nav button");
 await nav(page, "Practice"); await sleep(250);
 check("a reload starts in the normal layout", !(await isFullscreen()) && (await canvasWidth()) === 960);
-await page.click('.language button:text-is("PT")'); await sleep(250);
+await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
 check("pt: the button is translated", (await page.locator('button[aria-label="Tela cheia"]').count()) === 1);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

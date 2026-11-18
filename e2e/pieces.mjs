@@ -310,13 +310,13 @@ flow("The question before anything is lost");
 
   await nav(page, "Library"); await sleep(200);
   await openDrawers(page);
-  await page.getByRole("button", { name: "PT", exact: true }).click(); await sleep(200);
+  await page.click("header summary"); await page.getByRole("button", { name: "PT", exact: true }).click(); await sleep(200);
   await openDrawers(page); // Changing language builds the Library again, with its drawers closed.
   await t.row("Other tune").getByRole("button", { name: "Excluir", exact: true }).click(); await t.modal.waitFor();
   const question = await t.modal.innerText();
   check("the question comes in Portuguese too", question.includes('Excluir "Other tune"?') && question.includes("Cancelar"), question.replaceAll("\n", " | "));
   await answer(page, "Cancelar");
-  await page.getByRole("button", { name: "EN", exact: true }).click(); await sleep(200);
+  await page.click("header summary"); await page.getByRole("button", { name: "EN", exact: true }).click(); await sleep(200);
   await openDrawers(page);
   check("the browser's own popups aren't used anywhere", popups === 0, `${popups}`);
   notProblems(s);

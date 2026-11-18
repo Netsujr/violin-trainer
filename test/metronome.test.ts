@@ -116,6 +116,15 @@ describe("metronome", () => {
     expect(clicks.map((click) => click.hz)).toEqual([2500, 2500, 2500, 3200]);
   });
 
+  it("carries on at its next beat after a gap, as when the screen changes, rather than starting over", () => {
+    const metronome = createMetronome();
+    // Clicks at 500 and 1500, then nothing until 2700: the one due at 2500 is missed, and the next is at 3500, on the
+    // same beat, rather than half a second after the gap.
+    run(metronome, 0, 1600, 60);
+    run(metronome, 2700, 3500, 60);
+    expect(metronome.nearestBeat(3600, 60)).toBe(3500);
+  });
+
   it("starts over after a reset", () => {
     const metronome = createMetronome();
     run(metronome, 0, 2000, 60);

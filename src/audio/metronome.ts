@@ -40,13 +40,20 @@ export function createMetronome() {
     set meter(next: Meter) {
       meter = next;
     },
-    // Runs on Practice's own timer while it's switched on, run or no run.
+    // Runs on a timer while it's switched on. Fallen behind, as while the screen changes or while it's off, it carries
+    // on at its next beat, keeping time with the clicks before.
     tick(now: number, bpm: number) {
-      if (nextClick === null || nextClick < now) nextClick = now + FIRST_CLICK_DELAY_MS;
+      const beatMs = 60000 / bpm;
+      if (nextClick === null) nextClick = now + FIRST_CLICK_DELAY_MS;
+      else if (nextClick < now) {
+        const missed = Math.ceil((now - nextClick) / beatMs);
+        nextClick += missed * beatMs;
+        count += missed;
+      }
       while (nextClick - now < SCHEDULE_AHEAD_MS + outputLatencyMs()) {
         playClick(nextClick, count % meter.beatsPerBar === 0);
         lastClick = nextClick;
-        nextClick += 60000 / bpm;
+        nextClick += beatMs;
         count++;
       }
     },
@@ -71,3 +78,6 @@ export function createMetronome() {
     },
   };
 }
+
+// The one metronome every screen plays, so it keeps its beat from one screen to the next.
+export const sharedMetronome = createMetronome();

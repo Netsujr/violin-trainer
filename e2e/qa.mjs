@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard } from "./lib.mjs";
+import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -37,12 +37,12 @@ const startRun = async () => { await press(button("Start")); await button("Stop"
 const stopRun = async () => { if (await button("Stop").count()) await press(button("Stop"), { timeout: 1500 }).catch(() => {}); await page.locator('button:text-is("Start"):not([disabled])').first().waitFor(); await sleep(150); };
 // Options are always shown now, above the lanes.
 const options = async () => {};
-const setOption = async (label, on) => { await options(); const box = page.locator(`.options label:has-text("${label}") input`); if ((await box.isChecked()) !== on) await press(box); await sleep(100); };
+const setOption = async (label, on) => { await options(); const box = page.locator(`.section-bar label:has-text("${label}") input`); if ((await box.isChecked()) !== on) await press(box); await sleep(100); };
 // Practice at a speed, through Options, which starts closed on a phone.
 const practiceAt = async (bpm) => {
   await freshPractice(page);
   await options();
-  await page.locator(".bpm input").fill(String(bpm));
+  await setBpm(page, bpm);
 };
 const tileAt = async (index, lane) => {
   const box = await page.locator("canvas").boundingBox();
@@ -125,11 +125,11 @@ check("Practice says so too", (await page.locator(".warning").first().innerText(
 
 flow("4. Practice: a whole scale, waiting for each note");
 await freshPractice(page);
-check("Options show above the lanes", await page.locator(".options + .timeline-section").isVisible());
+check("Tempo and the count-in are on the lanes' bar", (await page.locator('.section-bar label:has-text("Tempo")').isVisible()) && (await page.locator(".section-bar .count-in").isVisible()));
 await auditCheck(page, "Practice");
 await shot("4-practice");
 await options();
-await page.locator(".bpm input").fill("120");
+await setBpm(page, 120);
 await followNotes(page, { midis: D, delayMs: 120 });
 await press(button("Start")); await sleep(300);
 check("counts in first", (await showing()).startsWith("Starts in"), await showing());
@@ -167,7 +167,7 @@ check("and turns off", (await button("Play reference").count()) === 1);
 flow("6. Tempo and the metronome");
 await practiceAt(90);
 await setOption("Tempo", true);
-await setOption("Metronome", true);
+await press(page.locator('header .metronome-button')); await sleep(100);
 await followNotes(page, { midis: D, delayMs: 120 });
 await spyOnSounds();
 await startRun();
@@ -178,13 +178,13 @@ check("the run finishes on the beat", (await laneScore(page)).includes("15 hit")
 check("the metronome clicks, audio running", clicks.length >= 10 && clicks.every((click) => click.state === "running") && clicks.some((click) => click.hz === 3200), `${clicks.length} clicks, ${clicks.at(-1)?.state}`);
 await stopRun();
 await setOption("Tempo", false);
-await setOption("Metronome", false);
+await press(page.locator('header .metronome-button')); await sleep(100);
 
 flow("7. Don't wait");
 await practiceAt(120);
 await press(button("Don't wait")); await sleep(300);
 check("the icon turns green", (await button("Don't wait").evaluate((element) => getComputedStyle(element).color)) === "rgb(76, 208, 125)");
-check("Tempo no longer applies, so it's hidden", await page.locator('.options label:has-text("Tempo")').isHidden());
+check("Tempo no longer applies, so it's hidden", await page.locator('.section-bar label:has-text("Tempo")').isHidden());
 await followNotes(page, { midis: D, delays: { 3: 60000 } });
 await startRun();
 await waitForText(page, "Note 3 of 15");
@@ -341,7 +341,7 @@ await press(rewritten.getByRole("button", { name: "Delete", exact: true })); awa
 await say("Delete");
 await press(page.locator(".piece", { hasText: "Hot Cross Buns" }).getByRole("button", { name: "Practice", exact: true })); await sleep(400);
 await options();
-await page.locator(".bpm input").fill("120");
+await setBpm(page, 120);
 await setCountIn(page, 0);
 await followNotes(page, { midis: [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62], delayMs: 100 });
 await startRun();
@@ -382,14 +382,14 @@ const panel = await page.locator(".settings-panel").boundingBox();
 check("fits on screen", panel.x >= 0 && panel.x + panel.width <= page.viewportSize().width + 1, JSON.stringify(panel));
 await auditCheck(page, "Settings", ".settings-panel");
 await shot("14-settings");
-await page.locator('label.setting:has-text("Tolerance") input').fill("25"); await sleep(100);
+await page.locator('input[aria-label="Close enough"]').fill("25"); await sleep(100);
 check("Tolerance applies and saves", (await savedSettings(page)).toleranceCents === 25 && (await page.evaluate(() => document.documentElement.style.getPropertyValue("--tolerance"))) === "25%");
-await page.locator('label.setting:has-text("Tolerance") input').fill("40");
+await page.locator('input[aria-label="Close enough"]').fill("40");
 await tapPoint({ x: page.viewportSize().width / 2, y: page.viewportSize().height - 8 }); await sleep(200);
 check("tapping elsewhere closes it", await page.locator(".settings-panel").isHidden());
 
 flow("15. Portuguese");
-await press(button("PT")); await sleep(300);
+await press(page.locator("header summary")); await press(button("PT")); await sleep(300);
 check("the app switches over", (await page.title()) === "Treinador de Notas para Violino" && (await button("Praticar").count()) === 1);
 for (const screen of ["Ouvir", "Praticar", "Biblioteca", "Calendário"]) {
   await tab(screen);
@@ -398,7 +398,7 @@ for (const screen of ["Ouvir", "Praticar", "Biblioteca", "Calendário"]) {
 await tab("Praticar");
 await shot("15-portuguese");
 check("Practice is translated", (await button("Iniciar").count()) === 1 && (await page.locator(".mode-note").innerText()).startsWith("Espera cada nota"), await page.locator(".mode-note").innerText());
-await press(button("EN")); await sleep(300);
+await press(page.locator("header summary")); await press(button("EN")); await sleep(300);
 
 flow("16. Coming back later");
 await page.reload(); await page.waitForSelector("nav button");

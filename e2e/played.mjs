@@ -1,6 +1,6 @@
 // The ghost note on the staff: where it sits against the current note, which way its arrow points, and when it shows.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT, setCountIn } from "./lib.mjs";
+import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT, setCountIn, setBpm } from "./lib.mjs";
 
 wav(OUT + "played-silent.wav", [rest(3)]);
 const s = await open(OUT + "played-silent.wav");
@@ -85,7 +85,7 @@ await stop(page); await sleep(200);
 
 // Following the scale
 await freshPractice(page);
-await page.locator(".bpm input").fill("120");
+await setBpm(page, 120);
 await followNotes(page, { midis: D, delays: { 5: 60000 } });
 await page.click('button:text-is("Start")');
 await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 5 of 15", null, { timeout: 15000 });
@@ -120,7 +120,7 @@ await stop(page); await sleep(200);
 
 // At the end
 await freshPractice(page);
-await page.locator(".bpm input").fill("120");
+await setBpm(page, 120);
 await followNotes(page, { midis: D, delayMs: 150 });
 await page.click('button:text-is("Start")');
 await waitForText(page, "All", 20000);
@@ -141,7 +141,7 @@ await setCountIn(page, 0);
 
 await freshPractice(page);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
-await page.locator(".bpm input").fill("120");
+await setBpm(page, 120);
 // The first note in tune starts the lanes. The rest are sharp.
 await followNotes(page, { midis: D.map((midi, index) => (index === 0 ? midi : midi + 2)) });
 await page.click('button:text-is("Start")');

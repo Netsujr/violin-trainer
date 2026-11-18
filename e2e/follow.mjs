@@ -1,6 +1,6 @@
 // "Don't wait": the lanes start on the first note played in tune, then keep moving at the BPM, each note is judged as it passes, and a run ends with a score.
 import { wav, rest } from "./wav.mjs";
-import { setRecord, open, nav, stop, sleep, check, followNotes, near, progress, laneScore, begin, waitForText, freshPractice, savedLog, savedSettings, canvasHasColor, D_MAJOR as D, OUT } from "./lib.mjs";
+import { setRecord, open, nav, stop, sleep, check, followNotes, near, progress, laneScore, begin, waitForText, freshPractice, savedLog, savedSettings, canvasHasColor, D_MAJOR as D, OUT, setBpm } from "./lib.mjs";
 
 const BUNS = [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62];
 const BEAT_PX = 120;
@@ -23,12 +23,12 @@ const plainColor = await page.locator('button[aria-label="Fullscreen"]').evaluat
 check("off by default, looking like the buttons beside it", (await waiting()) && (await savedSettings(page)).followOn === false && (await color()) === plainColor, await color());
 const { x: followX, width: followWidth } = await dontWait().boundingBox();
 check("an icon, with the run buttons", (await dontWait().innerText()) === "" && Math.abs((await page.locator('button[aria-label="Lanes and staff"]').boundingBox()).x - (followX + followWidth)) < 16);
-check("gone from Options", (await page.locator('.options :text("Don\'t wait")').count()) === 0);
+check("not on the lanes' bar", (await page.locator('.section-bar :text("Don\'t wait")').count()) === 0);
 const hint = await dontWait().getAttribute("title");
 check("explains itself", hint?.includes("score"), hint);
 await dontWait().click(); await sleep(300);
 check("turns green when on", (await color()) === "rgb(76, 208, 125)", await color());
-check("saved, and Tempo no longer applies", (await savedSettings(page)).followOn === true && (await page.locator('.options label:has-text("Tempo")').isHidden()));
+check("saved, and Tempo no longer applies", (await savedSettings(page)).followOn === true && (await page.locator('.section-bar label:has-text("Tempo")').isHidden()));
 
 // Silence: the lanes wait on the first note, with no count-in
 await freshPractice(page, 120);
@@ -115,16 +115,16 @@ await begin(page);
 await page.waitForFunction(() => /^Note [2-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 8000 });
 const box = await page.locator("canvas").boundingBox();
 await page.mouse.click(box.x + 130 + 40, box.y + 126); // Whatever's on the A string at the hit line, or nothing.
-await page.locator(".bpm input").fill("60");
+await setBpm(page, 60);
 await watch();
 await sleep(1500);
 const slower = await frames();
 const slowSpeed = (slower.at(-1).left - slower[0].left) / ((slower.at(-1).at - slower[0].at) / 1000);
 check("a BPM change applies straight away", Math.abs(slowSpeed - BEAT_PX) < 8, `${Math.round(slowSpeed)} px/s`);
-await page.locator(".bpm input").fill("120");
+await setBpm(page, 120);
 const before = (await savedLog(page)).length;
 await dontWait().click(); await sleep(300);
-check("switching it off ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await savedLog(page)).length === before + 1 && (await page.locator('.options label:has-text("Tempo")').isVisible()));
+check("switching it off ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await savedLog(page)).length === before + 1 && (await page.locator('.section-bar label:has-text("Tempo")').isVisible()));
 check("back to waiting, on the first note", (await progress(page)) === "Note 1 of 15", await progress(page));
 await freshPractice(page, 120); // Ends the synthetic player, which would play the first note again.
 await begin(page); await sleep(3200); // Past the count-in.
@@ -148,7 +148,7 @@ await stop(page); await sleep(200);
 // The metronome waits for the first note, then joins on the beat
 await freshPractice(page, 120);
 await followNotes(page, { midis: D });
-await page.locator('.options label:has-text("Metronome") input').check();
+await page.locator('header .metronome-button').click();
 await page.evaluate(() => {
   window.clicks = [];
   const startNode = OscillatorNode.prototype.start;
@@ -169,7 +169,7 @@ const leftAt = (time) => clickRun.reduce((best, frame) => (Math.abs(frame.at - t
 check("no clicks before the lanes start", clicks.length >= 5 && clicks[0].at > firstMove.at, `${Math.round(clicks[0].at - firstMove.at)} ms`);
 check("then each lands on a beat", clicks.slice(0, 5).every((click, index) => Math.abs(leftAt(click.at) - (index + 1) * BEAT_PX) < 15), clicks.slice(0, 5).map((click) => Math.round(leftAt(click.at))).join(" "));
 check("a bar's first beat is accented", clicks[3].hz === 3200 && clicks[0].hz === 2500);
-await page.locator('.options label:has-text("Metronome") input').uncheck();
+await page.locator('header .metronome-button').click();
 
 // A recording's markers land on the notes
 await freshPractice(page, 120);
@@ -211,7 +211,7 @@ await page.screenshot({ path: OUT + "follow-fullscreen.png" });
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(200);
 await stop(page); await sleep(200);
 
-await page.click('.language button:text-is("PT")'); await sleep(250);
+await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
 await page.locator("nav button").nth(1).click(); await sleep(200);
 check("pt: translated", (await page.locator('button[aria-label="Sem esperar"]').count()) === 1);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));

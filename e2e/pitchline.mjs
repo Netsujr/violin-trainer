@@ -1,5 +1,5 @@
 // The pitch line: with "Don't wait" on the moving line, what's played is drawn through the staff, the ghost notehead at
-// its tip. In tune, it crosses the middle of each notehead. The switch only shows where it applies.
+// its tip. In tune, it crosses the middle of each notehead. It comes with Don't wait, with no switch of its own.
 import { wav, rest } from "./wav.mjs";
 import { open, nav, stop, sleep, check, followNotes, begin, freshPractice, savedSettings, waitForText, D_MAJOR, OUT } from "./lib.mjs";
 
@@ -7,22 +7,12 @@ wav(OUT + "pitchline-silent.wav", [rest(3)]);
 const s = await open(OUT + "pitchline-silent.wav");
 const { page } = s;
 const button = (label) => page.locator(`button[aria-label="${label}"]`);
-const line = button("Pitch line");
 await nav(page, "Practice"); await sleep(250);
 
-check("hidden while the lanes wait for each note", await line.isHidden());
+check("there's no pitch line button", (await button("Pitch line").count()) === 0);
 await button("Don't wait").click(); await sleep(200);
-check("shown with Don't wait on the moving line, off to start", (await line.isVisible()) && (await line.getAttribute("aria-pressed")) === "false" && (await line.getAttribute("title")).includes("middle of each note"));
+check("Don't wait says it draws the line", (await button("Don't wait").getAttribute("title")).includes("middle of each note"));
 
-// Off, Don't wait draws no line.
-await freshPractice(page, 60);
-await followNotes(page, { midis: D_MAJOR });
-await begin(page); await sleep(2500);
-check("off, there's no line", (await page.locator(".pitch-trace polyline").count()) === 0);
-await stop(page); await sleep(200);
-
-await line.click(); await sleep(100);
-check("on, and saved", (await line.getAttribute("aria-pressed")) === "true" && (await savedSettings(page)).pitchLineOn === true);
 await freshPractice(page, 120);
 await followNotes(page, { midis: D_MAJOR });
 await begin(page); await sleep(2500);
@@ -46,18 +36,15 @@ check("on, the line is drawn as it's played", traced.points > 100, `${traced.poi
 check("in tune, it crosses the middle of each notehead", traced.offsets.length > 10 && Math.max(...traced.offsets) < 1.5, `${traced.offsets.length} points, furthest ${Math.max(...traced.offsets).toFixed(2)} px`);
 check("it stays once the run is over, until the next", (await page.locator(".pitch-trace polyline").count()) > 0);
 
-// Only on the moving line: the bigger staff keeps it, the staff on its own and the open sheet don't.
+// Only on the moving line: the bigger staff keeps it, the staff on its own doesn't.
 const view = page.locator('.actions button[aria-label="Lanes and staff"], .actions button[aria-label^="Bigger staff"], .actions button[aria-label^="Staff only"]');
+const lines = () => page.locator(".pitch-trace polyline").count();
 await view.click(); await sleep(200);
-check("the bigger staff is still the moving line", await line.isVisible());
+check("the bigger staff is still the moving line, so the line stays", (await lines()) > 0);
 await view.click(); await sleep(200);
-check("the staff on its own is the whole sheet, so it's hidden, and the line goes", (await line.isHidden()) && (await page.locator(".pitch-trace polyline").count()) === 0);
+check("the staff on its own is the whole sheet, so the line goes", (await lines()) === 0);
 await view.click(); await sleep(200);
-check("back on the lanes, it's back", await line.isVisible());
-await page.locator(".staff-toggle").click(); await sleep(200);
-check("opening the full sheet hides it", await line.isHidden());
-await page.locator(".staff-toggle").click(); await sleep(200);
 await button("Don't wait").click(); await sleep(200);
-check("and so does waiting for each note", await line.isHidden());
+check("and waiting for each note draws none", (await lines()) === 0);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

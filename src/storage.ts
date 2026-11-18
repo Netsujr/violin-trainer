@@ -7,7 +7,10 @@ import type { LogEntry } from "./practice/log";
 
 export type Settings = {
   language: Language;
+  // How far off, in cents, is in tune (green), and still counts (yellow), if yellow is on.
+  greenCents: number;
   toleranceCents: number;
+  yellowOn: boolean;
   holdMs: number;
   minRms: number;
   tempoOn: boolean;
@@ -23,8 +26,6 @@ export type Settings = {
   staffBig: boolean;
   // The staff on its own, with the lanes hidden. In fullscreen it's the full sheet.
   staffOnly: boolean;
-  // "Don't wait" on the moving line: what's played, drawn as a line through the staff.
-  pitchLineOn: boolean;
   toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean };
   // Pieces marked for practice, in no particular order.
   highlighted: string[];
@@ -48,10 +49,14 @@ export type Settings = {
   bowBeats: number;
   // Technique: a long bow's notes each one beat with a beat's pause before the next, to place the finger before bowing.
   bowPause: boolean;
+  // The note guesser: the staff, the fingerboard or both; and tapes on the fingerboard.
+  guesserView: GuesserView;
+  fingerboardTapes: boolean;
 };
 
 export type ListenMode = "free" | "guesser" | "technique";
 export type GuesserLevel = "easy" | "medium" | "hard";
+export type GuesserView = "staff" | "both" | "board";
 
 // view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
 export type RecordingView = "lanes" | "bigStaff" | "staffOnly";
@@ -60,7 +65,9 @@ export type Recording = { blob: Blob; markers: { pitch: string; seconds: number 
 export const COUNT_IN_CHOICES = [2, 4, 6, 8, 10];
 
 const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
+  greenCents: 10,
   toleranceCents: 40,
+  yellowOn: true,
   holdMs: 200,
   minRms: 0.01,
   tempoOn: false,
@@ -75,7 +82,6 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   staffOpen: false,
   staffBig: false,
   staffOnly: false,
-  pitchLineOn: false,
   toggles: { fingers: true, noteNames: true, letterNames: true },
   highlighted: [],
   plan: {},
@@ -89,6 +95,8 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bowString: "A",
   bowBeats: 4,
   bowPause: false,
+  guesserView: "staff",
+  fingerboardTapes: true,
 };
 
 const read = <T>(key: string, fallback: T): T => {
@@ -120,6 +128,9 @@ export function getSettings() {
 }
 
 export const saveSettings = () => write("settings", getSettings());
+
+// How far off a note still counts: out to yellow's edge, or green's with yellow off or inside green.
+export const passCents = ({ greenCents, toleranceCents, yellowOn }: Pick<Settings, "greenCents" | "toleranceCents" | "yellowOn"> = getSettings()) => (yellowOn ? Math.max(greenCents, toleranceCents) : greenCents);
 
 // Practice opens on the piece it had open last.
 export function rememberPiece(pieceId: string) {

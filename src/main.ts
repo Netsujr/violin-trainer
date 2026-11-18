@@ -1,5 +1,7 @@
 import "@picocss/pico/css/pico.pumpkin.min.css";
 import "./style.css";
+import { sharedMetronome } from "./audio/metronome";
+import { sharedAudioContext } from "./audio/reference";
 import { setLanguage, t, type Language } from "./i18n";
 import { getSettings, saveSettings } from "./storage";
 import { h, type Screen } from "./ui/dom";
@@ -8,16 +10,13 @@ import { listenScreen } from "./ui/listen";
 import { calendarScreen } from "./ui/calendar";
 import { practiceScreen } from "./ui/practice";
 import { progressScreen, type GroupKey } from "./ui/progress";
+import { createMetronomeButton } from "./ui/practice/options";
+import { createRecordToggle } from "./ui/runControls";
 import { createSettingsPanel } from "./ui/settings";
 
 const SCREEN_NAMES = ["Listen", "Practice", "Library", "Calendar"] as const;
 // Progress isn't in the menu: it opens from a Library group, for that group, or from Listen, for its scored modes.
 type ScreenName = (typeof SCREEN_NAMES)[number] | "Progress";
-
-const LANGUAGES: [Language, string][] = [
-  ["en", "EN"],
-  ["pt", "PT"],
-];
 
 const header = h("header");
 const main = h("main");
@@ -53,20 +52,13 @@ function renderHeader() {
   header.replaceChildren(
     h("strong", { className: "brand" }, t.appName),
     h("nav", {}, h("div", { role: "group" }, ...navButtons)),
-    h(
-      "div",
-      { role: "group", className: "language", ariaLabel: t.language },
-      ...LANGUAGES.map(([language, label]) =>
-        h("button", {
-          textContent: label,
-          ariaPressed: String(language === getSettings().language),
-          onclick: () => changeLanguage(language),
-        }),
-      ),
-    ),
-    createSettingsPanel(),
+    // Record, and the metronome with its BPM, on every screen, by Settings.
+    h("div", { className: "row header-tools" }, createRecordToggle(), createMetronomeButton(tempoChanged)),
+    createSettingsPanel(changeLanguage),
   );
 }
+
+const tempoChanged = () => current?.tempoChanged?.();
 
 // ponytail: rebuilding the screen ends a running session (logged and saved) and returns Practice to its first piece.
 function changeLanguage(language: Language) {
@@ -82,6 +74,13 @@ renderHeader();
 document.querySelector("#app")!.append(header, main);
 
 addEventListener("pagehide", () => current?.leave());
+
+// The header's metronome, playing whenever it's on, on any screen that doesn't play its own clicks.
+const METRONOME_TICK_MS = 25;
+setInterval(() => {
+  const { metronomeOn, bpm } = getSettings();
+  if (metronomeOn && !current?.ownsMetronome?.() && sharedAudioContext().state === "running") sharedMetronome.tick(performance.now(), bpm);
+}, METRONOME_TICK_MS);
 
 // The Settings panel covers the run buttons, so anything outside it closes it, as a menu would.
 const closeSettings = () => header.querySelector("details")?.removeAttribute("open");

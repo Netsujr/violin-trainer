@@ -56,7 +56,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
 
   // Every screen, in English and in the longer Portuguese
   for (const language of ["EN", "PT"]) {
-    await go(`.language button:text-is("${language}")`); await sleep(200);
+    await go("header summary"); await go(`.language button:text-is("${language}")`); await sleep(200);
     const tabs = await page.locator("nav button").allInnerTexts();
     for (let index = 0; index < 4; index++) {
       await page.locator("nav button").nth(index).click(); await sleep(250);
@@ -73,7 +73,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
     await auditCheck(page, `${tag} ${language} Settings open`, ".settings-panel");
     await page.keyboard.press("Escape"); await sleep(100);
   }
-  await go('.language button:text-is("EN")'); await sleep(200);
+  await go("header summary"); await go('.language button:text-is("EN")'); await sleep(200);
   await goNav("Practice"); await sleep(250);
 
   // The timeline and the run buttons can be seen together
@@ -85,8 +85,8 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
 
   // Fullscreen: only the controls, lanes and staff, with nothing to scroll
   await go('button[aria-label="Fullscreen"]'); await sleep(400);
-  const full = await page.evaluate(() => { const canvas = document.querySelector("canvas").getBoundingClientRect(), staff = document.querySelector(".staff").getBoundingClientRect(); return { down: document.documentElement.scrollHeight - innerHeight, canvasWidth: Math.round(canvas.width), staffBottom: Math.round(staff.bottom), inner: innerHeight, width: innerWidth, header: !!document.querySelector("header").checkVisibility(), bpm: !!document.querySelector(".actions .bpm") }; });
-  check(`${tag} fullscreen: lanes and staff fit with no scrolling`, full.down <= 0 && full.staffBottom <= full.inner && Math.abs(full.canvasWidth - (full.width - 32)) <= 2 && !full.header && full.bpm, JSON.stringify(full));
+  const full = await page.evaluate(() => { const canvas = document.querySelector("canvas").getBoundingClientRect(), staff = document.querySelector(".staff").getBoundingClientRect(); return { down: document.documentElement.scrollHeight - innerHeight, canvasWidth: Math.round(canvas.width), staffBottom: Math.round(staff.bottom), inner: innerHeight, width: innerWidth, header: !!document.querySelector("header").checkVisibility() }; });
+  check(`${tag} fullscreen: lanes and staff fit with no scrolling`, full.down <= 0 && full.staffBottom <= full.inner && Math.abs(full.canvasWidth - (full.width - 32)) <= 2 && !full.header, JSON.stringify(full));
   await auditCheck(page, `${tag} fullscreen`);
   await go('button[aria-label="Exit fullscreen"]'); await sleep(400);
   check(`${tag} fullscreen: exits to the normal layout`, fillsWidth(await page.locator("canvas").evaluate((c) => Math.round(c.getBoundingClientRect().width)), width) && (await page.locator("header").isVisible()));
@@ -123,8 +123,8 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await page.waitForSelector('button:text-is("Start"):not([disabled])'); // A finished run ends by itself.
 
   // Tempo with the metronome, and a pattern
-  await page.locator('.options label:has-text("Tempo")').click();
-  await page.locator('.options label:has-text("Metronome")').click();
+  await page.locator('.section-bar label:has-text("Tempo")').click();
+  await page.locator('header .metronome-button').click();
   await go('.patterns button:text-is("4")'); await sleep(200);
   await auditCheck(page, `${tag} Tempo and pattern`);
   const notes = Number((await progress(page)).match(/of (\d+)/)[1]);
@@ -137,8 +137,8 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
     check(`${tag}: Tempo and metronome run through`, true);
   } catch { check(`${tag}: Tempo and metronome run through`, false, await progress(page)); }
   await go('button:text-is("Stop")'); await sleep(200);
-  await page.locator('.options label:has-text("Tempo")').click();
-  await page.locator('.options label:has-text("Metronome")').click();
+  await page.locator('.section-bar label:has-text("Tempo")').click();
+  await page.locator('header .metronome-button').click();
 
   // Turning the device mid-scale
   if (touch) {
@@ -181,7 +181,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await go(".staff-toggle"); await sleep(200);
   await goNav("Library"); await sleep(200);
   await page.locator(".piece", { hasText: LONG_TITLE }).locator('button[aria-label="Practice"]').click(); await sleep(300);
-  await go('.actions button[aria-label="Record"]');
+  await go('header button[aria-label="Record"]');
   await followNotes(page, { midis: Array(10).fill([62, 64, 66, 67]).flat(), delayMs: 30 });
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
   await page.waitForFunction(() => /^Note [4-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 15000 });

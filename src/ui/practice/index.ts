@@ -1,4 +1,4 @@
-import { createMetronome } from "../../audio/metronome";
+import { sharedMetronome as metronome } from "../../audio/metronome";
 import { sharedAudioContext } from "../../audio/reference";
 import { t } from "../../i18n";
 import { countNotes, meterOf, midiOf } from "../../music/notes";
@@ -6,7 +6,7 @@ import { withPattern, withRepeatedTop } from "../../music/patterns";
 import { createJudge } from "../../practice/judge";
 import type { Session } from "../../practice/session";
 import { aroundSpot } from "../../practice/trouble";
-import { allPieces, getSettings, isScale, rememberPiece } from "../../storage";
+import { allPieces, getSettings, isScale, passCents, rememberPiece } from "../../storage";
 import { h, type Screen } from "../dom";
 import type { Section } from "../highway";
 import { createRunControls } from "../runControls";
@@ -56,8 +56,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const holdMs = () => holdMsFor(piece.notes[currentIndex()]?.beats, settings.tempoOn && currentIndex() < endIndex() - 1);
   const withLoopNumber = (text: string) => (loopCount > 1 ? `${text} · ${t.loopNumber(loopCount, lastScore)}` : text);
 
-  const judge = createJudge({ get toleranceCents() { return settings.toleranceCents; }, get holdMs() { return holdMs(); } });
-  const metronome = createMetronome();
+  const judge = createJudge({ get toleranceCents() { return passCents(); }, get holdMs() { return holdMs(); } });
   const progress = h("p");
   const board = createStaffSection(pickNote, renderNotes, (beat) => track.showBeat(beat));
   const results = createResults(board, playAgain, { onSpot: (spot) => { selection.spot(spot); renderNotes(); }, onPractise: practiseSpot });
@@ -232,7 +231,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const toolbar = createPracticeControls({
     run: controls, pieces, board, track, referenceButton: tone.button, loadPiece, render: renderNotes,
     piece: () => basePiece, section: () => selection.section,
-    resetBeat: () => glide.resetBeat(), clearStats: () => results.clear(),
+    clearStats: () => results.clear(),
     async onPick(picked) { await controls.stop(); basePiece = picked; loadPiece(); },
   });
 
@@ -252,7 +251,6 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       progress,
       toolbar.actions,
       toolbar.modeNote,
-      ...(track.panel ? [] : [toolbar.optionsPanel]),
       // Aligning, everything for lining the track up sits in one box: its controls, the lanes, and the waveform under them.
       track.panel ? h("div", { className: "track-align" }, track.panel, board.timeline, track.strip!) : board.timeline,
       results.element,
@@ -260,6 +258,9 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       toolbar.patternRow,
       countIn.overlay,
     ),
+    // The metronome switched or the BPM changed: the beat starts again from here.
+    tempoChanged: () => glide.resetBeat(),
+    ownsMetronome: () => true,
     leave() {
       clearInterval(metronomeTimer);
       tone.stop();

@@ -1,6 +1,6 @@
 // Tempo mode, rhythm patterns and the metronome.
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, D_MAJOR as D, OUT, pickPiece } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, D_MAJOR as D, OUT, pickPiece, setBpm, savedSettings } from "./lib.mjs";
 
 const REPEAT = [{ id: "r", title: "Repeat", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
 const TWO = [{ id: "two", title: "Two", source: "built-in", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
@@ -123,14 +123,33 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
 }
 {
   const s = await practice("t-silent.wav", {});
-  const slider = s.page.locator(".bpm input");
-  await slider.focus();
+  const metronome = s.page.locator("header .metronome-button");
+  const badge = () => metronome.locator(".bpm-badge").innerText();
+  await metronome.focus();
   await s.page.keyboard.press("ArrowRight");
-  check("BPM moves in single steps", (await s.page.locator(".bpm output").innerText()) === "61 BPM");
+  check("BPM moves in single steps, shown in the metronome's corner", (await badge()) === "61" && (await savedSettings(s.page)).bpm === 61);
+  await metronome.hover();
+  await s.page.mouse.wheel(0, -100);
+  check("and the mouse wheel steps it too", (await badge()) === "62");
+  const box = await metronome.boundingBox();
+  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+  await s.page.mouse.move(x, y);
+  await s.page.mouse.down();
+  await s.page.mouse.move(x + 40, y, { steps: 5 });
+  await s.page.mouse.up();
+  check("a slide right raises it, a step every 4px, without switching the metronome on", (await badge()) === "72" && (await metronome.getAttribute("aria-pressed")) === "false");
+  await s.page.mouse.move(x, y);
+  await s.page.mouse.down();
+  await s.page.mouse.move(x - 40, y, { steps: 5 });
+  await s.page.mouse.up();
+  check("and a slide left lowers it", (await badge()) === "62");
+  await metronome.click();
+  check("a tap switches the metronome on", (await metronome.getAttribute("aria-pressed")) === "true" && (await savedSettings(s.page)).metronomeOn === true);
+  await metronome.click();
   await s.page.reload();
   await s.page.waitForSelector("nav button");
   await nav(s.page, "Practice");
-  check("BPM survives a reload", (await s.page.locator(".bpm output").innerText()) === "61 BPM");
+  check("BPM survives a reload", (await s.page.locator("header .metronome-button .bpm-badge").innerText()) === "62");
   await s.close();
 }
 
@@ -235,7 +254,7 @@ for (const [label, bpm, late, expected] of [
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1500);
   check("metronome: silent when off", (await s.page.evaluate(() => window.clicks.length)) === 0);
-  await s.page.locator('.options label:has-text("Metronome") input').check();
+  await s.page.locator('header .metronome-button').click();
   await sleep(5500);
   await stop(s.page);
   await sleep(300);
@@ -248,11 +267,29 @@ for (const [label, bpm, late, expected] of [
   const count = clicks.length;
   await sleep(1500);
   check("metronome: keeps going after the session, until it's switched off", (await s.page.evaluate(() => window.clicks.length)) > count);
-  await s.page.locator('.options label:has-text("Metronome") input').uncheck();
+  await s.page.locator('header .metronome-button').click();
   await sleep(300);
   const off = await s.page.evaluate(() => window.clicks.length);
   await sleep(1500);
   check("metronome: switched off, it stops", (await s.page.evaluate(() => window.clicks.length)) === off);
+  await s.close();
+}
+// The header's metronome on its own: a tap on another screen, with no run, and it plays.
+{
+  const s = await practice("t-silent.wav", { settings: { bpm: 120 } });
+  await nav(s.page, "Library");
+  await spyOnClicks(s.page);
+  await s.page.locator("header .metronome-button").click();
+  await sleep(2000);
+  check("metronome: a tap plays it on any screen, with no run", (await s.page.evaluate(() => window.clicks.length)) >= 3);
+  await nav(s.page, "Calendar");
+  await sleep(1200);
+  await nav(s.page, "Practice");
+  await sleep(1200);
+  const beats = await s.page.evaluate(() => window.clicks.map((click) => click.scheduled));
+  const gaps = beats.slice(1).map((at, index) => Math.round(at - beats[index]));
+  check("metronome: switching screens doesn't restart it, the beat stays steady", gaps.length >= 8 && near(gaps, [500], 15), gaps.join(" "));
+  await s.page.locator("header .metronome-button").click();
   await s.close();
 }
 {
@@ -272,11 +309,11 @@ for (const [label, bpm, late, expected] of [
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(2600);
-  await s.page.locator(".bpm input").fill("120");
+  await setBpm(s.page, 120);
   await sleep(2600);
   const clicks = await s.page.evaluate(() => window.clicks.map((click) => click.scheduled));
   const gaps = clicks.slice(1).map((time, index) => Math.round(time - clicks[index]));
-  check("metronome: follows the BPM slider mid-run", gaps.some((gap) => Math.abs(gap - 1000) <= 15) && near(gaps.slice(-3), [500], 15), gaps.join(" "));
+  check("metronome: follows the header's BPM mid-run", gaps.some((gap) => Math.abs(gap - 1000) <= 15) && near(gaps.slice(-3), [500], 15), gaps.join(" "));
   await s.close();
 }
 {
