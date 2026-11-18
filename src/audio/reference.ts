@@ -1,9 +1,20 @@
-import { frequencyOf, midiOf, type PieceNote } from "../music/notes";
+import { midiOf, type PieceNote } from "../music/notes";
 
-const VOLUME = 0.3;
+const VOLUME = 0.9;
 const FADE_SECONDS = 0.02;
+// A note ends over this long, as a bow leaves the string, rather than cutting off.
+const RELEASE_SECONDS = 0.08;
 // A moment's silence at the end of each note played in turn, so a repeated note is heard again.
 const NOTE_GAP_SECONDS = 0.05;
+
+// Real violin notes, one for each note of first position, G3 to B5, named by MIDI number. src/assets/violin/README.md
+// says where they're from. Each plays its bow's start once, then loops from LOOP_START_SECONDS to its end, so a note
+// sounds for as long as it's needed. They're decoded at their own rate, which keeps the loop exact.
+const SAMPLE_URLS = import.meta.glob<string>("../assets/violin/*.flac", { eager: true, query: "?url", import: "default" });
+const SAMPLES = new Map(Object.entries(SAMPLE_URLS).map(([path, url]) => [Number(path.match(/(\d+)\.flac$/)![1]), url]));
+export const SAMPLE_MIDIS = [...SAMPLES.keys()].sort((a, b) => a - b);
+const SAMPLE_RATE = 32000;
+const LOOP_START_SECONDS = 0.26;
 
 let context: AudioContext | undefined;
 
@@ -14,61 +25,110 @@ export function sharedAudioContext() {
   return context;
 }
 
-// A triangle tone, starting on the note given if any, silent until its volume is raised. Stopping it fades it out
-// quickly, so it doesn't click.
-function createTone(midi?: number) {
+// The recording for a note, and how much faster to play it: the note's own, as recorded, or outside first position,
+// the nearest one's, retuned.
+export function sampleFor(midi: number) {
+  const nearest = SAMPLE_MIDIS.reduce((best, sample) => (Math.abs(sample - midi) < Math.abs(best - midi) ? sample : best));
+  return { midi: nearest, rate: 2 ** ((midi - nearest) / 12) };
+}
+
+let recordings: Map<number, Promise<AudioBuffer>> | undefined;
+// Fetches and decodes every recording, once, so the first note asked for is ready, or nearly.
+export function loadRecordings() {
+  recordings ??= new Map(
+    SAMPLE_MIDIS.map((midi) => [midi, fetch(SAMPLES.get(midi)!).then((response) => response.arrayBuffer()).then((data) => new OfflineAudioContext(1, 1, SAMPLE_RATE).decodeAudioData(data))]),
+  );
+  return recordings;
+}
+
+// One note from `at`: its recording, looping for as long as it sounds, faded in so it doesn't click, and ended by
+// `end` if given, or else when it's stopped.
+function bow(buffer: AudioBuffer, rate: number, at: number, end?: number) {
   const context = sharedAudioContext();
-  const oscillator = context.createOscillator();
+  const source = context.createBufferSource();
   const gain = context.createGain();
-  oscillator.type = "triangle";
-  if (midi !== undefined) oscillator.frequency.value = frequencyOf(midi);
-  gain.gain.setValueAtTime(0, context.currentTime);
-  oscillator.connect(gain).connect(context.destination);
-  oscillator.start();
-
-  return {
-    context,
-    oscillator,
-    volume: gain.gain,
-    stop() {
-      gain.gain.cancelScheduledValues(context.currentTime);
-      gain.gain.setValueAtTime(gain.gain.value, context.currentTime);
-      gain.gain.linearRampToValueAtTime(0, context.currentTime + FADE_SECONDS);
-      oscillator.stop(context.currentTime + FADE_SECONDS);
-    },
-  };
-}
-
-// A steady tone that sounds until it's stopped, with short fades so it doesn't click.
-export function startReference(midi: number) {
-  const { context, oscillator, volume, stop } = createTone(midi);
-  volume.linearRampToValueAtTime(VOLUME, context.currentTime + FADE_SECONDS);
-
-  return {
-    setNote(next: number) {
-      oscillator.frequency.value = frequencyOf(next);
-    },
-    stop,
-  };
-}
-
-// Plays notes one after another, each for its beats, with a rest silent for its own. Returns how to stop early, and
-// calls onEnd once it has stopped, at the end or early.
-export function playNotes(notes: PieceNote[], beatMs: number, onEnd: () => void) {
-  const { context, oscillator, volume, stop } = createTone();
-  let at = context.currentTime;
-  for (const note of notes) {
-    const end = at + (note.beats! * beatMs) / 1000;
-    if (note.pitch) {
-      oscillator.frequency.setValueAtTime(frequencyOf(midiOf(note.pitch)), at);
-      volume.setValueAtTime(0, at);
-      volume.linearRampToValueAtTime(VOLUME, at + FADE_SECONDS);
-      volume.setValueAtTime(VOLUME, end - NOTE_GAP_SECONDS - FADE_SECONDS);
-      volume.linearRampToValueAtTime(0, end - NOTE_GAP_SECONDS);
-    }
-    at = end;
+  source.buffer = buffer;
+  source.loop = true;
+  source.loopStart = LOOP_START_SECONDS;
+  source.loopEnd = buffer.duration;
+  source.playbackRate.value = rate;
+  gain.gain.setValueAtTime(0, at);
+  gain.gain.linearRampToValueAtTime(VOLUME, at + FADE_SECONDS);
+  source.connect(gain).connect(context.destination);
+  source.start(at);
+  if (end !== undefined) {
+    gain.gain.setValueAtTime(VOLUME, end - RELEASE_SECONDS);
+    gain.gain.linearRampToValueAtTime(0, end);
+    source.stop(end);
   }
-  oscillator.onended = onEnd;
-  oscillator.stop(at);
-  return stop;
+  let done = false;
+  source.onended = () => (done = true);
+
+  return {
+    stop() {
+      if (done) return;
+      const now = context.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + RELEASE_SECONDS);
+      source.stop(now + RELEASE_SECONDS);
+    },
+  };
+}
+
+// A note that sounds until it's stopped. A new note is bowed afresh, once its recording is ready, unless by then it's
+// been stopped or moved on again.
+export function startReference(midi: number) {
+  let playing: number | null = null;
+  let note: ReturnType<typeof bow> | null = null;
+
+  async function play(next: number) {
+    if (next === playing) return;
+    playing = next;
+    const { midi: sample, rate } = sampleFor(next);
+    const buffer = await loadRecordings().get(sample)!;
+    if (playing !== next) return;
+    note?.stop();
+    note = bow(buffer, rate, sharedAudioContext().currentTime);
+  }
+  void play(midi);
+
+  return {
+    setNote: (next: number) => void play(next),
+    stop() {
+      playing = null;
+      note?.stop();
+      note = null;
+    },
+  };
+}
+
+// Plays notes one after another, each for its beats, with a rest silent for its own, once their recordings are ready.
+// Returns how to stop early, and calls onEnd once it has stopped, at the end or early.
+export function playNotes(notes: PieceNote[], beatMs: number, onEnd: () => void) {
+  const bowed: ReturnType<typeof bow>[] = [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let ended = false;
+  function end(early = true) {
+    if (ended) return;
+    ended = true;
+    clearTimeout(timer);
+    if (early) bowed.forEach((note) => note.stop());
+    onEnd();
+  }
+
+  const pitched = notes.flatMap((note) => (note.pitch ? [sampleFor(midiOf(note.pitch))] : []));
+  void Promise.all(pitched.map(({ midi }) => loadRecordings().get(midi)!)).then((buffers) => {
+    if (ended) return;
+    const context = sharedAudioContext();
+    let at = context.currentTime;
+    let next = 0;
+    for (const note of notes) {
+      const until = at + (note.beats! * beatMs) / 1000;
+      if (note.pitch) bowed.push(bow(buffers[next], pitched[next++].rate, at, until - NOTE_GAP_SECONDS));
+      at = until;
+    }
+    timer = setTimeout(() => end(false), (at - context.currentTime) * 1000);
+  });
+  return () => end();
 }

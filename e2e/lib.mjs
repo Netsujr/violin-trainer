@@ -102,7 +102,28 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
   }, { midis, delayMs, delays });
 export const near = (values, expected, tolerance = 60) => values.length > 0 && values.every((value, index) => Math.abs(value - (expected[index % expected.length])) <= tolerance);
 export const progress = (page) => page.locator("section > p").first().innerText();
-// Arms recording for the next run, or disarms it, with the record button by Start.
+// Watches the violin recordings the app plays, for recordings() to read.
+export const spyOnRecordings = (page) => page.evaluate(() => {
+  window.recordings = [];
+  const start = AudioBufferSourceNode.prototype.start, stop = AudioBufferSourceNode.prototype.stop;
+  AudioBufferSourceNode.prototype.start = function (...args) { window.recordings.push(this); this.stopped = false; return start.apply(this, args); };
+  AudioBufferSourceNode.prototype.stop = function (...args) { this.stopped = true; return stop.apply(this, args); };
+});
+// Each recording played so far: its pitch, as heard, read from its own samples with YIN, whether it loops, and whether
+// it's been stopped.
+export const recordings = (page) => page.evaluate(() => window.recordings.map((source) => {
+  const data = source.buffer.getChannelData(0), rate = source.buffer.sampleRate, from = Math.round(0.6 * rate), size = 2048, maxLag = Math.ceil(rate / 150);
+  const d = new Float64Array(maxLag + 2), c = new Float64Array(maxLag + 2);
+  for (let lag = 1; lag <= maxLag + 1; lag++) { let sum = 0; for (let i = 0; i < size; i++) { const v = data[from + i] - data[from + i + lag]; sum += v * v; } d[lag] = sum; }
+  let run = 0;
+  for (let lag = 1; lag <= maxLag + 1; lag++) { run += d[lag]; c[lag] = (d[lag] * lag) / run; }
+  let lag = Math.floor(rate / 1500);
+  while (lag < maxLag && !(c[lag] < 0.15 && c[lag] <= c[lag + 1])) lag++;
+  const [a, b, e] = [c[lag - 1], c[lag], c[lag + 1]];
+  const period = lag + ((a - e) / (2 * (a - 2 * b + e)) || 0);
+  return { hz: Math.round((rate / period) * source.playbackRate.value), loop: source.loop, stopped: source.stopped, state: source.context.state };
+}));
+// Arms recording for the next run, or disarms it, with the record button in the header.
 export async function setRecord(page, on) {
   const button = page.locator('button[aria-label="Record"]').first();
   if ((await button.getAttribute("aria-pressed")) !== String(on)) await button.click();

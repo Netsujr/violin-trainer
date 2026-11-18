@@ -1,4 +1,4 @@
-import { playNotes } from "../audio/reference";
+import { loadRecordings, playNotes } from "../audio/reference";
 import { t } from "../i18n";
 import type { PieceNote } from "../music/notes";
 import { h } from "./dom";
@@ -8,6 +8,8 @@ import { PLAY_ICON, STOP_ICON } from "./toggles";
 // The piece editor's play buttons, one for each line of the staff, so a piece can be heard as it's written. A line
 // plays at Practice's BPM, one line at a time, and pressing its button again stops it.
 export function createLinePlayer() {
+  // The violin recordings start loading now, so the first line plays at once.
+  loadRecordings();
   let playing: { button: HTMLButtonElement; stop: () => void } | null = null;
 
   function reset() {

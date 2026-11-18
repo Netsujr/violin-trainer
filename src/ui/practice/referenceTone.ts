@@ -1,4 +1,4 @@
-import { startReference } from "../../audio/reference";
+import { loadRecordings, startReference } from "../../audio/reference";
 import { t } from "../../i18n";
 import { midiOf, type PieceNote } from "../../music/notes";
 import { h } from "../dom";
@@ -10,6 +10,8 @@ const REFERENCE_ECHO_MS = 150;
 // The Play reference button, a speaker, sounding the current note until pressed again. Its name is its tooltip.
 // The speakers mustn't score a hit, so what the mic hears doesn't count while it sounds or just after.
 export function createReferenceTone(currentNote: () => PieceNote | undefined) {
+  // The violin recordings start loading now, so the first press sounds at once.
+  loadRecordings();
   let tone: ReturnType<typeof startReference> | null = null;
   let mutedUntil = 0;
 

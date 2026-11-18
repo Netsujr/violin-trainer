@@ -1,6 +1,6 @@
-// Loop, repeating a scale's top note, the steady reference tone, and the line that says which of them is on.
+// Loop, repeating a scale's top note, the violin reference note, and the line that says which of them is on.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn, setBpm } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn, setBpm, spyOnRecordings, recordings } from "./lib.mjs";
 
 const D_TOP_TWICE = [62, 64, 66, 67, 69, 71, 73, 74, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "modes-silent.wav", [rest(3)]);
@@ -110,28 +110,24 @@ await stop(page); await sleep(200);
 await dontWait().click(); await loop().click(); await sleep(100);
 await setCountIn(page, 0);
 
-// The reference tone keeps sounding
+// The reference: a real violin note, which keeps sounding
 await freshPractice(page);
-await page.evaluate(() => {
-  window.tones = [];
-  const start = OscillatorNode.prototype.start, stop = OscillatorNode.prototype.stop;
-  OscillatorNode.prototype.start = function (when) { window.tones.push(this); this.stopped = false; return start.call(this, when); };
-  OscillatorNode.prototype.stop = function (when) { this.stopped = true; return stop.call(this, when); };
-});
-const tone = () => page.evaluate(() => { const tone = window.tones.at(-1); return tone ? { hz: Math.round(tone.frequency.value), stopped: tone.stopped, count: window.tones.length, state: tone.context.state } : null; });
+await spyOnRecordings(page);
+const tone = async () => (await recordings(page)).at(-1) ?? null;
 const play = () => page.click('button[aria-label="Play reference"]');
 const off = () => page.click('button[aria-label="Stop reference"]');
 await play(); await sleep(300);
-check("pressing it starts the first note's pitch", (await tone()).hz === 294 && (await tone()).state === "running", JSON.stringify(await tone()));
+check("pressing it bows the first note's pitch on a violin", (await tone())?.hz === 294 && (await tone()).state === "running", JSON.stringify(await tone()));
 check("the button turns green and offers to stop", (await page.locator('button[aria-label="Stop reference"]').count()) === 1 && (await color(page.locator('button[aria-label="Stop reference"]'))) === GREEN);
 await sleep(2500);
-check("it's still sounding well past the old one second", !(await tone()).stopped, JSON.stringify(await tone()));
+check("it's still sounding well past its recording's length, looping", !(await tone()).stopped && (await tone()).loop, JSON.stringify(await tone()));
 await off(); await sleep(100);
 check("pressing again stops it", (await tone()).stopped && (await page.locator('button[aria-label="Play reference"]').count()) === 1);
-await play(); await sleep(100);
-await page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84); await sleep(150);
-check("it moves with the current note, without restarting", (await tone()).hz === 330 && !(await tone()).stopped && (await tone()).count === 2, JSON.stringify(await tone()));
-await pickPiece(page, "a-major-1oct"); await sleep(150);
+await play(); await sleep(300);
+await page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84); await sleep(300);
+const moved = await recordings(page);
+check("it moves with the current note, bowing the new one", moved.at(-1).hz === 330 && !moved.at(-1).stopped && moved.at(-2).stopped, JSON.stringify(moved));
+await pickPiece(page, "a-major-1oct"); await sleep(300);
 check("and with the piece", (await tone()).hz === 440, JSON.stringify(await tone()));
 await nav(page, "Calendar"); await sleep(150);
 check("leaving Practice stops it", (await tone()).stopped);

@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm } from "./lib.mjs";
+import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm, spyOnRecordings, recordings } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -157,10 +157,10 @@ await page.locator(".staff").scrollIntoViewIfNeeded();
 await shot("5-ghost");
 await stopRun();
 check("Stop clears it", (await ghost()) === null);
-await spyOnSounds();
+await spyOnRecordings(page);
 await press(button("Play reference")); await sleep(1500);
-const tone = await sounds();
-check("the reference keeps sounding, audio running", tone.length === 1 && Math.round(tone[0].hz) === 294 && tone[0].state === "running" && (await button("Stop reference").count()) === 1, JSON.stringify(tone));
+const tone = await recordings(page);
+check("the reference, a violin note, keeps sounding, audio running", tone.length === 1 && tone[0].hz === 294 && !tone[0].stopped && tone[0].state === "running" && (await button("Stop reference").count()) === 1, JSON.stringify(tone));
 await press(button("Stop reference")); await sleep(150);
 check("and turns off", (await button("Play reference").count()) === 1);
 
