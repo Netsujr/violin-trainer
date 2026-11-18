@@ -11,7 +11,7 @@ import { progressScreen, type GroupKey } from "./ui/progress";
 import { createSettingsPanel } from "./ui/settings";
 
 const SCREEN_NAMES = ["Listen", "Practice", "Library", "Calendar"] as const;
-// Progress isn't in the menu: it opens from a Library group, for that group.
+// Progress isn't in the menu: it opens from a Library group, for that group, or from Listen, for its scored modes.
 type ScreenName = (typeof SCREEN_NAMES)[number] | "Progress";
 
 const LANGUAGES: [Language, string][] = [
@@ -27,8 +27,8 @@ let current: Screen | undefined;
 
 // id is the piece for Practice, and the group for Progress.
 function build(name: ScreenName, id?: string, aligning = false) {
-  if (name === "Listen") return listenScreen();
-  if (name === "Progress") return progressScreen(id as GroupKey, () => show("Library"));
+  if (name === "Listen") return listenScreen(() => show("Progress", "listen"));
+  if (name === "Progress") return progressScreen(id as GroupKey | "listen", () => show(id === "listen" ? "Listen" : "Library"));
   if (name === "Practice") return practiceScreen(id, aligning ? () => show("Library") : undefined);
   if (name === "Library") return libraryScreen((piece) => show("Practice", piece), (piece) => show("Practice", piece, true), (group) => show("Progress", group));
   return calendarScreen();
@@ -42,7 +42,7 @@ async function show(name: ScreenName, id?: string, aligning = false) {
   main.replaceChildren(current.element);
   // Progress opens from a Library group, which can be far down the page.
   if (name === "Progress") scrollTo(0, 0);
-  const menuName = name === "Progress" ? "Library" : name;
+  const menuName = name === "Progress" ? (id === "listen" ? "Listen" : "Library") : name;
   navButtons.forEach((button, index) => (button.ariaCurrent = SCREEN_NAMES[index] === menuName ? "page" : null));
 }
 

@@ -300,6 +300,29 @@ section > ul > li {
   stroke: #b03020;
 }
 
+/* A note played right in the note guesser turns green, with a little pop. */
+.staff .right text {
+  fill: #14914a;
+}
+
+.staff .right path {
+  stroke: #14914a;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .staff .right {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: right-pop 0.4s ease-out;
+  }
+}
+
+@keyframes right-pop {
+  40% {
+    scale: 1.25;
+  }
+}
+
 .highway {
   position: relative;
   padding-bottom: 0.875rem; /* The scrollbar sits here, below the lanes. */
@@ -1500,6 +1523,18 @@ a[download] {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
+/* Listen in fullscreen: the staff as large as fits, about twice as wide as it's tall, with room under it for the
+   needle and the controls. On a phone on its side the controls sit beside it, so it takes the whole height. */
+.fullscreen .listen .staff {
+  width: calc((100dvh - 12rem) * 1.75);
+}
+
+@media (max-height: 500px) {
+  .fullscreen .listen .staff {
+    width: calc((100dvh - 2rem) * 1.75);
+  }
+}
+
 .fullscreen .practice > p,
 .fullscreen .practice > .actions {
   grid-row: 1;
@@ -1629,7 +1664,9 @@ a[download] {
   display: none;
 }
 
-.fullscreen .countdown:not([hidden]) {
+/* Practice shows it only in fullscreen; Technique's count-in in Listen always shows it, as nothing else needs doing then. */
+.fullscreen .countdown:not([hidden]),
+.listen .countdown:not([hidden]) {
   position: fixed;
   inset: 0;
   z-index: 10;

@@ -36,6 +36,12 @@ describe("progress", () => {
     expect(progress).toMatchObject({ minutes: 8, daysPractised: 3, lastDay: "2026-11-05" });
   });
 
+  it("scores a Listen exercise's day as the average of its scores, as it has no notes", () => {
+    const exercise = { notesHit: 0, notesSkipped: 0, exercise: true as const };
+    const entries = [run(3, { ...exercise, score: 60 }, "technique"), run(3, { ...exercise, score: 80 }, "technique"), run(3, { ...exercise, score: 0 }, "technique")];
+    expect(progressOf(entries, "technique").scored).toEqual([{ day: "2026-11-03", score: 47, bpm: null }]);
+  });
+
   it("charts only the last 30 scored days", () => {
     const entries = Array.from({ length: 40 }, (_, day) => run(day + 1, { score: 90 }));
     const { scored } = progressOf(entries, "hills");

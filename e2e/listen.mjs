@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, heard, OUT } from "./lib.mjs";
+import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, savedLog, heard, OUT } from "./lib.mjs";
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
@@ -91,6 +91,66 @@ wav(OUT + "silence.wav", [rest(4)]);
   await s.close();
 }
 
+// The note guesser and Technique log their time under their own names.
+{
+  const s = await open(OUT + "a440.wav");
+  for (const [mode, title] of [["Note guesser", "Note guesser"], ["Technique", "Technique"]]) {
+    await s.page.click(`.listen-modes button:text-is("${mode}")`);
+    await start(s.page);
+    await sleep(500);
+    await stop(s.page);
+    await sleep(100);
+  }
+  const log = await savedLog(s.page);
+  check("the note guesser and Technique are logged by name", log.map((entry) => entry.pieceTitle).join(",") === "Note guesser,Technique", JSON.stringify(log.map((entry) => entry.pieceId)));
+  await s.close();
+}
+
+// Listen's Progress: the note guesser's and Technique's scores over time, from a chart button hidden in free play.
+{
+  const s = await open(OUT + "a440.wav");
+  const day = (date) => new Date(2026, 10, date, 10).toISOString();
+  const game = (date, score) => ({ id: `g${date}`, startedAt: day(date), pieceId: "note-guesser", pieceTitle: "Note guesser", minutes: 2, passes: 0, notesHit: 0, notesSkipped: 0, averageCents: null, averagePassSeconds: null, slowest: [], score, exercise: true });
+  await seed(s.page, { settings: { listenMode: "free" }, log: [game(3, 40), game(4, 70)] });
+  const chart = s.page.locator('.listen button[aria-label="Listen: progress"]');
+  check("free play has no progress button", await chart.isHidden());
+  await s.page.click('.listen-modes button:text-is("Note guesser")');
+  await chart.click();
+  const text = await s.page.locator(".progress").innerText();
+  check("it shows the guesser's score chart, and Technique waiting for a round", text.includes("Listen: progress") && (await s.page.locator(".progress-piece .progress-chart").count()) === 1 && text.includes("Not practised yet: Technique"), text.slice(0, 200));
+  await s.page.click('.progress button:text-is("‹ Listen")');
+  check("its back button returns to Listen", await s.page.locator(".listen").isVisible());
+  check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}
+
+// Technique's count-in covers the screen, fading as it counts down, then goes.
+{
+  const s = await open(OUT + "a440.wav", undefined, { keepCountIn: true });
+  await seed(s.page, { settings: { listenMode: "technique", countInOn: true, countInBeats: 2, metronomeOn: false } });
+  await start(s.page);
+  const overlay = s.page.locator(".listen .countdown");
+  await overlay.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+  const box = await overlay.boundingBox();
+  check("the count-in covers the screen", box !== null && box.width >= 1000 && box.height >= 900, JSON.stringify(box));
+  await overlay.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+  check("and goes when the first note starts", await overlay.isHidden());
+  await stop(s.page);
+  await s.close();
+}
+
+// Fullscreen in Listen: no header, a bigger staff, and back again.
+{
+  const s = await open(OUT + "a440.wav");
+  const staffWidth = async () => (await s.page.locator(".listen > .staff").boundingBox()).width;
+  const before = await staffWidth();
+  await s.page.click('.listen button[aria-label="Fullscreen"]');
+  check("Listen's fullscreen hides the header and enlarges the staff", (await s.page.locator("header").isHidden()) && (await staffWidth()) > before, `${before} → ${await staffWidth()}`);
+  await s.page.click('.listen button[aria-label="Exit fullscreen"]');
+  check("leaving fullscreen brings the header back", await s.page.locator("header").isVisible());
+  await s.close();
+}
+
 // Recording from Listen
 {
   const s = await open(OUT + "a440.wav");
@@ -117,15 +177,22 @@ const dealDThenA = () => {
   const score = () => s.page.locator(".guess-score").innerText();
   const staffTop = async () => (await s.page.locator(".listen > .staff").boundingBox()).y;
   const before = await staffTop();
+  const started = Date.now();
   await start(s.page);
   check("a game is 10 notes", (await score()) === "0 of 10", await score());
   await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent.startsWith("Right! Next in 5"), null, { timeout: 8000 });
   const t0 = Date.now();
+  check("a note counts only after a second held in tune", t0 - started >= 1000, `${t0 - started} ms`);
+  check("the note played right turns green", (await s.page.locator(".listen .staff .vf-stavenote.right").count()) === 1);
   check("with the toggles off, its note shows unnamed, and the staff stays put as notes start", (await s.page.locator(".listen .staff text[font-family^=system-ui]").count()) === 0 && Math.abs((await staffTop()) - before) < 1, `${before} → ${await staffTop()}`);
   await s.page.waitForFunction(() => document.querySelector(".guess-score").textContent === "1 of 10", null, { timeout: 9000 });
   const waited = Date.now() - t0;
   check("the next note comes 5 seconds after one played right", waited >= 4500 && waited < 7000, `${waited} ms`);
   await s.page.screenshot({ path: OUT + "listen-guesser.png" });
+  await stop(s.page);
+  await sleep(100);
+  const logged = (await savedLog(s.page)).at(-1);
+  check("a guesser run logs its score", logged.pieceId === "note-guesser" && logged.exercise && logged.score > 0 && logged.score <= 100, JSON.stringify(logged));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

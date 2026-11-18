@@ -4,6 +4,7 @@ import type { LogEntry } from "../practice/log";
 import { progressOf, tuningOf } from "../practice/progress";
 import { allPieces, loadLog, pieceGroups } from "../storage";
 import { h, type Screen } from "./dom";
+import { SCORED_MODES } from "./listen";
 import { lineChart } from "./progressChart";
 
 export type GroupKey = ReturnType<typeof pieceGroups>[number][0];
@@ -32,8 +33,10 @@ function tuning(piece: Piece, entries: LogEntry[]) {
   return [h("h4", {}, t.outOfTune), h("div", { className: "chip-row" }, ...chips)];
 }
 
-// A piece's days, minutes and last day, then its score and tempo over time, then its out-of-tune notes.
+// A piece's days, minutes and last day, then its score and tempo over time, then its out-of-tune notes. A Listen
+// exercise has no notes, so only its score.
 function pieceProgress(piece: Piece, entries: LogEntry[]) {
+  const exercise = piece.notes.length === 0;
   const { minutes, daysPractised, lastDay, scored } = progressOf(entries, piece.id);
   const points = (value: (day: (typeof scored)[number]) => number | null) => scored.map((day) => ({ label: shortDay(day.day), value: value(day) }));
   const bpms = scored.flatMap((day) => day.bpm ?? []);
@@ -43,7 +46,7 @@ function pieceProgress(piece: Piece, entries: LogEntry[]) {
         lineChart(points((day) => day.score), { title: t.scoreChart, min: 0, max: 100, format: (value) => `${value}%` }),
         ...(bpms.length ? [lineChart(points((day) => day.bpm), { title: t.tempoChart, ...tempoRange, format: String })] : []),
       ]
-    : [note(t.noScoresYet)];
+    : [note(exercise ? t.noExerciseScoresYet : t.noScoresYet)];
   return h(
     "article",
     { className: "progress-piece" },
@@ -54,14 +57,16 @@ function pieceProgress(piece: Piece, entries: LogEntry[]) {
       h("div", { className: "chip-row" }, chip(t.days(daysPractised)), chip(`${localNumber(minutes, 1)} min`), chip(t.lastPractised(shortDay(lastDay!)))),
     ),
     ...charts,
-    ...tuning(piece, entries),
+    ...(exercise ? [] : tuning(piece, entries)),
   );
 }
 
-// How each piece in a Library group is coming along, the most recently practised first, with those not yet practised named at the end.
-export function progressScreen(group: GroupKey, back: () => void): Screen {
+// How each piece in a Library group is coming along, the most recently practised first, with those not yet practised
+// named at the end. "listen" is Listen's note guesser and Technique, opened from Listen.
+export function progressScreen(group: GroupKey | "listen", back: () => void): Screen {
   const entries = loadLog();
-  const pieces = pieceGroups(allPieces()).find(([key]) => key === group)?.[1] ?? [];
+  const pieces = group === "listen" ? SCORED_MODES : (pieceGroups(allPieces()).find(([key]) => key === group)?.[1] ?? []);
+  const from = group === "listen" ? t.screens.Listen : t.screens.Library;
   const lastDays = new Map(pieces.map((piece) => [piece.id, progressOf(entries, piece.id).lastDay]));
   const practised = pieces.filter((piece) => lastDays.get(piece.id)).sort((a, b) => lastDays.get(b.id)!.localeCompare(lastDays.get(a.id)!));
   const notYet = pieces.filter((piece) => !lastDays.get(piece.id)).map((piece) => localTitle(piece.id, piece.title));
@@ -70,8 +75,8 @@ export function progressScreen(group: GroupKey, back: () => void): Screen {
     element: h(
       "section",
       { className: "progress" },
-      h("button", { type: "button", className: "link-button", textContent: `‹ ${t.screens.Library}`, onclick: back }),
-      h("h2", {}, t.progressOf(t[group])),
+      h("button", { type: "button", className: "link-button", textContent: `‹ ${from}`, onclick: back }),
+      h("h2", {}, t.progressOf(group === "listen" ? from : t[group])),
       ...practised.map((piece) => pieceProgress(piece, entries)),
       ...(notYet.length ? [note(t.notPractisedYet(notYet.join(", ")))] : []),
     ),

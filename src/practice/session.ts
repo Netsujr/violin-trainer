@@ -19,6 +19,8 @@ export class Session {
   following = false;
   // The tempo the lanes moved at, for "Don't wait".
   bpm?: number;
+  // A Listen exercise's score out of 100, from the note guesser or Technique, which have no notes of their own.
+  exerciseScore?: number;
   // How each pitch sounded, from every reading near it, in tune or a near miss: cents added up (sharp above 0), and how many.
   tuning = new Map<string, { cents: number; readings: number }>();
   private noteStart: number;

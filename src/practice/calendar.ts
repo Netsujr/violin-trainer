@@ -1,4 +1,4 @@
-import type { LogEntry } from "./log";
+import { scoredNotes, scorePercent, type LogEntry } from "./log";
 
 // A day as "2026-11-10", in local time, so a session late in the evening counts for the day it was played.
 export function dayKey(date: Date) {
@@ -53,6 +53,7 @@ export function summarise(sessions: LogEntry[]) {
       const centsWeight = sum((run) => (run.averageCents === null ? 0 : run.notesHit));
       return {
         scored: runs[0].score !== undefined,
+        score: scorePercent(sum((run) => scoredNotes(run).hit), sum((run) => scoredNotes(run).judged)),
         playedAlong: Boolean(runs[0].playedAlong),
         runs: runs.length,
         minutes: sum((run) => run.minutes),

@@ -13,8 +13,10 @@ export type LogEntry = {
   averagePassSeconds: number | null;
   slowest: { pitch: string; seconds: number }[];
   recordingId?: string;
-  // Only when the lanes kept moving, where notesSkipped holds the missed notes.
+  // Only when the lanes kept moving, where notesSkipped holds the missed notes, or for a Listen exercise.
   score?: number;
+  // A Listen exercise, the note guesser or Technique: it has no notes, only its score.
+  exercise?: true;
   // A play-along with nothing heard: only its minutes count.
   playedAlong?: true;
   // The tempo of a "Don't wait" run.
@@ -24,6 +26,10 @@ export type LogEntry = {
 };
 
 export const scorePercent = (hit: number, total: number) => (total === 0 ? 0 : Math.round((hit / total) * 100));
+
+// A scored run as notes hit out of notes judged, to add up with others. A Listen exercise counts as its score out of 100.
+export const scoredNotes = (entry: LogEntry) =>
+  entry.exercise ? { hit: entry.score!, judged: 100 } : { hit: entry.notesHit, judged: entry.notesHit + entry.notesSkipped };
 
 const average = (values: number[]) =>
   values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -42,12 +48,13 @@ export function buildEntry(session: Session, now: number, recordingId?: string):
     averagePassSeconds: average(session.passSeconds),
     slowest: session.following
       ? []
-      : [...session.hits]
-          .sort((a, b) => b.ms - a.ms)
+      : session.hits
+          .toSorted((a, b) => b.ms - a.ms)
           .slice(0, 3)
           .map((hit) => ({ pitch: hit.pitch, seconds: hit.ms / 1000 })),
     recordingId,
     ...(session.following && { score: scorePercent(session.hits.length, session.hits.length + session.missed), bpm: session.bpm }),
+    ...(session.exerciseScore !== undefined && { score: session.exerciseScore, exercise: true as const }),
     ...(session.tuning.size > 0 && {
       tuning: Object.fromEntries([...session.tuning].map(([pitch, { cents, readings }]) => [pitch, [Math.round((cents / readings) * 10) / 10, readings]])),
     }),

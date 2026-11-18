@@ -3,7 +3,8 @@ import { sharedAudioContext } from "../audio/reference";
 import { t } from "../i18n";
 import { fillFingering, stringFor } from "../music/fingering";
 import { centsFrom, midiOf, type PieceNote, type StringName } from "../music/notes";
-import { scoreLongBow, scoreSlurs, type TechniqueReading } from "../practice/technique";
+import type { Session } from "../practice/session";
+import { roundScore, scoreLongBow, scoreSlurs, type TechniqueReading } from "../practice/technique";
 import { getSettings, saveSettings } from "../storage";
 import { h } from "./dom";
 import { levelNotes, toggleLabels } from "./guesser";
@@ -32,8 +33,8 @@ const chip = (text: string) => h("span", { className: "info-chip" }, text);
 // lasts the beats picked, at Practice's BPM, after a count-in, while the pitch line shows what's played. A long bow
 // ends with how steady the pitch and the loudness were, slurs with the notes in tune and the bows without a break,
 // and both with how many beats were held.
-// onDone ends the run once a round is played.
-export function createTechnique(staff: ReturnType<typeof createStaff>, onDone: () => void) {
+// The round's score goes on the run's session, for the log. onDone ends the run once a round is played.
+export function createTechnique(staff: ReturnType<typeof createStaff>, session: () => Session | null, onDone: () => void) {
   const settings = getSettings();
   const metronome = createMetronome();
   const status = h("p", { className: "technique-status" });
@@ -64,6 +65,7 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, onDone: (
     current = -1;
     round = { firstNoteAt: null, readings: [] };
     countIn.cancel();
+    countIn.hideOverlay();
     staff.clearTrace();
     staff.hidePlayed();
     status.textContent = "";
@@ -75,6 +77,7 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, onDone: (
     round = null;
     current = -1;
     countIn.cancel();
+    countIn.hideOverlay();
     staff.hidePlayed();
     status.textContent = "";
     drawStaff();
@@ -82,20 +85,30 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, onDone: (
 
   function finish(readings: TechniqueReading[]) {
     stop();
-    results.replaceChildren(...outcome(readings).map(chip));
+    const { words, score } = outcome(readings);
+    results.replaceChildren(...words.map(chip));
+    const run = session();
+    if (run && score !== null) run.exerciseScore = score;
     onDone();
   }
 
-  // How the round went, in a few words each.
+  // How the round went, in a few words each, and as a score out of 100: the average of its shares, of the notes in tune
+  // and bows smooth for slurs, or how steady a long bow was, and of the beats held.
   function outcome(readings: TechniqueReading[]) {
     const options = { beatMs: beatMs(), minRms: settings.minRms, toleranceCents: settings.toleranceCents, holdMs: settings.holdMs };
-    if (!readings.some(({ rms }) => rms >= settings.minRms)) return [t.nothingHeard];
+    if (!readings.some(({ rms }) => rms >= settings.minRms)) return { words: [t.nothingHeard], score: null };
     if (settings.bowNotes > 1) {
       const { inTune, smooth, bows, held, beats } = scoreSlurs(notes, settings.bowNotes, readings, options);
-      return [t.inTuneNotes(inTune, notes.length), t.smoothSlurs(smooth, bows), t.heldBeats(held, beats)];
+      return {
+        words: [t.inTuneNotes(inTune, notes.length), t.smoothSlurs(smooth, bows), t.heldBeats(held, beats)],
+        score: roundScore([inTune / notes.length, smooth / bows, held / beats]),
+      };
     }
     const { pitchSpread, steadiness, held, beats } = scoreLongBow(notes, readings, options);
-    return [...(pitchSpread === null ? [] : [t.pitchSpread(pitchSpread)]), ...(steadiness === null ? [] : [t.volumeSteady(steadiness)]), t.heldBeats(held, beats)];
+    return {
+      words: [...(pitchSpread === null ? [] : [t.pitchSpread(pitchSpread)]), ...(steadiness === null ? [] : [t.volumeSteady(steadiness)]), t.heldBeats(held, beats)],
+      score: roundScore([...(steadiness === null ? [] : [steadiness / 100]), held / beats]),
+    };
   }
 
   // Each choice is kept, and starts the exercise again.
@@ -124,6 +137,7 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, onDone: (
     h("div", { className: "row" }, captioned(t.perBow, perBow), captioned(t.bowString, strings), captioned(t.beats, beats), metronomeSwitch.label),
     status,
     results,
+    countIn.overlay,
   );
 
   return {
@@ -139,6 +153,7 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, onDone: (
       if (round.firstNoteAt === null) {
         if (!countIn.active) countIn.start();
         if (!countIn.tick(now)) return;
+        countIn.hideOverlay();
         round.firstNoteAt = now;
       }
 

@@ -1,6 +1,6 @@
 import { localNumber, localTitle, t } from "../i18n";
 import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practice/calendar";
-import { scorePercent, type LogEntry } from "../practice/log";
+import type { LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording, type RecordingView } from "../storage";
 import { planSection } from "./calendarPlan";
 import { backupButtons } from "./backup";
@@ -21,7 +21,7 @@ const describeRuns = (runs: ReturnType<typeof summarise>[number]) =>
     ...(runs.playedAlong
       ? [t.playedAlongRuns]
       : runs.scored
-        ? [t.score(scorePercent(runs.hit, runs.hit + runs.missed)), t.hitMissed(runs.hit, runs.missed)]
+        ? [t.score(runs.score), ...(runs.hit + runs.missed ? [t.hitMissed(runs.hit, runs.missed)] : [])]
         : [t.passes(runs.passes), t.hitSkipped(runs.hit, runs.missed)]),
     runs.averageCents === null ? null : t.centsOff(Math.round(runs.averageCents)),
   ]

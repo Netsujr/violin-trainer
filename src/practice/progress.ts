@@ -1,5 +1,5 @@
 import { entryDay } from "./calendar";
-import { scorePercent, type LogEntry } from "./log";
+import { scoredNotes, scorePercent, type LogEntry } from "./log";
 
 // The most recent practice days a chart shows.
 export const CHART_DAYS = 30;
@@ -18,7 +18,8 @@ export function progressOf(entries: LogEntry[], pieceId: string) {
   for (const entry of mine.filter((candidate) => candidate.score !== undefined)) {
     const day = days.get(entryDay(entry)) ?? { hit: 0, judged: 0, bpm: null };
     const bpm = entry.bpm === undefined ? day.bpm : Math.max(day.bpm ?? 0, entry.bpm);
-    days.set(entryDay(entry), { hit: day.hit + entry.notesHit, judged: day.judged + entry.notesHit + entry.notesSkipped, bpm });
+    const { hit, judged } = scoredNotes(entry);
+    days.set(entryDay(entry), { hit: day.hit + hit, judged: day.judged + judged, bpm });
   }
   const scored: DayProgress[] = [...days]
     .sort(([a], [b]) => a.localeCompare(b))

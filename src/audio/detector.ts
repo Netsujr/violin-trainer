@@ -9,7 +9,7 @@ const SMOOTHING_READINGS = 5;
 export const rootMeanSquare = (frame: Float32Array) =>
   Math.sqrt(frame.reduce((sum, sample) => sum + sample * sample, 0) / frame.length);
 
-const median = (values: number[]) => [...values].sort((a, b) => a - b)[values.length >> 1];
+const median = (values: number[]) => values.toSorted((a, b) => a - b)[values.length >> 1];
 
 export function createDetector(frameSize: number, sampleRate: number) {
   const pitchDetector = PitchDetector.forFloat32Array(frameSize);

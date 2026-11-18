@@ -4,15 +4,25 @@ import { centsFrom, nearestMidi, pitchOf } from "../music/notes";
 import { getSettings, saveSettings, type ListenMode } from "../storage";
 import { h, type Screen } from "./dom";
 import { createGuesser, toggleLabels } from "./guesser";
+import { createFullscreen } from "./practice/fullscreen";
+import { ICON_BUTTON } from "./practice/options";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
 import { createTechnique } from "./technique";
-import { createIconToggle } from "./toggles";
+import { CHART_ICON, createIconToggle } from "./toggles";
 import { createVolumeCurve } from "./volumeCurve";
 
 const SILENCE_MS = 300;
-const FREE_PLAY = { id: "free-play", title: "Free play", source: "listen", notes: [] };
 const MODES: ListenMode[] = ["free", "guesser", "technique"];
+// Each mode's time goes in the log under its own name, in English like the pieces', and translated where it's shown.
+// ponytail: a run whose mode is switched partway is logged under the mode it started in; split it on a switch if that matters.
+const LOGGED_AS = {
+  free: { id: "free-play", title: "Free play", source: "listen", notes: [] },
+  guesser: { id: "note-guesser", title: "Note guesser", source: "listen", notes: [] },
+  technique: { id: "technique", title: "Technique", source: "listen", notes: [] },
+};
+// The modes with a score, shown on Listen's Progress.
+export const SCORED_MODES = [LOGGED_AS.guesser, LOGGED_AS.technique];
 
 export function createNeedle() {
   const mark = h("i");
@@ -32,7 +42,8 @@ export function createNeedle() {
   return { element: h("div", { className: "row" }, "♭", track, "♯", value), show };
 }
 
-export function listenScreen(): Screen {
+// goProgress opens the note guesser's and Technique's scores over time.
+export function listenScreen(goProgress: () => void): Screen {
   const settings = getSettings();
   const hertz = h("p");
   const needle = createNeedle();
@@ -40,8 +51,10 @@ export function listenScreen(): Screen {
   const staff = createStaff();
   let midi: number | null = null;
   let lastHeard = 0;
-  const guesser = createGuesser(staff, () => controls.finish(() => true));
-  const technique = createTechnique(staff, () => controls.finish(() => true));
+  const guesser = createGuesser(staff, () => controls.session, () => controls.finish(() => true));
+  const technique = createTechnique(staff, () => controls.session, () => controls.finish(() => true));
+  const progressLabel = t.progressOf(t.screens.Listen);
+  const progressButton = h("button", { type: "button", className: ICON_BUTTON, innerHTML: CHART_ICON, title: progressLabel, ariaLabel: progressLabel, onclick: goProgress });
   const modeNames = { free: t.freePlay, guesser: t.noteGuesser, technique: t.technique };
   const modeButtons = MODES.map((mode) => h("button", { type: "button", textContent: modeNames[mode], onclick: () => setMode(mode) }));
 
@@ -54,6 +67,7 @@ export function listenScreen(): Screen {
     guesser.panel.hidden = mode !== "guesser";
     technique.panel.hidden = mode !== "technique";
     volume.element.hidden = mode !== "technique";
+    progressButton.hidden = mode === "free";
     staff.hidePlayed();
     staff.clearTrace();
     // Ends a technique round, before the mode picked draws its own notes.
@@ -97,7 +111,7 @@ export function listenScreen(): Screen {
   }
 
   const controls = createRunControls({
-    piece: () => FREE_PLAY,
+    piece: () => LOGGED_AS[settings.listenMode],
     onReading(frequency, now, rms) {
       if (frequency !== null) hear(frequency, now);
       else if (midi !== null && now - lastHeard > SILENCE_MS) goQuiet();
@@ -121,6 +135,9 @@ export function listenScreen(): Screen {
     },
   });
 
+  // Fullscreen hides the header and makes the staff as large as fits; CSS lays it out.
+  const fullscreen = createFullscreen(() => {});
+
   setMode(settings.listenMode);
   goQuiet();
 
@@ -140,11 +157,16 @@ export function listenScreen(): Screen {
         h("div", { className: "row toggles" }, ...(["fingers", "noteNames", "letterNames"] as const).map((key) => createIconToggle(key, relabel))),
         controls.recordToggle,
         controls.startButton,
+        fullscreen.button,
+        progressButton,
         controls.message,
       ),
       guesser.panel,
       technique.panel,
     ),
-    leave: controls.leave,
+    leave() {
+      fullscreen.leave();
+      return controls.leave();
+    },
   };
 }

@@ -14,6 +14,9 @@ const DIP_SHARE = 0.5;
 export type TechniqueReading = { beat: number; frequency: number | null; rms: number };
 
 const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+// A round's score out of 100, from its shares, each 0 to 1, weighed alike.
+export const roundScore = (shares: number[]) => Math.round(100 * mean(shares));
+
 // How far values stray from their average, as a standard deviation.
 function spread(values: number[]) {
   const average = mean(values);

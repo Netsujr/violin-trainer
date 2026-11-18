@@ -5,7 +5,7 @@ const MEDIAN_OF = 3;
 type Reading = { beat: number; frequency: number };
 type Place = (beat: number, frequency: number) => { x: number; y: number; line: number } | null;
 
-const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+const median = (values: number[]) => values.toSorted((a, b) => a - b)[Math.floor(values.length / 2)];
 
 // The pitch played, drawn through the staff as it's played, like karaoke: right with the beat, up and down with the
 // pitch, crossing the middle of a notehead when in tune. Silence breaks it, and so do a rest and going on to the sheet's next line.
