@@ -35,6 +35,9 @@ export const SPEAKER_ICON = svgIcon('<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M1
 export const TEMPO_ICON = svgIcon('<path d="M3.5 17a9 9 0 1 1 17 0"/><path d="m12 14 4-5"/><circle cx="12" cy="14" r="1.5"/>');
 export const METRONOME_ICON = svgIcon('<path d="M9 3h6l4 18H5z"/><path d="M5.5 18h13M12 18l5-11"/>');
 export const COUNT_IN_ICON = svgIcon('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M10 2h4"/>');
+// Listen's note guesser, a question mark, and Technique, the down bow and up bow marks.
+export const GUESS_ICON = svgIcon('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>');
+export const BOWING_ICON = svgIcon('<path d="M3 18V7h8v11"/><path d="M3 7h8" stroke-width="4"/><path d="m14 7 3.5 11L21 7"/>');
 export const PENCIL_ICON = svgIcon('<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>');
 
 function iconFor(key: keyof Settings["toggles"]) {

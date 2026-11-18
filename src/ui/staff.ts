@@ -429,6 +429,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       else placeGhost(point.x, point.y, cents, inTune);
     },
     clearTrace: () => trace.clear(),
+    // Picks out the pitch line from one beat to another, as where a note sounded when it shouldn't have.
+    markTrace: (from: number, to: number) => trace.mark(from, to),
     // The piece's bars, for where they fall.
     setMeter(next: Meter) {
       meter = next;

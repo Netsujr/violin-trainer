@@ -244,14 +244,14 @@ section > ul > li {
   min-width: 120px;
   height: 12px;
   border-radius: 6px;
-  /* One cent is 1% of the track. --tolerance comes from Settings: green is its inner half, yellow the rest. */
+  /* One cent is 1% of the track. Green is 10 cents either way; --tolerance comes from Settings, and yellow runs out to it. */
   background: linear-gradient(var(--pico-color), var(--pico-color)) center / 2px 100% no-repeat,
     linear-gradient(
       to right,
       var(--pico-muted-border-color) calc(50% - var(--tolerance)),
-      #6e5c1c calc(50% - var(--tolerance)) calc(50% - var(--tolerance) / 2),
-      #1f6e42 calc(50% - var(--tolerance) / 2) calc(50% + var(--tolerance) / 2),
-      #6e5c1c calc(50% + var(--tolerance) / 2) calc(50% + var(--tolerance)),
+      #6e5c1c calc(50% - var(--tolerance)) 40%,
+      #1f6e42 40% 60%,
+      #6e5c1c 60% calc(50% + var(--tolerance)),
       var(--pico-muted-border-color) calc(50% + var(--tolerance))
     );
 }
@@ -366,9 +366,10 @@ section > ul > li {
   margin-inline: auto;
 }
 
-/* The staff is Listen's main view: a fifth larger than its 300-unit sheet, and narrower only to fit a small screen. */
+/* The staff is Listen's main view: a fifth larger than its sheet, 300 units wide or wider for Technique (--sheet), and
+   narrower only to fit a small screen. */
 .listen .staff {
-  width: calc(360px + 1rem);
+  width: calc(var(--sheet, 300) * 1.2px + 1rem);
   max-width: 100%;
   margin: 1rem auto;
 }
@@ -386,6 +387,20 @@ section > ul > li {
 .listen [role="group"] button {
   padding: 0.25rem 0.75rem;
   font-size: 0.875rem;
+}
+
+.listen-modes svg {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* The mode picked, named small under the needle. */
+.listen .listen-mode-title {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--pico-muted-color);
 }
 
 .guesser .row {
@@ -1407,7 +1422,7 @@ a[download] {
 
   .listen > .staff {
     grid-column: 2;
-    grid-row: 1 / span 5;
+    grid-row: 1 / span 6;
     margin: 0;
   }
 
@@ -1523,15 +1538,16 @@ a[download] {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
-/* Listen in fullscreen: the staff as large as fits, about twice as wide as it's tall, with room under it for the
-   needle and the controls. On a phone on its side the controls sit beside it, so it takes the whole height. */
+/* Listen in fullscreen: the staff as large as fits, a 300-unit sheet about twice as wide as it's tall and a wider one
+   wider still, with room under it for the needle and the controls. On a phone on its side the controls sit beside it,
+   so it takes the whole height. */
 .fullscreen .listen .staff {
-  width: calc((100dvh - 12rem) * 1.75);
+  width: calc((100dvh - 12rem) * 1.75 * var(--sheet, 300) / 300);
 }
 
 @media (max-height: 500px) {
   .fullscreen .listen .staff {
-    width: calc((100dvh - 2rem) * 1.75);
+    width: calc((100dvh - 2rem) * 1.75 * var(--sheet, 300) / 300);
   }
 }
 
@@ -2489,4 +2505,11 @@ a[download] {
   stroke-linejoin: round;
   stroke-linecap: round;
   opacity: 0.85;
+}
+
+/* Where a note sounded when it shouldn't have, as Technique's finger timing finds: a highlighter under the line. */
+.pitch-trace polyline.mark {
+  stroke: #f2b705;
+  stroke-width: 10;
+  opacity: 0.6;
 }

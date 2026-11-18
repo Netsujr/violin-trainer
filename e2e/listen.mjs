@@ -95,7 +95,7 @@ wav(OUT + "silence.wav", [rest(4)]);
 {
   const s = await open(OUT + "a440.wav");
   for (const [mode, title] of [["Note guesser", "Note guesser"], ["Technique", "Technique"]]) {
-    await s.page.click(`.listen-modes button:text-is("${mode}")`);
+    await s.page.click(`.listen-modes button[aria-label="${mode}"]`);
     await start(s.page);
     await sleep(500);
     await stop(s.page);
@@ -114,7 +114,7 @@ wav(OUT + "silence.wav", [rest(4)]);
   await seed(s.page, { settings: { listenMode: "free" }, log: [game(3, 40), game(4, 70)] });
   const chart = s.page.locator('.listen button[aria-label="Listen: progress"]');
   check("free play has no progress button", await chart.isHidden());
-  await s.page.click('.listen-modes button:text-is("Note guesser")');
+  await s.page.click('.listen-modes button[aria-label="Note guesser"]');
   await chart.click();
   const text = await s.page.locator(".progress").innerText();
   check("it shows the guesser's score chart, and Technique waiting for a round", text.includes("Listen: progress") && (await s.page.locator(".progress-piece .progress-chart").count()) === 1 && text.includes("Not practised yet: Technique"), text.slice(0, 200));
@@ -202,7 +202,7 @@ const dealDThenA = () => {
 {
   const s = await open(OUT + "a440.wav");
   await seed(s.page, { settings: { guesserOn: true, toggles: { fingers: false, noteNames: false, letterNames: false } } });
-  check("an old note guesser switch opens on the note guesser", (await s.page.locator('.listen-modes button[aria-pressed="true"]').innerText()) === "Note guesser");
+  check("an old note guesser switch opens on the note guesser", (await s.page.locator('.listen-modes button[aria-pressed="true"]').getAttribute("aria-label")) === "Note guesser");
   const level = s.page.locator(".guess-level");
   check("the level starts on Easy", (await level.innerText()) === "Easy");
   await level.click();
@@ -223,11 +223,12 @@ const dealDThenA = () => {
 {
   const s = await open(OUT + "a440.wav");
   await seed(s.page, { settings: { toggles: { fingers: true, noteNames: false, letterNames: false } } });
-  const modes = await s.page.locator(".listen-modes button").allInnerTexts();
-  check("Listen has three modes", modes.join(",") === "Free play,Note guesser,Technique", modes.join(","));
+  const modes = await s.page.locator(".listen-modes button").evaluateAll((buttons) => buttons.map((button) => button.ariaLabel));
+  check("Listen has three modes, as icons", modes.join(",") === "Free play,Note guesser,Technique", modes.join(","));
+  check("the mode picked is named under the needle", (await s.page.locator(".listen-mode-title").innerText()) === "Free play");
   const row = s.page.locator(".technique");
   check("the technique row is hidden in free play", await row.isHidden());
-  await s.page.click('.listen-modes button:text-is("Technique")');
+  await s.page.click('.listen-modes button[aria-label="Technique"]');
   check("Technique shows its row, and hides the guesser's", (await row.isVisible()) && (await s.page.locator(".guesser").isHidden()));
   const pressed = (label) => row.locator(`[aria-label="${label}"] [aria-pressed="true"]`).innerText();
   check("it starts on a long bow on the A string, 4 beats a note", (await pressed("Notes per bow")) === "1" && (await pressed("String")) === "A" && (await pressed("Beats per note")) === "4");
@@ -239,10 +240,21 @@ const dealDThenA = () => {
   const kept = await savedSettings(s.page);
   check("each choice is kept", kept.bowString === "D" && kept.bowBeats === 8 && kept.bowNotes === 3 && kept.listenMode === "technique", JSON.stringify(kept));
   check("8 beats a note draws as whole notes", (await s.page.locator(".listen .staff .vf-stavenote").count()) >= 4);
+  // A pause before each note: only for a long bow, a rest after each note, and no beats to pick.
+  const pause = row.locator('.icon-switch[title^="Pause before each note"]');
+  check("the pause switch is hidden with three notes to a bow", await pause.isHidden());
+  await row.locator('[aria-label="Notes per bow"] button:text-is("1")').click();
+  await pause.click();
+  const drawn = await s.page.locator(".listen .staff .vf-stavenote").count();
+  check("with it on, a rest comes between each of its six notes, and the beats are hidden", drawn === 11 && (await row.locator('[aria-label="Beats per note"]').isHidden()), `${drawn} drawn`);
+  const wide = (await s.page.locator(".listen > .staff").boundingBox()).width;
+  await s.page.click('.listen-modes button[aria-label="Note guesser"]');
+  check("Technique's staff is wider than the guesser's, for its eight notes' names", wide > (await s.page.locator(".listen > .staff").boundingBox()).width);
+  await s.page.click('.listen-modes button[aria-label="Technique"]');
   await s.page.reload();
   await s.page.waitForSelector(".technique");
   check("and Listen opens on Technique again", (await row.isVisible()) && (await pressed("String")) === "D");
-  await s.page.click('.listen-modes button:text-is("Free play")');
+  await s.page.click('.listen-modes button[aria-label="Free play"]');
   check("free play hides the row again", await row.isHidden());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -268,10 +280,11 @@ const techniqueRound = { listenMode: "technique", bpm: 120, countInBeats: 2, bow
   await s.page.waitForSelector(".technique .info-chip", { timeout: 6000 });
   const chips = await s.page.locator(".technique .info-chip").allInnerTexts();
   check("a steady tone scores steady, and held throughout", /^Pitch ±[01] cents?$/.test(chips[0]) && /^Volume steady (9\d|100)%$/.test(chips[1]) && chips[2] === "Held 8/8 beats", chips.join(" | "));
+  check("a tone that never moves to the next note has no note changes to time", chips[3] === "Note changes not heard", chips.join(" | "));
   await s.page.waitForSelector('button:text-is("Start")', { timeout: 3000 });
-  check("the round ends the run, and the results stay", (await s.page.locator(".technique .info-chip").count()) === 3);
+  check("the round ends the run, and the results stay", (await s.page.locator(".technique .info-chip").count()) === 4);
   await s.page.screenshot({ path: OUT + "listen-technique.png" });
-  await s.page.click('.listen-modes button:text-is("Free play")');
+  await s.page.click('.listen-modes button[aria-label="Free play"]');
   check("free play hides the volume curve, and the pitch line goes", (await s.page.locator(".volume-curve").isHidden()) && (await s.page.locator(".listen .pitch-trace polyline").count()) === 0);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();

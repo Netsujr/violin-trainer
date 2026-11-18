@@ -23,15 +23,16 @@ function spread(values: number[]) {
   return Math.sqrt(mean(values.map((value) => (value - average) ** 2)));
 }
 
-// Each note's readings after its attack, with where the note starts and ends, in beats.
+// Where each note starts, in beats, and then where the last one ends.
+export const noteStarts = (notes: PieceNote[]) => notes.reduce((starts, note) => [...starts, starts.at(-1)! + note.beats!], [0]);
+
+// Each note's readings after its attack, with where the note starts and ends, in beats. A rest is passed over.
 function notesHeard(notes: PieceNote[], readings: TechniqueReading[], beatMs: number) {
   const attack = ATTACK_MS / beatMs;
-  let start = 0;
-  return notes.map((note) => {
-    const end = start + note.beats!;
-    const heard = { note, start, end, readings: readings.filter(({ beat }) => beat >= start + attack && beat < end) };
-    start = end;
-    return heard;
+  const starts = noteStarts(notes);
+  return notes.flatMap((note, index) => {
+    const [start, end] = [starts[index], starts[index + 1]];
+    return note.pitch ? [{ note, start, end, readings: readings.filter(({ beat }) => beat >= start + attack && beat < end) }] : [];
   });
 }
 
@@ -112,4 +113,52 @@ export function scoreSlurs(
     bows: bows.length,
     ...heldBeats(heard, options.minRms),
   };
+}
+
+// A finger this close to its moment, late or early, is on time: good players differ by about this much, unheard.
+export const ON_TIME_MS = 60;
+// How far either side of a note change to look for the bow changing, at most.
+const CHANGE_REACH_MS = 400;
+// The new note counts as arrived once this many readings in a row are on it.
+const ARRIVED_READINGS = 3;
+
+// How a change from one note to the next was timed by the finger: ms late, or early below 0, or null when the new note
+// wasn't heard; whether the finger lifted, going down the string; and the beats where the wrong note sounded, if any.
+export type NoteChange = { lift: boolean; ms: number | null; wrong: [from: number, to: number] | null };
+
+// Each change of note, timed. Between bows, or across a rest, the bow change is found as the dip in loudness: a late
+// finger leaves the old note sounding on the new bow, and an early one plays the new note on the old bow. Inside a slur,
+// or when the bow changed too smoothly to find, the new note is timed against the beat it should come on.
+// ponytail: a bow change with no dip falls back to the beat, which mixes the bow's timing in; fine while bow changes dip.
+export function noteChanges(
+  notes: PieceNote[],
+  perBow: number,
+  readings: TechniqueReading[],
+  { beatMs, toleranceCents }: { beatMs: number; toleranceCents: number },
+) {
+  const starts = noteStarts(notes);
+  const pitched = notes.flatMap((note, index) => (note.pitch ? [index] : []));
+  return pitched.slice(1).flatMap((next, count): NoteChange[] => {
+    const previous = pitched[count];
+    if (notes[previous].pitch === notes[next].pitch) return [];
+    const midi = midiOf(notes[next].pitch!);
+    const lift = midi < midiOf(notes[previous].pitch!);
+    const reach = Math.min(CHANGE_REACH_MS / beatMs, Math.min(notes[previous].beats!, notes[next].beats!) / 2);
+    // From just before the old note ends to halfway through the new one, so a very late finger is still found.
+    const near = readings.filter(({ beat }) => beat >= starts[previous + 1] - reach && beat < starts[next] + notes[next].beats! / 2);
+    const onNew = ({ frequency }: TechniqueReading) => frequency !== null && Math.abs(centsFrom(frequency, midi)) <= toleranceCents;
+    const arrival = near.findIndex((_, index) => index + ARRIVED_READINGS <= near.length && near.slice(index, index + ARRIVED_READINGS).every(onNew));
+    if (arrival < 0) return [{ lift, ms: null, wrong: null }];
+
+    const timed = (from: number, to: number, sign: number): NoteChange => ({ lift, ms: sign * (to - from) * beatMs, wrong: to > from ? [from, to] : null });
+    const arrivedAt = near[arrival].beat;
+    const newBow = Math.floor(count / perBow) !== Math.floor((count + 1) / perBow);
+    const aroundChange = near.filter(({ beat }) => beat < starts[next] + reach);
+    const average = mean(aroundChange.map(({ rms }) => rms));
+    const dip = aroundChange.reduce((lowest, reading) => (reading.rms < lowest.rms ? reading : lowest), aroundChange[0]);
+    if (!newBow || !dip || dip.rms >= DIP_SHARE * average) return [arrivedAt >= starts[next] ? timed(starts[next], arrivedAt, 1) : timed(arrivedAt, starts[next], -1)];
+    if (arrivedAt < dip.beat) return [timed(arrivedAt, dip.beat, -1)];
+    const sounded = near.find(({ beat, frequency }) => beat >= dip.beat && frequency !== null)!;
+    return [timed(sounded.beat, arrivedAt, 1)];
+  });
 }

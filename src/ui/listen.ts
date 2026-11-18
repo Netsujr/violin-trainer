@@ -9,11 +9,17 @@ import { ICON_BUTTON } from "./practice/options";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
 import { createTechnique } from "./technique";
-import { CHART_ICON, createIconToggle } from "./toggles";
+import { BOWING_ICON, CHART_ICON, createIconToggle, GUESS_ICON, MUSIC_ICON } from "./toggles";
 import { createVolumeCurve } from "./volumeCurve";
 
 const SILENCE_MS = 300;
 const MODES: ListenMode[] = ["free", "guesser", "technique"];
+const MODE_ICONS = { free: MUSIC_ICON, guesser: GUESS_ICON, technique: BOWING_ICON };
+// Green on the needle: this close is in tune by ear, whatever the Tolerance, which only says what clears a note.
+const IN_TUNE_CENTS = 10;
+// The staff's width, in its own units: Technique's rounds have up to eight notes, each with its name under it.
+const SHEET_WIDTH = 300;
+const WIDE_SHEET_WIDTH = 480;
 // Each mode's time goes in the log under its own name, in English like the pieces', and translated where it's shown.
 // ponytail: a run whose mode is switched partway is logged under the mode it started in; split it on a switch if that matters.
 const LOGGED_AS = {
@@ -32,7 +38,7 @@ export function createNeedle() {
     // Green and yellow both clear a note in Practice. Only the outer edge of yellow, Tolerance, decides that.
     const off = Math.abs(cents ?? Infinity);
     const { toleranceCents } = getSettings();
-    track.dataset.zone = off <= toleranceCents / 2 ? "green" : off <= toleranceCents ? "yellow" : "out";
+    track.dataset.zone = off <= IN_TUNE_CENTS ? "green" : off <= toleranceCents ? "yellow" : "out";
     mark.hidden = cents === null;
     mark.style.left = `${50 + Math.max(-50, Math.min(50, cents ?? 0))}%`;
     value.textContent = cents === null ? "—" : `${cents > 0 ? "+" : ""}${centsText(Math.round(cents))}`;
@@ -56,7 +62,9 @@ export function listenScreen(goProgress: () => void): Screen {
   const progressLabel = t.progressOf(t.screens.Listen);
   const progressButton = h("button", { type: "button", className: ICON_BUTTON, innerHTML: CHART_ICON, title: progressLabel, ariaLabel: progressLabel, onclick: goProgress });
   const modeNames = { free: t.freePlay, guesser: t.noteGuesser, technique: t.technique };
-  const modeButtons = MODES.map((mode) => h("button", { type: "button", textContent: modeNames[mode], onclick: () => setMode(mode) }));
+  // The modes as icons, with the one picked named under the needle.
+  const modeButtons = MODES.map((mode) => h("button", { type: "button", innerHTML: MODE_ICONS[mode], title: modeNames[mode], ariaLabel: modeNames[mode], onclick: () => setMode(mode) }));
+  const modeTitle = h("p", { className: "listen-mode-title" });
 
   // Each mode has its own row of choices under the buttons, hidden in the others. Technique also shows how loud the
   // playing is, under the needle.
@@ -64,6 +72,10 @@ export function listenScreen(goProgress: () => void): Screen {
     settings.listenMode = mode;
     saveSettings();
     modeButtons.forEach((button, index) => (button.ariaPressed = String(MODES[index] === mode)));
+    modeTitle.textContent = modeNames[mode];
+    const width = mode === "technique" ? WIDE_SHEET_WIDTH : SHEET_WIDTH;
+    staff.resize(width, 1);
+    staff.element.style.setProperty("--sheet", String(width));
     guesser.panel.hidden = mode !== "guesser";
     technique.panel.hidden = mode !== "technique";
     volume.element.hidden = mode !== "technique";
@@ -148,6 +160,7 @@ export function listenScreen(goProgress: () => void): Screen {
       // The staff comes first, with how in tune under it.
       staff.element,
       needle.element,
+      modeTitle,
       volume.element,
       hertz,
       h(

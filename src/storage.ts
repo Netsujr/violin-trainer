@@ -46,6 +46,8 @@ export type Settings = {
   bowNotes: number;
   bowString: StringName;
   bowBeats: number;
+  // Technique: a long bow's notes each one beat with a beat's pause before the next, to place the finger before bowing.
+  bowPause: boolean;
 };
 
 export type ListenMode = "free" | "guesser" | "technique";
@@ -86,6 +88,7 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bowNotes: 1,
   bowString: "A",
   bowBeats: 4,
+  bowPause: false,
 };
 
 const read = <T>(key: string, fallback: T): T => {

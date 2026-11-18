@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { frequencyOf, midiOf } from "../src/music/notes";
-import { scoreLongBow, scoreSlurs, type TechniqueReading } from "../src/practice/technique";
+import { frequencyOf, midiOf, type PieceNote } from "../src/music/notes";
+import { noteChanges, scoreLongBow, scoreSlurs, type TechniqueReading } from "../src/practice/technique";
 
 // At 60 BPM a beat is a second, and the mic reads 60 times a second.
 const BEAT_MS = 1000;
@@ -73,5 +73,56 @@ describe("slurs", () => {
 
   it("doesn't call a silent bow smooth", () => {
     expect(score((beat) => (beat < 2 ? null : steady))).toMatchObject({ smooth: 1, held: 2 });
+  });
+});
+
+describe("note changes", () => {
+  const TWO: PieceNote[] = [
+    { pitch: "A4", beats: 1 },
+    { pitch: "B4", beats: 1 },
+  ];
+  // What's heard at each reading, from the sound at each beat: a pitch at a loudness, or silence with null.
+  const hear = (beats: number, at: (beat: number) => { pitch: string; rms: number } | null): TechniqueReading[] =>
+    Array.from({ length: beats * 60 }, (_, index) => {
+      const beat = index / 60;
+      const sound = at(beat);
+      return sound ? { beat, frequency: frequencyOf(midiOf(sound.pitch)), rms: sound.rms } : { beat, frequency: null, rms: 0 };
+    });
+  // A bow change, a moment's silence at beat 1, with the finger reaching B4 at fingerAt.
+  const bowChange = (fingerAt: number) => hear(2, (beat) => (Math.abs(beat - 1) < 0.03 ? null : { pitch: beat < fingerAt ? "A4" : "B4", rms: 0.1 }));
+  const timed = (readings: TechniqueReading[], notes: PieceNote[] = TWO, perBow = 1) => noteChanges(notes, perBow, readings, { beatMs: BEAT_MS, toleranceCents: 40 });
+
+  it("finds a late finger as the old note sounding on the new bow, and where it sounded", () => {
+    const [change] = timed(bowChange(1.15));
+    expect(change.lift).toBe(false);
+    expect(change.ms).toBeGreaterThan(100);
+    expect(change.ms).toBeLessThan(140);
+    expect(change.wrong![0]).toBeGreaterThan(1);
+  });
+
+  it("finds an early finger as the new note sounding on the old bow", () => {
+    const [change] = timed(bowChange(0.85));
+    expect(change.ms).toBeLessThan(-120);
+    expect(change.ms).toBeGreaterThan(-150);
+    expect(change.wrong![1]).toBeLessThan(1);
+  });
+
+  it("calls a finger down by the bow change clean", () => {
+    expect(timed(bowChange(1))).toEqual([{ lift: false, ms: 0, wrong: null }]);
+  });
+
+  it("times a change inside a slur against its beat, and knows a finger lifting", () => {
+    const [change] = timed(hear(2, (beat) => ({ pitch: beat < 1.1 ? "B4" : "A4", rms: 0.1 })), TWO.toReversed(), 2);
+    expect(change.lift).toBe(true);
+    expect(change.ms).toBeGreaterThan(90);
+    expect(change.ms).toBeLessThan(110);
+  });
+
+  it("finds a late finger after a pause, and says when the new note never came", () => {
+    const paused = [TWO[0], { beats: 1 }, TWO[1]];
+    const [late] = timed(hear(3, (beat) => (beat >= 1 && beat < 2 ? null : { pitch: beat < 2.1 ? "A4" : "B4", rms: 0.1 })), paused);
+    expect(late.ms).toBeGreaterThan(90);
+    expect(late.ms).toBeLessThan(110);
+    expect(timed(hear(2, () => ({ pitch: "A4", rms: 0.1 })))).toEqual([{ lift: false, ms: null, wrong: null }]);
   });
 });
