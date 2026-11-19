@@ -1,17 +1,23 @@
+import { playNotes } from "../audio/reference";
 import { t } from "../i18n";
 import { fillFingering, fingerOn, HIGHEST_MIDI, LOWEST_MIDI, stringFor } from "../music/fingering";
 import { centsFrom, midiOf, pitchOf } from "../music/notes";
 import type { Session } from "../practice/session";
-import { getSettings, passCents, saveSettings, type GuesserLevel, type GuesserView } from "../storage";
+import { getSettings, passCents, saveSettings, type GuessBy, type GuesserLevel } from "../storage";
 import { h } from "./dom";
-import { createFingerboard } from "./fingerboard";
+import type { createFingerboard } from "./fingerboard";
 import type { createStaff } from "./staff";
-import { chipGroup, FINGERBOARD_ICON, STAFF_AND_BOARD_ICON, STAFF_ICON } from "./toggles";
+import { chipGroup, EAR_ICON, EYE_ICON } from "./toggles";
 
 export const GUESS_COUNTS = [1, 2, 4];
 export const LEVELS: GuesserLevel[] = ["easy", "medium", "hard"];
-const VIEWS: GuesserView[] = ["staff", "both", "board"];
-const VIEW_ICONS = { staff: STAFF_ICON, both: STAFF_AND_BOARD_ICON, board: FINGERBOARD_ICON };
+const GUESS_BY: GuessBy[] = ["eye", "ear"];
+// By ear, each note sounds this long, and the mic waits this long after, so it doesn't hear the speakers' last of it.
+const EAR_NOTE_MS = 2000;
+const ECHO_MS = 150;
+// By ear, the note sounds again once the player's been quiet this long without finding it, until it's found. It can't
+// sound all the time, or the mic would hear the speakers and count it as played.
+const EAR_AGAIN_MS = 2500;
 // A game is this many notes.
 const GAME_NOTES = 10;
 // A round played right moves on this long after the playing stops.
@@ -56,8 +62,11 @@ export function nextTargets(count: number, pool: string[], last?: string, random
 // make it easier or harder. The ghost note shows what's being played against the one to play, and its arrow which way
 // to go; the fingerboard, beside it or on its own, shows where on the violin it's played.
 // A round played right waits for the playing to stop, then the next notes come; a game played right starts another.
-// The run's score goes on its session, for the log. onView says the view has changed, for Listen to lay out.
-export function createGuesser(staff: ReturnType<typeof createStaff>, session: () => Session | null, onView: () => void) {
+// The run's score goes on its session, for the log. board is Listen's fingerboard, which shows the note to play.
+// By ear, the notes aren't shown but heard, each sounding on the violin as it comes up once a run's going, again each
+// time the player's been quiet a while without finding it, and when the staff's tapped; a note shows, green, once it's
+// played right. The toggles' labels still show, as hints.
+export function createGuesser(staff: ReturnType<typeof createStaff>, session: () => Session | null, board: ReturnType<typeof createFingerboard>) {
   const settings = getSettings();
   let targets: string[] = [];
   let index = 0;
@@ -71,13 +80,30 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
   const score = h("strong", { className: "guess-score" });
   // Over the staff, so it shows in fullscreen too: the round is right, and when the next one comes.
   const banner = h("p", { className: "guess-banner", hidden: true });
-  const board = createFingerboard();
+  const byEar = () => settings.guesserBy === "ear";
+  // By ear: the note sounded last, by how many the game has had right, how to stop it, and when the mic listens again.
+  let sounded = -1;
+  let stopSound: (() => void) | null = null;
+  let listensAt = 0;
+
+  function sound() {
+    stopSound?.();
+    listensAt = Infinity;
+    stopSound = playNotes([{ pitch: targets[index], beats: 1 }], EAR_NOTE_MS, () => {
+      stopSound = null;
+      listensAt = performance.now() + ECHO_MS;
+      // Finding it is timed from when it's been heard.
+      upSince = performance.now();
+    });
+  }
 
   // Each note played right turns green, and the fingerboard shows the one being played, or the last, once right.
   const drawStaff = () => {
     staff.draw(targets.map((pitch) => fillFingering({ pitch })), doneAt === null ? index : -1, toggleLabels());
     staff.element.querySelectorAll(".vf-stavenote").forEach((note, at) => note.classList.toggle("right", at < index));
-    board.show(targets.length ? fillFingering({ pitch: targets[Math.min(index, targets.length - 1)] }) : null, index >= targets.length);
+    // By ear, the fingerboard would give the note away, so it shows only once the round's right.
+    const hidden = byEar() && index < targets.length;
+    board.show(targets.length && !hidden ? fillFingering({ pitch: targets[Math.min(index, targets.length - 1)] }) : null, index >= targets.length);
   };
 
   function draw() {
@@ -89,7 +115,7 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
   function newRound(now = performance.now()) {
     if (right === GAME_NOTES) right = 0;
     targets = nextTargets(Math.min(settings.guesserCount, GAME_NOTES - right), levelNotes(settings.guesserLevel), targets.at(-1));
-    [index, doneAt, inTuneSince, upSince] = [0, null, null, now];
+    [index, doneAt, inTuneSince, upSince, sounded] = [0, null, null, now, -1];
     banner.hidden = true;
     staff.hidePlayed();
     draw();
@@ -125,40 +151,58 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
     newRound();
   });
 
-  // One button for what the stage shows, stepping through the staff, the staff and fingerboard, and the fingerboard.
-  const viewButton = h("button", {
-    type: "button",
-    className: "box-toggle",
-    onclick() {
-      settings.guesserView = VIEWS[(VIEWS.indexOf(settings.guesserView) + 1) % VIEWS.length];
-      saveSettings();
-      showView();
-      onView();
-    },
-  });
-  const showView = () => {
-    viewButton.replaceChildren(h("span", { className: "icon", innerHTML: VIEW_ICONS[settings.guesserView] }));
-    viewButton.title = viewButton.ariaLabel = t.guesserViews[settings.guesserView];
+  // By eye or by ear, two icons side by side, the one picked pressed. Changing starts a new game.
+  const byButtons = GUESS_BY.map((by) =>
+    h("button", {
+      type: "button",
+      innerHTML: by === "eye" ? EYE_ICON : EAR_ICON,
+      title: t.guessBy[by],
+      ariaLabel: t.guessBy[by],
+      onclick() {
+        settings.guesserBy = by;
+        saveSettings();
+        showBy();
+        stopSound?.();
+        restart();
+      },
+    }),
+  );
+  const showBy = () => {
+    byButtons.forEach((button, at) => (button.ariaPressed = String(GUESS_BY[at] === settings.guesserBy)));
+    // By ear, the CSS hides the notes until they're played right, and a tap on the staff sounds the note again.
+    staff.element.classList.toggle("by-ear", byEar());
+    staff.element.title = byEar() ? t.hearAgain : "";
   };
-  showView();
 
   const panel = h(
     "div",
     { className: "guesser" },
-    h("div", { className: "row" }, levelButton, t.notesAtATime, counts, score, viewButton),
+    h("div", { className: "row" }, h("div", { role: "group", className: "guess-by" }, ...byButtons), levelButton, t.notesAtATime, counts, score),
   );
 
   return {
     panel,
     banner,
-    board: board.element,
     // A new game.
-    start: restart,
+    start() {
+      showBy();
+      restart();
+    },
+    // By ear: whether the mic counts now, not while the note sounds or just after; the note again, for a tap on the
+    // staff; and its sound stopped, as when the run stops or the mode changes.
+    hearing: (now: number) => now >= listensAt,
+    replay: () => byEar() && targets.length > 0 && doneAt === null && sound(),
+    hush: () => stopSound?.(),
     // Draws the notes again, after a toggle changes their labels.
     relabel: drawStaff,
     // Each reading from the mic, or null when it hears nothing.
     read(frequency: number | null, now: number) {
       if (frequency !== null) soundAt = now;
+      const quiet = stopSound === null && now - Math.max(soundAt, listensAt) >= EAR_AGAIN_MS;
+      if (byEar() && doneAt === null && targets.length && (sounded !== right || quiet)) {
+        sounded = right;
+        sound();
+      }
       if (doneAt !== null) {
         const left = NEXT_AFTER_MS - (now - Math.max(doneAt, soundAt));
         if (left <= 0) return newRound(now);

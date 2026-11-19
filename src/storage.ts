@@ -40,23 +40,29 @@ export type Settings = {
   lastPieceId?: string;
   // What Listen does: show the note heard, the note guesser, or technique exercises.
   listenMode: ListenMode;
+  // Free play: whether a note picked on the staff sounds.
+  listenReferenceOn: boolean;
   // The note guesser: the level of its random notes, and notes shown at a time.
   guesserLevel: GuesserLevel;
   guesserCount: number;
+  // The note guesser by eye, the notes shown, or by ear, the notes heard and shown once played right.
+  guesserBy: GuessBy;
   // Technique: the notes played in one bow (one is a long bow, more are slurs), the string, and the beats each note lasts.
   bowNotes: number;
   bowString: StringName;
   bowBeats: number;
   // Technique: a long bow's notes each one beat with a beat's pause before the next, to place the finger before bowing.
   bowPause: boolean;
-  // The note guesser: the staff, the fingerboard or both; and tapes on the fingerboard.
-  guesserView: GuesserView;
+  // Tapes on the fingerboard.
+  // Listen's stage: the staff, the staff and fingerboard, or the fingerboard.
+  listenView: ListenView;
   fingerboardTapes: boolean;
 };
 
 export type ListenMode = "free" | "guesser" | "technique";
 export type GuesserLevel = "easy" | "medium" | "hard";
-export type GuesserView = "staff" | "both" | "board";
+export type ListenView = "staff" | "both" | "board";
+export type GuessBy = "eye" | "ear";
 
 // view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
 export type RecordingView = "lanes" | "bigStaff" | "staffOnly";
@@ -89,13 +95,15 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   planTargets: {},
   lastTargets: {},
   listenMode: "free",
+  listenReferenceOn: true,
   guesserLevel: "easy",
   guesserCount: 1,
+  guesserBy: "eye",
   bowNotes: 1,
   bowString: "A",
   bowBeats: 4,
   bowPause: false,
-  guesserView: "staff",
+  listenView: "staff",
   fingerboardTapes: true,
 };
 
@@ -122,6 +130,8 @@ export function getSettings() {
       highlighted: stored.highlighted ?? Object.keys((stored as { targetDays?: object }).targetDays ?? {}),
       // The note guesser was a switch before Listen had three modes.
       listenMode: stored.listenMode ?? ((stored as { guesserOn?: boolean }).guesserOn ? "guesser" : "free"),
+      // The stage's view was the note guesser's alone before it was all of Listen's.
+      listenView: stored.listenView ?? (stored as { guesserView?: ListenView }).guesserView ?? DEFAULT_SETTINGS.listenView,
     };
   }
   return settings;

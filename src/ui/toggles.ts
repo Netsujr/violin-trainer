@@ -20,6 +20,7 @@ export const STOP_ICON = svgIcon('<rect x="6" y="6" width="12" height="12" rx="1
 export const CHART_ICON = svgIcon('<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>');
 export const PAUSE_ICON = svgIcon('<path d="M8 5v14M16 5v14"/>');
 export const DOWNLOAD_ICON = svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>');
+export const EYE_ICON = svgIcon('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>');
 export const EAR_ICON = svgIcon('<path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/>');
 export const RECORD_ICON = svgIcon('<circle cx="12" cy="12" r="6" fill="currentColor"/>');
 export const LANES_ICON = svgIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/>');

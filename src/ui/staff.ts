@@ -1,5 +1,5 @@
 import { Note } from "tonal";
-import { BAR_BEATS, centsFrom, COMMON_TIME, midiOf, noteLabels, staffStepsFrom, type Meter } from "../music/notes";
+import { BAR_BEATS, centsFrom, COMMON_TIME, midiOf, naturalBelowF5, noteLabels, staffStepsFrom, type Meter } from "../music/notes";
 import { Accidental, BarNote, Beam, Dot, Formatter, Renderer, Stave, StaveNote, Voice, type RenderContext } from "vexflow/bravura";
 import { h } from "./dom";
 import type { Section } from "./highway";
@@ -239,6 +239,12 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   const played = createPlayedNote();
   const trace = createTrace(placeAt);
   let sheet = { width: 0, height: 0, top: 0 };
+  // Where the first line's top staff line is, for telling which line or space a tap is on.
+  let topLineY = 0;
+  // A lone note in the middle of the staff, as free play's is, rather than just after the clef.
+  let centred = false;
+  // How far the lone note's start is moved, so its head, not its start, lands in the middle, past any accidental.
+  let nudge = 0;
   let section: Section | null = null;
   let followedBeat = 0;
   // When set, an open sheet is drawn as large as fits this many pixels of height.
@@ -287,7 +293,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     }
   }
 
-  function render(notes: StaffNote[]) {
+  function render(notes: StaffNote[], moved = false) {
     element.replaceChildren();
     element.classList.toggle("collapsed", collapsed);
     const totalBeats = beatsIn(notes);
@@ -317,7 +323,11 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     lines.forEach(({ line, formatWidth }, lineIndex) => {
       const staveX = collapsed ? COLLAPSED_MARGIN : 0;
       const stave = new Stave(staveX, top + lineIndex * LINE_HEIGHT, fullWidth - staveX - 1).addClef("treble");
-      if (lineIndex === 0) addTime(stave, meter);
+      if (lineIndex === 0) {
+        addTime(stave, meter);
+        topLineY = stave.getYForLine(0);
+      }
+      if (centred && notes.length === 1) stave.setNoteStartX(stave.getX() + stave.getWidth() / 2 + nudge);
       if (collapsed) stave.setNoteStartX(COLLAPSED_NOTE_START);
       const drawn = drawLine(context, stave, line, formatWidth, labels, (...label) => svgText(svg, ...label));
       allNotes.push(...drawn);
@@ -325,6 +335,12 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     });
 
     noteXs = allNotes.map((note) => note.getAbsoluteX());
+    // A lone note's head is measured where it landed, and drawn once more, moved into the middle of the staff.
+    const off = centred && notes.length === 1 ? fullWidth / 2 - (noteXs[0] + NOTEHEAD_CENTER) : 0;
+    if (!moved && Math.abs(off) > 0.5) {
+      nudge += off;
+      return render(notes, true);
+    }
     noteYs = allNotes.map((note) => note.getYs()[0]);
     shownNotes = notes;
     drawSection(svg);
@@ -410,6 +426,16 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       if (!element.isConnected) requestAnimationFrame(scrollToBeat);
     },
     hidePlayed: () => played.group.remove(),
+    // Puts a lone note in the middle, or back after the clef, from the next draw.
+    centre(on: boolean) {
+      if (on !== centred) shown = "";
+      centred = on;
+    },
+    // The natural note on the first line at a height on the screen, by the line or space nearest it.
+    midiAt(clientY: number) {
+      const point = new DOMPoint(0, clientY).matrixTransform(element.querySelector("svg")!.getScreenCTM()!.inverse());
+      return naturalBelowF5(Math.round((point.y - topLineY) / STAFF_STEP_HEIGHT));
+    },
     // Shows what's being played against the note at index, or nothing with cents null.
     showPlayed(index: number, cents: number | null, inTune: boolean) {
       const note = shownNotes[index];

@@ -190,6 +190,10 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
     panel,
     // The pause switch, for Listen to put over the staff.
     pause: pauseButton,
+    // The note to play now, or in a rest or before the round, the next one, for the fingerboard.
+    get note() {
+      return notes.slice(Math.max(0, current)).find((note) => note.pitch) ?? null;
+    },
     start,
     stop,
     // Draws the notes again, after a toggle changes their labels.

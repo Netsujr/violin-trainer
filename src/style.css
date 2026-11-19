@@ -510,9 +510,8 @@ section > ul > li {
   visibility: hidden;
 }
 
-.listen:not([data-mode="guesser"]) .fingerboard,
 .listen[data-view="staff"] .fingerboard,
-.listen[data-mode="guesser"][data-view="board"] .stage-sheet,
+.listen[data-view="board"] .stage-sheet,
 .listen:not([data-mode="guesser"]) .guess-banner {
   display: none;
 }
@@ -579,7 +578,8 @@ section > ul > li {
 /* The labels' toggles, small in the staff's top left corner, and Technique's pause switch in its top right: bare
    icons, grey when off and in the theme's colour when on. */
 .stage-labels,
-.stage-pause {
+.stage-pause,
+.stage-speaker {
   position: absolute;
   top: 0.25rem;
   margin: 0;
@@ -590,12 +590,31 @@ section > ul > li {
   gap: 0.25rem;
 }
 
-.stage-pause {
+.stage-pause,
+.stage-speaker {
   right: 0.25rem;
 }
 
+/* In free play a tap on the staff picks a note to copy, and the note a tap would pick shows faintly under the pointer.
+   By ear in the note guesser, a tap sounds the note again, and the notes stay hidden, but for their labels as hints,
+   until they're played right. */
+.listen[data-mode="free"] .staff,
+.listen[data-mode="guesser"] .staff.by-ear {
+  cursor: pointer;
+}
+
+.listen[data-mode="free"] .staff.preview .vf-stavenote,
+.listen[data-mode="free"] .staff.preview svg > text {
+  opacity: 0.35;
+}
+
+.listen[data-mode="guesser"] .staff.by-ear .vf-stavenote:not(.right) {
+  visibility: hidden;
+}
+
 .stage-labels .box-toggle,
-.stage-pause .box-toggle {
+.stage-pause .box-toggle,
+.stage-speaker .box-toggle {
   min-width: 1.75rem;
   height: 1.75rem;
   padding: 0 0.25rem;
@@ -606,19 +625,22 @@ section > ul > li {
 }
 
 .stage-labels .box-toggle[aria-pressed="true"],
-.stage-pause .box-toggle[aria-pressed="true"] {
+.stage-pause .box-toggle[aria-pressed="true"],
+.stage-speaker .box-toggle[aria-pressed="true"] {
   color: var(--pico-primary);
   background: none;
 }
 
 .stage-labels .box-toggle .icon svg,
-.stage-pause .box-toggle .icon svg {
+.stage-pause .box-toggle .icon svg,
+.stage-speaker .box-toggle .icon svg {
   width: 1rem;
   height: 1rem;
 }
 
 .listen:not([data-mode="technique"]) .stage-pause,
-.listen[data-mode="guesser"][data-view="board"] .stage-labels {
+.listen:not([data-mode="free"]) .stage-speaker,
+.listen[data-view="board"] .stage-labels {
   display: none;
 }
 
@@ -726,7 +748,8 @@ section > ul > li {
   font-size: 0.875rem;
 }
 
-.listen-modes svg {
+.listen-modes svg,
+.guess-by svg {
   display: block;
   width: 1.25rem;
   height: 1.25rem;
@@ -1866,7 +1889,7 @@ a[download] {
     height: min(var(--stage-height), calc((var(--staff-room, 100cqi) - 1rem) * 170 / var(--sheet, 300)));
   }
 
-  .fullscreen .listen[data-mode="guesser"][data-view="both"] {
+  .fullscreen .listen[data-view="both"] {
     --staff-room: calc(70cqi - 0.75rem);
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barMarks, countNotes, staffStepsFrom } from "../src/music/notes";
+import { barMarks, countNotes, midiOf, naturalBelowF5, staffStepsFrom } from "../src/music/notes";
 
 describe("bars", () => {
   const lengths = (...beats: (number | undefined)[]) => barMarks(beats.map((length) => ({ pitch: "D4", beats: length })));
@@ -52,5 +52,13 @@ describe("placing a played pitch on the staff", () => {
   it("keeps a sharp on the natural's position", () => {
     expect(staffStepsFrom(FSHARP4, -100)).toBe(0); // F natural, so only the arrow can tell them apart
     expect(staffStepsFrom(D4, 100)).toBe(0); // D sharp
+  });
+});
+
+describe("naturalBelowF5", () => {
+  it("names the natural note on each line and space of the treble staff, and above and below it", () => {
+    expect([0, 1, 4, 8].map(naturalBelowF5)).toEqual(["F5", "E5", "B4", "E4"].map(midiOf));
+    expect(naturalBelowF5(13)).toBe(midiOf("G3"));
+    expect(naturalBelowF5(-2)).toBe(midiOf("A5"));
   });
 });

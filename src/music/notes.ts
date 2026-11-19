@@ -28,6 +28,12 @@ const ACCIDENTAL: Record<string, string> = { "": "", "#": "♯", b: "♭" };
 export const midiOf = (pitch: string) => Note.midi(pitch)!;
 export const pitchOf = (midi: number) => Note.fromMidiSharps(midi);
 export const frequencyOf = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
+// The natural note a number of lines and spaces below the treble staff's top line, F5: below it for more, above for
+// fewer than none.
+export function naturalBelowF5(steps: number) {
+  const diatonic = 5 * 7 + 3 - steps;
+  return midiOf(`${"CDEFGAB"[((diatonic % 7) + 7) % 7]}${Math.floor(diatonic / 7)}`);
+}
 export const nearestMidi = (frequency: number) => Math.round(69 + 12 * Math.log2(frequency / 440));
 export const BEAT_LENGTHS = [0.5, 1, 1.5, 2, 3, 4];
 export const BEAT_LABELS: Record<number, string> = { 0.5: "½", 1: "1", 1.5: "1½", 2: "2", 3: "3", 4: "4" };
