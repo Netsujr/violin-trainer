@@ -162,6 +162,30 @@ header details[open] > summary {
   margin: 0;
 }
 
+/* Settings as a gear, the size of record and the metronome beside it, with no arrow. */
+.settings-gear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  color: var(--pico-muted-color);
+}
+
+.settings-gear::after {
+  display: none;
+}
+
+.settings-gear svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+details[open] > .settings-gear {
+  color: var(--pico-primary);
+}
+
 .settings-panel {
   position: absolute;
   z-index: 10;
@@ -2302,11 +2326,45 @@ a[download] {
   font-weight: 700;
 }
 
+/* The plan: a block for each piece on a dark backing, so it reads on any shade of orange. A block is full once its
+   piece is done and half full partway, and they're all green once the plan's done. */
 .calendar-plan {
-  font-size: 1rem;
-  line-height: 0.5;
-  color: var(--pico-primary);
-  letter-spacing: 0.1em;
+  line-height: 0;
+}
+
+.plan-blocks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.plan-blocks i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.15);
+}
+
+.plan-blocks i.full {
+  background: #f3ead9;
+}
+
+.plan-blocks i.half {
+  background: linear-gradient(to right, #f3ead9 50%, rgb(255 255 255 / 0.15) 50%);
+}
+
+.calendar-plan.done .plan-blocks i {
+  background: #4cd07d;
+}
+
+.calendar-legend {
+  margin-top: -0.5rem;
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
 }
 
 .day-details {
@@ -2478,6 +2536,18 @@ a[download] {
 
   .calendar-minutes {
     font-size: 0.6875rem;
+  }
+
+  /* Smaller blocks, so up to five pieces fit across a phone's tile. */
+  .plan-blocks {
+    gap: 1px;
+    padding: 1px;
+  }
+
+  .plan-blocks i {
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
   }
 }
 

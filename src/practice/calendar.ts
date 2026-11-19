@@ -72,3 +72,11 @@ export function planProgress(done: number, target?: number) {
   const met = target === undefined ? done > 0 : done >= target;
   return { status: met ? "✓" : done > 0 ? "◐" : "○", percent: target ? Math.min(100, (done / target) * 100) : 0 };
 }
+
+// How much of a day's plan was done: how many pieces got there, by planProgress, and the share of the whole plan, each
+// piece counting equally, one with a target partway by its minutes.
+export function planDone(plan: string[], targets: Record<string, number> = {}, practised: Map<string, number>) {
+  const progress = plan.map((pieceId) => ({ ...planProgress(practised.get(pieceId) ?? 0, targets[pieceId]), timed: targets[pieceId] !== undefined }));
+  const shares = progress.map((piece) => (piece.timed ? piece.percent / 100 : piece.status === "✓" ? 1 : 0));
+  return { met: progress.filter((piece) => piece.status === "✓").length, share: shares.reduce((sum, share) => sum + share, 0) / plan.length, shares };
+}

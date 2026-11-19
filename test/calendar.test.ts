@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayKey, minutesByDay, monthGrid, piecesOn, planProgress, summarise } from "../src/practice/calendar";
+import { dayKey, minutesByDay, monthGrid, piecesOn, planDone, planProgress, summarise } from "../src/practice/calendar";
 import type { LogEntry } from "../src/practice/log";
 
 const entry = (startedAt: Date, pieceId: string, minutes: number): LogEntry => ({
@@ -73,5 +73,14 @@ describe("calendar", () => {
     expect(planProgress(12, 10)).toEqual({ status: "✓", percent: 100 });
     expect(planProgress(0)).toEqual({ status: "○", percent: 0 });
     expect(planProgress(2)).toEqual({ status: "✓", percent: 0 });
+  });
+});
+
+describe("planDone", () => {
+  it("counts the pieces that got there, and the share of the plan, a timed piece partway by its minutes", () => {
+    const practised = new Map([["a", 10], ["b", 10]]);
+    expect(planDone(["a", "b", "c"], { a: 10, b: 20 }, practised)).toEqual({ met: 1, share: 0.5, shares: [1, 0.5, 0] });
+    expect(planDone(["a", "b"], {}, practised)).toEqual({ met: 2, share: 1, shares: [1, 1] });
+    expect(planDone(["c"], undefined, practised)).toEqual({ met: 0, share: 0, shares: [0] });
   });
 });

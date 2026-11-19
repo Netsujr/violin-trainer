@@ -7,17 +7,18 @@ import { createPieceMenu } from "./practice/pieceMenu";
 import { COPY_ICON, PASTE_ICON } from "./toggles";
 
 const PLAN_COLUMNS = 3;
-const TARGET_STEP = 5;
-const MOST_MINUTES = 60;
+// The targets a tap steps through, in minutes: a few short ones, then fives up to an hour.
+const TARGETS = [1, 2, 3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
 const MINUS_SHOWN_MS = 5000;
 
 // A copied plan, with its targets, kept while the app is open, to paste into other days.
 let copied: { ids: string[]; targets: Record<string, number> } | null = null;
 
-// The next target: up from none to 5 minutes, then in fives to 60, then back to none; or down again, to none.
+// The next target: up from none through TARGETS, then back to none; or down again, to none. One saved between steps
+// moves to the next step either way.
 export function nextTarget(target: number | undefined, by: 1 | -1) {
-  if (by > 0) return target === undefined ? TARGET_STEP : target >= MOST_MINUTES ? undefined : target + TARGET_STEP;
-  return target === undefined || target <= TARGET_STEP ? undefined : target - TARGET_STEP;
+  if (target === undefined) return by > 0 ? TARGETS[0] : undefined;
+  return by > 0 ? TARGETS.find((minutes) => minutes > target) : TARGETS.findLast((minutes) => minutes < target);
 }
 
 type Options = {

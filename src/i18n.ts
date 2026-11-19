@@ -109,6 +109,8 @@ const en = {
   tapForTime: "Tap to set a time to practise it",
   targetProgress: (done: string, target: number) => `${done} of ${target} min practised`,
   planTotal: (done: string, target: number) => `${done} of ${target} min`,
+  planDoneOf: (done: number, planned: number) => `${done} of ${planned} planned done`,
+  calendarLegend: "The brighter the orange, the more minutes of practice. Each block is a planned piece: full once it's done, half partway, and all green once the whole plan is done.",
   pastePlan: (count: number) => `Paste plan (${count})`,
 
   freePlay: "Free play",
@@ -359,6 +361,8 @@ const pt: Strings = {
   tapForTime: "Toque para definir um tempo de prática",
   targetProgress: (done, target) => `${done} de ${target} min praticados`,
   planTotal: (done, target) => `${done} de ${target} min`,
+  planDoneOf: (done, planned) => `${done} de ${planned} planejadas feitas`,
+  calendarLegend: "Quanto mais forte o laranja, mais minutos de prática. Cada bloco é uma peça planejada: cheio quando feita, meio cheio quando em andamento, e todos verdes quando o plano inteiro está feito.",
   pastePlan: (count) => `Colar plano (${count})`,
 
   freePlay: "Prática livre",

@@ -1,6 +1,7 @@
 import { t, type Language } from "../i18n";
 import { getSettings, passCents, saveSettings } from "../storage";
 import { h } from "./dom";
+import { GEAR_ICON } from "./toggles";
 
 const LANGUAGES: [Language, string][] = [
   ["en", "EN"],
@@ -65,7 +66,8 @@ export function createSettingsPanel(changeLanguage: (language: Language) => void
   return h(
     "details",
     {},
-    h("summary", {}, t.settings),
+    // A gear, named in its tooltip and for screen readers.
+    h("summary", { className: "settings-gear", innerHTML: GEAR_ICON, title: t.settings, ariaLabel: t.settings }),
     h(
       "div",
       { className: "settings-panel" },

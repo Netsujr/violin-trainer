@@ -1,5 +1,5 @@
 import { localNumber, localTitle, t } from "../i18n";
-import { dayKey, minutesByDay, monthGrid, piecesOn, summarise } from "../practice/calendar";
+import { dayKey, minutesByDay, monthGrid, piecesOn, planDone, summarise } from "../practice/calendar";
 import type { LogEntry } from "../practice/log";
 import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording, type RecordingView } from "../storage";
 import { planSection } from "./calendarPlan";
@@ -130,6 +130,14 @@ export function calendarScreen(): Screen {
         const key = dayKey(day);
         const played = minutes.get(key) ?? 0;
         const planned = planFor(key).length;
+        // The day's plan: a block for each piece, full once done, half partway, all green once the plan's done.
+        const done = planned ? planDone(planFor(key), settings.planTargets[key], new Map(piecesOn(entries, key).map((piece) => [piece.pieceId, piece.minutes]))) : null;
+        const plan = h(
+          "span",
+          { className: `calendar-plan${done?.share === 1 ? " done" : ""}` },
+          ...(done ? [h("span", { className: "plan-blocks" }, ...done.shares.map((share) => h("i", { className: share === 1 ? "full" : share > 0 ? "half" : "" })))] : []),
+        );
+        const date = day.toLocaleDateString(t.locale, { weekday: "long", day: "numeric", month: "long" });
         const cell = h(
           "button",
           {
@@ -137,7 +145,7 @@ export function calendarScreen(): Screen {
             className: ["calendar-day", day.getMonth() !== shown.getMonth() && "other-month", key === today && "today", key === selected && "selected", played > 0 && "practised"]
               .filter(Boolean)
               .join(" "),
-            ariaLabel: day.toLocaleDateString(t.locale, { weekday: "long", day: "numeric", month: "long" }),
+            ariaLabel: [date, ...(played > 0 ? [`${Math.max(1, Math.round(played))} min`] : []), ...(done ? [t.planDoneOf(done.met, planned)] : [])].join(", "),
             ariaPressed: String(key === selected),
             onclick() {
               selected = key;
@@ -147,7 +155,7 @@ export function calendarScreen(): Screen {
           },
           h("span", { className: "calendar-date" }, String(day.getDate())),
           h("span", { className: "calendar-minutes" }, played > 0 ? `${Math.max(1, Math.round(played))}′` : ""),
-          h("span", { className: "calendar-plan" }, planned > 0 ? "•".repeat(Math.min(planned, 3)) : ""),
+          plan,
         );
         // Busier days are a stronger orange.
         if (played > 0) cell.style.setProperty("--level", `${Math.round(15 + 50 * (played / busiest))}%`);
@@ -240,6 +248,7 @@ export function calendarScreen(): Screen {
         h("button", { type: "button", className: "secondary outline", textContent: "›", ariaLabel: t.nextMonth, onclick: () => moveMonth(1) }),
       ),
       grid,
+      h("p", { className: "calendar-legend" }, t.calendarLegend),
       details,
       h("div", { className: "calendar-storage-row" }, storage, ...backupButtons((problem) => ((storage.textContent = problem), (storage.className = "calendar-storage warning")))),
     ),
