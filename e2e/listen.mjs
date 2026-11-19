@@ -441,6 +441,8 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
   check("the speaker switch silences it, keeping the note, and is saved", (await drawn()) === 1 && (await recordings(s.page)).at(-1).stopped && (await savedSettings(s.page)).listenReferenceOn === false);
   await speaker.click(); await sleep(300);
   await s.page.mouse.click(middle.x, middle.y); await sleep(200);
+  // Away from the staff, so the note a tap would pick doesn't show faintly in its place.
+  await s.page.mouse.move(5, 5); await sleep(100);
   check("a second tap takes the note away, and the sound", (await drawn()) === 0 && (await recordings(s.page)).at(-1).stopped);
   await s.page.click('.listen-modes button[aria-label="Note guesser"]');
   check("only free play has the speaker switch", await speaker.isHidden());
