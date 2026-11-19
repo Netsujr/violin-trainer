@@ -14,6 +14,20 @@ const MINUS_SHOWN_MS = 5000;
 // A copied plan, with its targets, kept while the app is open, to paste into other days.
 let copied: { ids: string[]; targets: Record<string, number> } | null = null;
 
+// Pastes the copied plan into a day: what it doesn't have yet, with its targets, each one the piece's last too.
+export function pasteInto(day: string) {
+  const settings = getSettings();
+  const plan = settings.plan[day] ?? [];
+  const added = copied?.ids.filter((id) => !plan.includes(id)) ?? [];
+  if (!added.length) return;
+  settings.plan[day] = [...plan, ...added];
+  for (const id of added) {
+    const minutes = copied!.targets[id];
+    if (minutes) (settings.planTargets[day] ??= {})[id] = settings.lastTargets[id] = minutes;
+  }
+  saveSettings();
+}
+
 // The next target: up from none through TARGETS, then back to none; or down again, to none. One saved between steps
 // moves to the next step either way.
 export function nextTarget(target: number | undefined, by: 1 | -1) {
@@ -29,11 +43,14 @@ type Options = {
   practised: Map<string, number>;
   // A piece added, taken off or pasted in.
   onChange: () => void;
+  // Whether days are being picked to paste into, and the paste button's press, which starts or ends picking.
+  picking: boolean;
+  onPaste: () => void;
 };
 
 // A day's plan: its pieces in a faint table, each practised against an optional target in minutes, then the menu to add
 // more, and copy and paste between days. Tapping a piece raises its target, and a − beside it for 5 seconds lowers it.
-export function planSection({ day, editable, pieces, practised, onChange }: Options) {
+export function planSection({ day, editable, pieces, practised, onChange, picking, onPaste }: Options) {
   const settings = getSettings();
   const plan = settings.plan[day] ?? [];
   const targetOf = (pieceId: string) => settings.planTargets[day]?.[pieceId];
@@ -122,22 +139,22 @@ export function planSection({ day, editable, pieces, practised, onChange }: Opti
       onChange();
     },
   });
-  // Pasting adds what this day doesn't have yet, with its targets.
+  // Paste starts picking days to paste into, each tapped on the calendar, and ends it, pressed, when pressed again.
+  const pasteLabel = picking ? t.donePasting : t.pastePlan(copied?.ids.length ?? 0);
   const paste = h("button", {
     type: "button",
     className: "secondary outline icon-button plan-icon",
     innerHTML: PASTE_ICON,
-    title: t.pastePlan(copied?.ids.length ?? 0),
-    ariaLabel: t.pastePlan(copied?.ids.length ?? 0),
-    onclick() {
-      const added = copied!.ids.filter((id) => !plan.includes(id));
-      setPlan([...plan, ...added], Object.fromEntries(added.flatMap((id) => (copied!.targets[id] ? [[id, copied!.targets[id]]] : []))));
-    },
+    title: picking ? t.donePasting : `${pasteLabel}: ${t.pasteHint}`,
+    ariaLabel: pasteLabel,
+    ariaPressed: String(picking),
+    onclick: onPaste,
   });
   showTotal();
   return {
     // For the day's heading, on the right: paste and copy as icons, then the menu. Paste comes first, so copy stays put.
-    tools: [...(editable && copied?.ids.length ? [paste] : []), ...(plan.length ? [copy] : []), ...(editable ? [add.button, add.menu] : [])],
+    // Paste shows on any day once a plan's copied, a past one too, as it pastes into days picked on the calendar.
+    tools: [...(copied?.ids.length ? [paste] : []), ...(plan.length ? [copy] : []), ...(editable ? [add.button, add.menu] : [])],
     table: [h("h4", {}, t.plan, " ", total), h("ul", { className: "plan", ariaLabel: plan.length ? t.plan : t.nothingPlanned }, ...plan.map(cell), ...empty)],
   };
 }

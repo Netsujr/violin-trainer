@@ -1,13 +1,13 @@
 import { localNumber, localTitle, t } from "../i18n";
 import { dayKey, minutesByDay, monthGrid, piecesOn, planDone, summarise } from "../practice/calendar";
 import type { LogEntry } from "../practice/log";
-import { allPieces, deleteRecording, getRecording, getSettings, loadLog, type Recording, type RecordingView } from "../storage";
-import { planSection } from "./calendarPlan";
+import { allPieces, deleteRecording, getRecording, getSettings, loadLog, saveSettings, type Recording, type RecordingView } from "../storage";
+import { pasteInto, planSection } from "./calendarPlan";
 import { backupButtons } from "./backup";
 import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
 import { waveformPlayer } from "./waveform";
-import { EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON } from "./toggles";
+import { EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON, TRASH_ICON } from "./toggles";
 
 const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
 
@@ -96,6 +96,9 @@ export function calendarScreen(): Screen {
   const shown = new Date();
   shown.setDate(1);
   let selected = today;
+  // While a copied plan's being pasted: picking, each day from today on is tapped to paste into, and shows it's done.
+  let picking = false;
+  const pasted = new Set<string>();
   const urls: string[] = [];
 
   const monthTitle = h("h2", { className: "calendar-month" });
@@ -124,9 +127,7 @@ export function calendarScreen(): Screen {
     const days = monthGrid(shown.getFullYear(), shown.getMonth());
     const busiest = Math.max(1, ...days.map((day) => minutes.get(dayKey(day)) ?? 0));
     const weekdays = days.slice(0, 7).map((day) => h("span", { className: "calendar-weekday" }, day.toLocaleDateString(t.locale, { weekday: "short" })));
-    grid.replaceChildren(
-      ...weekdays,
-      ...days.map((day) => {
+    const tiles = days.map((day) => {
         const key = dayKey(day);
         const played = minutes.get(key) ?? 0;
         const planned = planFor(key).length;
@@ -142,12 +143,27 @@ export function calendarScreen(): Screen {
           "button",
           {
             type: "button",
-            className: ["calendar-day", day.getMonth() !== shown.getMonth() && "other-month", key === today && "today", key === selected && "selected", played > 0 && "practised"]
+            className: [
+              "calendar-day",
+              day.getMonth() !== shown.getMonth() && "other-month",
+              key === today && "today",
+              key === selected && "selected",
+              played > 0 && "practised",
+              picking && key >= today && "pickable",
+              pasted.has(key) && "pasted",
+            ]
               .filter(Boolean)
               .join(" "),
-            ariaLabel: [date, ...(played > 0 ? [`${Math.max(1, Math.round(played))} min`] : []), ...(done ? [t.planDoneOf(done.met, planned)] : [])].join(", "),
+            ariaLabel: [date, ...(played > 0 ? [`${Math.max(1, Math.round(played))} min`] : []), ...(done ? [t.planDoneOf(done.met, planned)] : []), ...(picking && key >= today ? [pasted.has(key) ? t.pastedHere : t.pasteHere] : [])].join(", "),
             ariaPressed: String(key === selected),
             onclick() {
+              // Picking, a tap pastes into the day, if it can still be planned, and the day picked stays.
+              if (picking) {
+                if (key < today) return;
+                pasteInto(key);
+                pasted.add(key);
+                return rerender();
+              }
               selected = key;
               renderMonth();
               renderDay();
@@ -160,14 +176,37 @@ export function calendarScreen(): Screen {
         // Busier days are a stronger orange.
         if (played > 0) cell.style.setProperty("--level", `${Math.round(15 + 50 * (played / busiest))}%`);
         cell.classList.toggle("busy", played / busiest > 0.5);
-        return cell;
-      }),
-    );
+        // Picking, a day with a plan has a red trash in its corner, on top of it, as its own button, clearing the plan.
+        if (!picking || key < today || !planned) return cell;
+        const clear = h("button", {
+          type: "button",
+          className: "day-clear",
+          innerHTML: TRASH_ICON,
+          title: t.clearPlan(date),
+          ariaLabel: t.clearPlan(date),
+          onclick() {
+            delete settings.plan[key];
+            delete settings.planTargets[key];
+            saveSettings();
+            pasted.delete(key);
+            rerender();
+          },
+        });
+        return h("div", { className: "calendar-cell" }, cell, clear);
+    });
+    grid.replaceChildren(...weekdays, ...tiles);
   }
 
   function rerender() {
     renderMonth();
     renderDay();
+  }
+
+  // Paste, pressed: picking days to paste into starts, or ends.
+  function togglePicking() {
+    picking = !picking;
+    pasted.clear();
+    rerender();
   }
 
   function renderDay() {
@@ -186,7 +225,7 @@ export function calendarScreen(): Screen {
     );
     const plan =
       planFor(selected).length || canPlan
-        ? planSection({ day: selected, editable: canPlan, pieces, practised: new Map(practised.map((piece) => [piece.pieceId, piece.minutes])), onChange: rerender })
+        ? planSection({ day: selected, editable: canPlan, pieces, practised: new Map(practised.map((piece) => [piece.pieceId, piece.minutes])), onChange: rerender, picking, onPaste: togglePicking })
         : { tools: [], table: [] };
     // The date with the plan's tools beside it, then the plan, then what was practised, each set apart by a line.
     details.replaceChildren(
@@ -248,7 +287,6 @@ export function calendarScreen(): Screen {
         h("button", { type: "button", className: "secondary outline", textContent: "›", ariaLabel: t.nextMonth, onclick: () => moveMonth(1) }),
       ),
       grid,
-      h("p", { className: "calendar-legend" }, t.calendarLegend),
       details,
       h("div", { className: "calendar-storage-row" }, storage, ...backupButtons((problem) => ((storage.textContent = problem), (storage.className = "calendar-storage warning")))),
     ),

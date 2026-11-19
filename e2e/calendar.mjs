@@ -67,7 +67,14 @@ await pickDay(1); await sleep(150);
 const pasteTools = await page.locator(".day-head .plan-add").evaluate((row) => [...row.children].filter((child) => child.offsetParent).map((child) => child.ariaLabel || child.textContent).join());
 check("another day offers paste, left of the rest", pasteTools === "Paste plan (3),Add a piece to the plan", pasteTools);
 await page.locator('button[aria-label="Paste plan (3)"]').click(); await sleep(150);
+check("paste starts picking days: each from today on shows a +, and paste is pressed, offering to finish", (await page.locator(".calendar-day.pickable").count()) > 1 && (await page.locator('button[aria-label="Done pasting"]').getAttribute("aria-pressed")) === "true");
+await pickDay(1); await sleep(150);
 check("pasting brings the pieces and their targets", (await page.locator(".plan-item:not(.empty)").count()) === 3 && (await piece("D (Ré) major").innerText()) === "○ D (Ré) major (10 min)" && (await piece("Twinkle").innerText()).endsWith("(2 min)"));
+const picked = await page.locator(".calendar-day.selected .calendar-date").innerText();
+await pickDay(2); await sleep(150);
+check("each day tapped is pasted into and ticked, and the day picked stays", (await page.locator(".calendar-day.pasted").count()) === 2 && (await page.locator(".calendar-day.selected .calendar-date").innerText()) === picked);
+await page.locator('button[aria-label="Done pasting"]').click(); await sleep(150);
+check("paste again ends picking", (await page.locator(".calendar-day.pickable, .calendar-day.pasted").count()) === 0 && (await page.locator('button[aria-label="Paste plan (3)"]').getAttribute("aria-pressed")) === "false");
 await page.locator(".plan-add .piece-select").click();
 check("the add menu stars highlighted pieces", (await page.locator(".plan-add .piece-menu button.highlighted").allInnerTexts()).join() === "Hills and Dales");
 await page.locator(".plan-add .piece-menu button[value='ode-to-joy']").evaluate((item) => item.click()); await sleep(150);
@@ -100,3 +107,24 @@ await page.locator("nav button").nth(3).click(); await sleep(250);
 check("pt: translated", (await page.locator(".plan-total").innerText()) === "20 de 32 min" && (await page.locator('button[aria-label="Copiar plano"]').count()) === 1);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();
+
+// A past day's plan can be copied, and pasted from there. Picking, a day with a plan has a trash that clears it, and a
+// tap anywhere else on a day pastes.
+{
+  const s = await open(OUT + "calendar-silent.wav");
+  const { page } = s;
+  await seed(page, { settings: { plan: { [key(-1)]: ["d-major-1oct", "twinkle-twinkle"], [key(1)]: ["ode-to-joy"], [key(2)]: ["a-major-1oct"] } } });
+  await nav(page, "Calendar"); await sleep(300);
+  const day = (offset) => page.locator(".calendar-day:not(.other-month)").filter({ has: page.locator(".calendar-date", { hasText: new RegExp(`^${new Date(Date.now() + offset * 864e5).getDate()}$`) }) }).first();
+  await day(-1).click(); await sleep(150);
+  await page.locator('button[aria-label="Copy plan"]').click(); await sleep(100);
+  check("a past day's plan can be copied, and pasting starts from there", (await page.locator('button[aria-label="Paste plan (2)"]').count()) === 1);
+  await page.locator('button[aria-label="Paste plan (2)"]').click(); await sleep(150);
+  check("picking, each day with a plan from today on has a trash", (await page.locator(".day-clear").count()) === 2);
+  await page.locator(".calendar-cell").first().locator(".day-clear").click(); await sleep(150);
+  await day(2).click({ position: { x: 20, y: 15 } }); await sleep(150);
+  const plans = await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).plan);
+  check("its trash clears a day's plan, and a tap elsewhere pastes", plans[key(1)] === undefined && plans[key(2)].join() === "a-major-1oct,d-major-1oct,twinkle-twinkle", JSON.stringify(plans));
+  check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}
