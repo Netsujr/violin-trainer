@@ -90,9 +90,10 @@ await stop(page); await sleep(200);
 
 // Loop with Don't wait
 await freshPractice(page, 120);
-await loop().click(); await dontWait().click(); await sleep(200);
+// A count-in set doesn't apply with Don't wait, which hides it, so it's set first.
 await setCountIn(page, 4);
-check("the line follows both", (await note_()).startsWith("Keeps moving · Loops until you press Stop"), await note_());
+await loop().click(); await dontWait().click(); await sleep(200);
+check("the line follows both, and the count-in, which doesn't apply, is hidden", (await page.locator(".count-in").isHidden()) && (await note_()).startsWith("Keeps moving · Loops until you press Stop"), await note_());
 await followNotes(page, { midis: D });
 await begin(page);
 await waitForText(page, "last 100%");
@@ -117,7 +118,7 @@ const tone = async () => (await recordings(page)).at(-1) ?? null;
 const play = () => page.click('button[aria-label="Play reference"]');
 const off = () => page.click('button[aria-label="Stop reference"]');
 await play(); await sleep(300);
-check("pressing it bows the first note's pitch on a violin", (await tone())?.hz === 294 && (await tone()).state === "running", JSON.stringify(await tone()));
+check("pressing it bows the first note's pitch on a violin", (await tone())?.midi === 62 && (await tone()).state === "running", JSON.stringify(await tone()));
 check("the button turns green and offers to stop", (await page.locator('button[aria-label="Stop reference"]').count()) === 1 && (await color(page.locator('button[aria-label="Stop reference"]'))) === GREEN);
 await sleep(2500);
 check("it's still sounding well past its recording's length, looping", !(await tone()).stopped && (await tone()).loop, JSON.stringify(await tone()));
@@ -126,9 +127,9 @@ check("pressing again stops it", (await tone()).stopped && (await page.locator('
 await play(); await sleep(300);
 await page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84); await sleep(300);
 const moved = await recordings(page);
-check("it moves with the current note, bowing the new one", moved.at(-1).hz === 330 && !moved.at(-1).stopped && moved.at(-2).stopped, JSON.stringify(moved));
+check("it moves with the current note, bowing the new one", moved.at(-1).midi === 64 && !moved.at(-1).stopped && moved.at(-2).stopped, JSON.stringify(moved));
 await pickPiece(page, "a-major-1oct"); await sleep(300);
-check("and with the piece", (await tone()).hz === 440, JSON.stringify(await tone()));
+check("and with the piece", (await tone()).midi === 69, JSON.stringify(await tone()));
 await nav(page, "Calendar"); await sleep(150);
 check("leaving Practice stops it", (await tone()).stopped);
 await nav(page, "Practice"); await sleep(200);

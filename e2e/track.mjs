@@ -83,7 +83,7 @@ await card().locator('button[aria-label="Practice"]').click(); await sleep(500);
 const playAlong = () => page.locator('.section-bar .box-toggle[title^="Play along with"]');
 const ear = () => page.locator('.section-bar .box-toggle[aria-label="Listen to my notes"]');
 check("Practice puts its switches on the lanes' bar: playing along on, the mic off", (await playAlong().isVisible()) && (await playAlong().getAttribute("aria-pressed")) === "true" && (await ear().getAttribute("aria-pressed")) === "false" && (await page.locator(".waveform").count()) === 0);
-check("and its speed stands in for the header's BPM", (await page.locator(".section-bar .speed").isVisible()) && !(await page.locator("header .metronome-button").isVisible()) && (await page.locator(".options .speed output").innerText()) === "Speed 100%");
+check("and its speed stands in for the header's BPM", (await page.locator(".section-bar .speed").isVisible()) && !(await page.locator("header .metronome-button").isVisible()) && (await page.locator(".section-bar .speed output").innerText()) === "Speed 100%");
 check("the line says so", (await page.locator(".mode-note").innerText()).startsWith("Plays along with the track"), await page.locator(".mode-note").innerText());
 await page.click('button:text-is("Start")'); await sleep(3500);
 check("Start plays along, with the lanes moving", (await lanes()).left > 0 && !(await page.evaluate(() => window.trackAudio.paused)));

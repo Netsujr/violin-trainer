@@ -46,7 +46,7 @@ export function createSettingsPanel(changeLanguage: (language: Language) => void
   const yellowRange = range(t.yellowZone, "toleranceCents", 10, 50, 1, "cents");
   const yellowButton = h("button", {
     type: "button",
-    className: "zone yellow",
+    className: "zone-cell",
     title: t.yellowZone,
     ariaLabel: t.yellowZone,
     onclick() {
@@ -54,7 +54,7 @@ export function createSettingsPanel(changeLanguage: (language: Language) => void
       saveSettings();
       showYellow();
     },
-  });
+  }, h("span", { className: "zone yellow" }));
   const showYellow = () => {
     yellowButton.ariaPressed = String(settings.yellowOn);
     yellowRange.forEach((part) => (part.hidden = !settings.yellowOn));
@@ -79,7 +79,7 @@ export function createSettingsPanel(changeLanguage: (language: Language) => void
           ...LANGUAGES.map(([language, label]) => h("button", { textContent: label, ariaPressed: String(language === settings.language), onclick: () => changeLanguage(language) })),
         ),
       ),
-      h("div", { className: "setting zone-setting" }, h("span", { className: "zone green", title: t.greenZone }), ...range(t.greenZone, "greenCents", 3, 25, 1, "cents")),
+      h("div", { className: "setting zone-setting" }, h("span", { className: "zone-cell", title: t.greenZone }, h("span", { className: "zone green" })), ...range(t.greenZone, "greenCents", 3, 25, 1, "cents")),
       h("div", { className: "setting zone-setting" }, yellowButton, ...yellowRange),
       slider(t.holdTime, "holdMs", 100, 500, 10, "ms"),
       slider(t.micSensitivity, "minRms", 0.002, 0.05, 0.001, "RMS"),

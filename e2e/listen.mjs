@@ -227,7 +227,7 @@ wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
   const needleTolerance = () => s.page.evaluate(() => document.documentElement.style.getPropertyValue("--tolerance"));
   const loose = await needleTolerance();
   await s.page.click("header summary");
-  await s.page.click("button.zone.yellow");
+  await s.page.click('button[aria-label="Close enough"]');
   check("yellow off takes the needle's yellow away at once, and hides its slider", loose === "40%" && (await needleTolerance()) === "10%" && (await s.page.locator('input[aria-label="Close enough"]').isHidden()), `${loose} → ${await needleTolerance()}`);
   await s.page.click("header summary");
   await start(s.page);

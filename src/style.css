@@ -40,11 +40,13 @@
 }
 
 /* Header */
+/* The Settings panel hangs from the header's right edge, so it stays on screen however the header wraps. */
 header {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1.5rem;
+  gap: 0.75rem 1rem;
   padding-bottom: 0.75rem;
   margin-bottom: 1.25rem;
   border-bottom: 1px solid #6b3a1e;
@@ -85,8 +87,8 @@ nav [role="group"] button {
   height: 1.375rem;
 }
 
-/* The metronome: slid sideways for its BPM, so a touch doesn't scroll the page. Its BPM is a small tag in the top
-   right corner. */
+/* The metronome: slid sideways for its BPM, so a touch doesn't scroll the page. Its BPM is a small tag inside the top
+   right corner, like the count-in's beats, so it's never cut off. */
 .metronome-button {
   position: relative;
   touch-action: none;
@@ -95,12 +97,12 @@ nav [role="group"] button {
 
 .bpm-badge {
   position: absolute;
-  top: -0.4375rem;
-  right: -0.5rem;
-  padding: 0 0.25rem;
-  font-size: 0.6875rem;
+  top: 1px;
+  right: 1px;
+  padding: 0 0.1875rem;
+  font-size: 0.625rem;
   font-weight: 800;
-  line-height: 1rem;
+  line-height: 0.875rem;
   font-variant-numeric: tabular-nums;
   /* The theme's text and page colours swapped, the strongest contrast in light or dark; on, a button's colours. */
   color: var(--pico-background-color);
@@ -153,7 +155,6 @@ nav button:not([aria-current]),
 }
 
 header details {
-  position: relative;
   margin: 0;
 }
 
@@ -164,7 +165,7 @@ header details[open] > summary {
 .settings-panel {
   position: absolute;
   z-index: 10;
-  top: calc(100% + 1.75rem);
+  top: calc(100% + 0.5rem);
   right: 0;
   width: min(22rem, calc(100vw - 2rem));
   padding: 1rem;
@@ -198,12 +199,23 @@ header details[open] > summary {
   text-align: right;
 }
 
-.zone {
+/* Each zone's box sits in a cell big enough to tap, which for yellow is its switch. */
+.zone-cell {
+  display: inline-flex;
   flex: none;
-  width: 1.75rem;
-  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.25rem;
   margin: 0;
   padding: 0;
+  background: none;
+  border: 0;
+}
+
+.zone {
+  width: 1.75rem;
+  height: 1rem;
   border: 1px solid transparent;
   border-radius: 0.25rem;
 }
@@ -217,7 +229,7 @@ header details[open] > summary {
 }
 
 /* Yellow off: an empty outline, and only green counts. */
-.zone.yellow[aria-pressed="false"] {
+[aria-pressed="false"] > .zone.yellow {
   background: none;
   border-color: var(--pico-muted-border-color);
 }
@@ -1546,10 +1558,6 @@ a[download] {
   header .header-tools {
     margin-left: 0;
   }
-
-  .settings-panel {
-    top: calc(100% + 0.75rem);
-  }
 }
 
 /* Phones in portrait. */
@@ -1606,10 +1614,17 @@ a[download] {
     padding-block: 0.5rem;
   }
 
+  /* One line, so closer together, with record and the metronome a little smaller. */
   header {
     flex-wrap: nowrap;
+    column-gap: 0.5rem;
     padding-bottom: 0.5rem;
     margin-bottom: 0.5rem;
+  }
+
+  header .header-tools .box-toggle {
+    min-width: 2.25rem;
+    height: 2.25rem;
   }
 
   .brand {

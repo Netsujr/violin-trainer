@@ -109,8 +109,8 @@ export const spyOnRecordings = (page) => page.evaluate(() => {
   AudioBufferSourceNode.prototype.start = function (...args) { window.recordings.push(this); this.stopped = false; return start.apply(this, args); };
   AudioBufferSourceNode.prototype.stop = function (...args) { this.stopped = true; return stop.apply(this, args); };
 });
-// Each recording played so far: its pitch, as heard, read from its own samples with YIN, whether it loops, and whether
-// it's been stopped.
+// Each recording played so far: its pitch, as heard, read from its own samples with YIN, and the nearest note's MIDI
+// number, whether it loops, and whether it's been stopped.
 export const recordings = (page) => page.evaluate(() => window.recordings.map((source) => {
   const data = source.buffer.getChannelData(0), rate = source.buffer.sampleRate, from = Math.round(0.6 * rate), size = 2048, maxLag = Math.ceil(rate / 150);
   const d = new Float64Array(maxLag + 2), c = new Float64Array(maxLag + 2);
@@ -121,7 +121,8 @@ export const recordings = (page) => page.evaluate(() => window.recordings.map((s
   while (lag < maxLag && !(c[lag] < 0.15 && c[lag] <= c[lag + 1])) lag++;
   const [a, b, e] = [c[lag - 1], c[lag], c[lag + 1]];
   const period = lag + ((a - e) / (2 * (a - 2 * b + e)) || 0);
-  return { hz: Math.round((rate / period) * source.playbackRate.value), loop: source.loop, stopped: source.stopped, state: source.context.state };
+  const hz = (rate / period) * source.playbackRate.value;
+  return { hz: Math.round(hz), midi: Math.round(69 + 12 * Math.log2(hz / 440)), loop: source.loop, stopped: source.stopped, state: source.context.state };
 }));
 // Arms recording for the next run, or disarms it, with the record button in the header.
 export async function setRecord(page, on) {

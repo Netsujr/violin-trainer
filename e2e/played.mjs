@@ -148,7 +148,8 @@ await page.click('button:text-is("Start")');
 await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 3 of 15", null, { timeout: 15000 });
 await sleep(150);
 seen = await ghost();
-check("Don't wait shows it too, moving with the notes", seen && seen.arrow === "↓" && seen.color === BLUE && Math.abs(seen.across) <= 6, JSON.stringify(seen));
+// Don't wait draws the pitch line, with the ghost at its tip, where the sound was played, just before the hit line.
+check("Don't wait shows it too, at the tip of its pitch line", seen && seen.arrow === "↓" && seen.color === BLUE && (await page.locator(".pitch-trace polyline").count()) > 0, JSON.stringify(seen));
 await stop(page); await sleep(200);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
 

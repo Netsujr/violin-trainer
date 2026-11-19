@@ -160,7 +160,7 @@ check("Stop clears it", (await ghost()) === null);
 await spyOnRecordings(page);
 await press(button("Play reference")); await sleep(1500);
 const tone = await recordings(page);
-check("the reference, a violin note, keeps sounding, audio running", tone.length === 1 && tone[0].hz === 294 && !tone[0].stopped && tone[0].state === "running" && (await button("Stop reference").count()) === 1, JSON.stringify(tone));
+check("the reference, a violin note, keeps sounding, audio running", tone.length === 1 && tone[0].midi === 62 && !tone[0].stopped && tone[0].state === "running" && (await button("Stop reference").count()) === 1, JSON.stringify(tone));
 await press(button("Stop reference")); await sleep(150);
 check("and turns off", (await button("Play reference").count()) === 1);
 

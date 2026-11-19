@@ -38,11 +38,12 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   check("options: off stays clickable", await label.locator("input").isEnabled());
 
   // Bars
-  check("bars: timeline order", (await titles(page, ".timeline-section")).join() === "Fingers,Note names (Do Ré Mi),Letter names (A G D)", (await titles(page, ".timeline-section")).join());
+  const order = await titles(page, ".timeline-section");
+  check("bars: timeline order, the count-in first", order[0].startsWith("Beat count-in") && order.slice(1).join() === "Fingers,Note names (Do Ré Mi),Letter names (A G D)", order.join());
   check("bars: the piece picker on the left, and no grid switch, the grid always drawn", (await page.locator(".section-bar > *").first().getAttribute("class")) === "piece-select" && (await page.locator('.box-toggle[title="Grid"]').count()) === 0);
   check("bars: only the lanes have a header", (await page.locator(".section-bar").count()) === 1 && (await page.locator(".staff-section label").count()) === 0);
   const toggleText = await page.locator(".section-bar .box-toggle:not([hidden])").evaluateAll((buttons) => buttons.map((button) => button.textContent).join(""));
-  check("bars: icons in boxes instead of names", toggleText === "DoA" && (await page.locator(".section-bar input[type=checkbox]").count()) === 0, toggleText);
+  check("bars: icons in boxes instead of names, Tempo's switch the only checkbox, under its icon", toggleText === "DoA" && (await page.locator(".section-bar label:not(.icon-switch) input[type=checkbox]").count()) === 0, toggleText);
   const below = (selector) => page.evaluate((selector) => { const section = document.querySelector(selector); return section.querySelector(".section-bar").getBoundingClientRect().bottom <= section.querySelector("canvas, .staff").getBoundingClientRect().top + 0.5; }, selector);
   check("bars: nothing sits on the lanes", await below(".timeline-section"));
   const arrow = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), button = document.querySelector(".staff-toggle").getBoundingClientRect(); return { left: Math.round(button.left - panel.left), bottom: Math.round(panel.bottom - button.bottom) }; });
@@ -154,7 +155,7 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await s.page.click("header summary");
   check("settings: its own header still toggles it", !(await isOpen()));
   await s.page.click("header summary");
-  await s.page.click("header summary"); await s.page.click('.language button:text-is("PT")');
+  await s.page.click('.language button:text-is("PT")');
   await sleep(200);
   check("settings: closed when the language changes", !(await isOpen()));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
