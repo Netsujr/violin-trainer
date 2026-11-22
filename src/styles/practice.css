@@ -183,6 +183,34 @@
   rotate: 180deg;
 }
 
+/* Full screen's choice for the whole sheet, beside ▾: solid brass, saying which it is, with arrows to say a press
+   switches to the other. */
+.sheet-fill {
+  position: absolute;
+  bottom: 0.375rem;
+  left: 2.75rem;
+  z-index: 1;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0 0.75rem;
+  color: var(--on-brass);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  background: var(--brass);
+  border: 1px solid var(--brass);
+  border-radius: 1rem;
+}
+
+.sheet-fill::after {
+  content: " ⇄";
+  opacity: 0.6;
+}
+
+html:not(.fullscreen) .sheet-fill,
+.staff-panel:has(.staff.collapsed) .sheet-fill {
+  display: none;
+}
+
 /* The count-in: − and + either side of its beats. */
 .stepper-value {
   display: inline-flex;

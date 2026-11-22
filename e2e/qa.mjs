@@ -92,8 +92,10 @@ await auditCheck(page, "Listen");
 await shot("1-listen");
 
 flow("2. Listen");
+// Free play listens on its own, from the mic it had as it opened, so it's opened again to hear this one.
 await toneMic();
-await startRun();
+await press(page.locator('.nav-sub .sub-item:has-text("Note guesser")'));
+await press(page.locator('.nav-sub .sub-item:has-text("Free play")'));
 await sleep(400);
 check("shows no note before one is played", (await heard(page)) === "", await heard(page));
 await page.evaluate(() => window.playTone(69));
@@ -109,17 +111,22 @@ check("follows to a D", (await heard(page)) === "0 Ré D", await heard(page));
 await press(page.locator('.dock button:text-is("A B C")')); await sleep(100);
 check("a switch changes what shows", (await heard(page)) === "0 Ré", await heard(page));
 await press(page.locator('.dock button:text-is("A B C")')); await sleep(100);
+// Held long enough to count as playing, not a stray sound.
+await page.evaluate(() => window.playTone(69));
+await sleep(5000);
 await page.evaluate(() => window.playTone(0));
 await sleep(600);
 check("goes quiet in silence", (await heard(page)) === "", await heard(page));
-await stopRun();
-check("logged as free play", (await savedLog(page)).at(-1).pieceId === "free-play");
+await tab("Practice");
+check("leaving logs it as free play", (await savedLog(page)).at(-1)?.pieceId === "free-play");
 
 flow("3. The mic is refused");
 await page.reload(); await page.waitForSelector("nav button");
 await page.evaluate(() => { MediaDevices.prototype.getUserMedia = async () => { throw new DOMException("Permission denied", "NotAllowedError"); }; });
-await press(button("Start")); await sleep(400);
-check("says so, and can try again", (await page.locator(".warning").first().innerText()).startsWith("Microphone unavailable") && (await button("Start").isEnabled()));
+await tab("Listen");
+await press(page.locator('.nav-sub .sub-item:has-text("Note guesser")'));
+await press(page.locator('.nav-sub .sub-item:has-text("Free play")')); await sleep(400);
+check("free play says so", (await page.locator(".warning").first().innerText()).startsWith("Microphone unavailable"));
 await tab("Practice");
 await press(button("Start")); await sleep(400);
 check("Practice says so too", (await page.locator(".warning").first().innerText()).startsWith("Microphone unavailable"));

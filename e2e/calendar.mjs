@@ -41,16 +41,16 @@ check("with how much of its plan is done", (await page.locator(".day-summary").i
 check("the plan has +, Copy plan and Clear plan under it", (await toolsShown()) === "Add a piece to the plan,Copy plan,Clear plan", await toolsShown());
 
 // Targets and progress
-check("each planned piece shows how far it's got against its target", (await target("D (Ré) major")) === "Done, 10 min" && (await target("Hills and Dales")) === "10 of 20 min" && (await target("Twinkle")) === "", `${await target("D (Ré) major")} | ${await target("Hills and Dales")}`);
+check("each planned piece shows how far it's got against its target", (await target("D (Ré) major")) === "Done, 10 min" && (await target("Hills and Dales")) === "20 min" && (await target("Twinkle")) === "", `${await target("D (Ré) major")} | ${await target("Hills and Dales")}`);
 check("its bar fills to match", (await progress("D (Ré) major")) === "100%" && (await progress("Hills and Dales")) === "50%" && (await progress("Twinkle")) === "0%", `${await progress("D (Ré) major")} ${await progress("Hills and Dales")} ${await progress("Twinkle")}`);
 check("the plan adds up its targets", (await page.locator(".plan-total").innerText()) === "20 of 30 min");
 check("a row a piece, with no − to begin with", (await page.locator(".plan-item").count()) === 3 && !(await minus("Hills and Dales").isVisible()));
 await piece("Twinkle").click();
-check("tapping a piece gives it a minute, and offers a −", (await target("Twinkle")) === "0 of 1 min" && (await minus("Twinkle").isVisible()));
+check("tapping a piece gives it a minute, and offers a −", (await target("Twinkle")) === "1 min" && (await minus("Twinkle").isVisible()));
 await piece("Twinkle").click(); await piece("Twinkle").click();
-check("each tap steps up: 2, then 3", (await target("Twinkle")) === "0 of 3 min");
+check("each tap steps up: 2, then 3", (await target("Twinkle")) === "3 min");
 await minus("Twinkle").click();
-check("the − steps back down", (await target("Twinkle")) === "0 of 2 min" && (await page.locator(".plan-total").innerText()) === "20 of 32 min");
+check("the − steps back down", (await target("Twinkle")) === "2 min" && (await page.locator(".plan-total").innerText()) === "20 of 32 min");
 await sleep(5300);
 check("the − goes 5 seconds after the last tap", !(await minus("Twinkle").isVisible()));
 // From 2 minutes: 3, 5, then fives from 10 to an hour, thirteen taps, and one more past it.
@@ -71,7 +71,7 @@ check("another day offers paste, after +", (await toolsShown()) === "Add a piece
 await page.locator('button:text-is("Paste plan (3)")').click(); await sleep(150);
 check("paste starts picking days: each from today on shows a +, and paste is pressed, offering to finish", (await page.locator(".calendar-day.pickable").count()) > 1 && (await page.locator('button:text-is("Done pasting")').getAttribute("aria-pressed")) === "true");
 await pickDay(1); await sleep(150);
-check("pasting brings the pieces and their targets", (await page.locator(".plan-item").count()) === 3 && (await target("D (Ré) major")) === "0 of 10 min" && (await target("Twinkle")) === "0 of 2 min");
+check("pasting brings the pieces and their targets", (await page.locator(".plan-item").count()) === 3 && (await target("D (Ré) major")) === "10 min" && (await target("Twinkle")) === "2 min");
 const picked = await page.locator(".calendar-day.selected .calendar-date").innerText();
 await pickDay(2); await sleep(150);
 check("each day tapped is pasted into and ticked, and the day picked stays", (await page.locator(".calendar-day.pasted").count()) === 2 && (await page.locator(".calendar-day.selected .calendar-date").innerText()) === picked);

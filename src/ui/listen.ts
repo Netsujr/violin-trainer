@@ -5,6 +5,7 @@ import { getSettings, passCents, saveSettings, type ListenMode } from "../storag
 import { h, type Screen } from "./dom";
 import { createGuesser, toggleLabels } from "./guesser";
 import { createFingerboard } from "./fingerboard";
+import { createFreeMic } from "./freeMic";
 import { createFreeTarget } from "./freeTarget";
 import { createListenDock } from "./listenDock";
 import { createListenStage } from "./listenStage";
@@ -12,7 +13,7 @@ import { createFullscreen } from "./practice/fullscreen";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
 import { createTechnique } from "./technique";
-import { CHART_ICON } from "./toggles";
+import { CHART_ICON, EXPAND_ICON } from "./toggles";
 import { createVolumeCurve } from "./volumeCurve";
 
 const SILENCE_MS = 300;
@@ -86,6 +87,13 @@ export function listenScreen(goProgress: () => void): Screen {
     staff.centre(mode === "free");
     target.clear();
     guesser.hush();
+    // Free play listens on its own, so a run another mode started ends first.
+    if (mode === "free") controls.stop().then(() => {
+        if (settings.listenMode !== "free") return;
+        controls.message.textContent = "";
+        freeMic.start();
+      });
+    else freeMic.stop();
     // Ends a technique round, before the mode picked draws its own notes.
     technique.stop();
     if (mode === "guesser") guesser.start();
@@ -153,6 +161,7 @@ export function listenScreen(goProgress: () => void): Screen {
     }
 
     stage.hear(frequency);
+    if (settings.listenMode === "free") freeMic.heard(now);
     // Against the note picked, what's played shows as a ghost, with its arrow.
     if (settings.listenMode === "free" && target.midi !== null) {
       const cents = centsFrom(frequency, target.midi);
@@ -167,21 +176,24 @@ export function listenScreen(goProgress: () => void): Screen {
     renderNote();
   }
 
+  function onReading(frequency: number | null, now: number, rms: number) {
+    // A note sounding, free play's picked one or the guesser's by ear, isn't the player.
+    const hearing = settings.listenMode === "free" ? target.hearing(now) : settings.listenMode === "guesser" ? guesser.hearing(now) : true;
+    if (!hearing) frequency = null;
+    if (frequency !== null) hear(frequency, now);
+    else if (midi !== null && now - lastHeard > SILENCE_MS) goQuiet();
+    if (settings.listenMode === "guesser") guesser.read(frequency, now);
+    if (settings.listenMode === "technique") {
+      volume.add(rms, settings.minRms);
+      technique.read(frequency, now, rms);
+    }
+    showBoard(frequency);
+  }
+
+  const freeMic = createFreeMic(LOGGED_AS.free, onReading, (error) => (controls.message.textContent = t.micUnavailable(error)));
   const controls = createRunControls({
     piece: () => LOGGED_AS[settings.listenMode],
-    onReading(frequency, now, rms) {
-      // A note sounding, free play's picked one or the guesser's by ear, isn't the player.
-      const hearing = settings.listenMode === "free" ? target.hearing(now) : settings.listenMode === "guesser" ? guesser.hearing(now) : true;
-      if (!hearing) frequency = null;
-      if (frequency !== null) hear(frequency, now);
-      else if (midi !== null && now - lastHeard > SILENCE_MS) goQuiet();
-      if (settings.listenMode === "guesser") guesser.read(frequency, now);
-      if (settings.listenMode === "technique") {
-        volume.add(rms, settings.minRms);
-        technique.read(frequency, now, rms);
-      }
-      showBoard(frequency);
-    },
+    onReading,
     onStart() {
       if (settings.listenMode === "guesser") guesser.start();
       if (settings.listenMode === "technique") {
@@ -197,16 +209,27 @@ export function listenScreen(goProgress: () => void): Screen {
     },
   });
 
-  // Fullscreen leaves the panels with Start or Stop and Exit, and the guesser's score; CSS lays it out.
-  const fullscreen = createFullscreen(() => {});
+  // Fullscreen leaves the panels with Start or Stop and Exit, and the guesser's score; CSS lays it out. In free play the
+  // tuner's own button makes it full screen alone.
+  const fullscreen = createFullscreen((on) => on || element.classList.remove("tuner-full"));
   controls.startButton.classList.add("listen-start");
+  const tunerFull = h("button", {
+    type: "button",
+    className: "tuner-full-button",
+    innerHTML: EXPAND_ICON,
+    ariaLabel: t.fullscreen,
+    onclick() {
+      element.classList.add("tuner-full");
+      if (!fullscreen.on) fullscreen.button.click();
+    },
+  });
 
   const dock = createListenDock(relabel, () => stage.arrange(), {
     free: [],
     guesser: guesser.options,
     technique: technique.options,
   });
-  const stage = createListenStage([staff.element, target.speaker, guesser.banner, technique.status, technique.results, technique.overlay], board.element, [volume.element]);
+  const stage = createListenStage([staff.element, target.speaker, guesser.banner, technique.status, technique.results, technique.overlay], board.element, [volume.element, tunerFull]);
   const element = h(
     "section",
     { className: "listen fills-window" },
@@ -235,6 +258,7 @@ export function listenScreen(goProgress: () => void): Screen {
       drawObserver.disconnect();
       target.clear();
       guesser.hush();
+      freeMic.leave();
       fullscreen.leave();
       return controls.leave();
     },

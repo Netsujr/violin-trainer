@@ -3,11 +3,11 @@ import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, s
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
-// A440 sine
+// A440 sine. Free play listens on its own, with no Start.
 wav(OUT + "a440.wav", [{ hz: 440, seconds: 5, wave: "sine" }]);
 {
   const s = await open(OUT + "a440.wav");
-  await start(s.page);
+  check("free play has no Start", await s.page.locator(".listen-start").isHidden());
   await sleep(1000);
   const readings = [];
   for (let i = 0; i < 40; i++) {
@@ -37,7 +37,6 @@ const OPEN = [[55, "0 Sol G"], [62, "0 Ré D"], [69, "0 Lá A"], [76, "0 Mi E"]]
 wav(OUT + "open.wav", OPEN.flatMap(([m]) => [note(m, 1.5), rest(0.5)]));
 {
   const s = await open(OUT + "open.wav");
-  await start(s.page);
   const seen = [];
   const t0 = Date.now();
   while (Date.now() - t0 < 9000) {
@@ -57,7 +56,6 @@ wav(OUT + "open.wav", OPEN.flatMap(([m]) => [note(m, 1.5), rest(0.5)]));
 wav(OUT + "silence.wav", [rest(4)]);
 {
   const s = await open(OUT + "silence.wav");
-  await start(s.page);
   const seen = new Set();
   for (let i = 0; i < 60; i++) { seen.add(await heard(s.page)); await sleep(25); }
   check("silence shows no note", seen.size === 1 && seen.has(""), [...seen].join(","));
@@ -75,7 +73,6 @@ wav(OUT + "silence.wav", [rest(4)]);
     header.writeUInt32LE(36 + data.length, 4); header.writeUInt32LE(data.length, 40);
     fs.writeFileSync(OUT + name + ".wav", Buffer.concat([header, data]));
     const s = await open(OUT + name + ".wav");
-    await start(s.page);
     await sleep(300);
     const seen = new Set();
     for (let i = 0; i < 100; i++) { seen.add(await heard(s.page)); await sleep(25); }
@@ -84,15 +81,16 @@ wav(OUT + "silence.wav", [rest(4)]);
   }
 }
 
-// Stop, logged session
+// Free play logs the time spent playing once it's left, and a moment's sound not at all.
 {
   const s = await open(OUT + "a440.wav");
-  await start(s.page);
-  await sleep(500);
-  await stop(s.page);
-  await sleep(100);
-  const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")));
-  check("Listen writes a log entry on Stop", log.length === 1 && log[0].pieceTitle === "Free play", JSON.stringify(log[0]));
+  await sleep(6000);
+  await nav(s.page, "Practice"); await sleep(200);
+  const log = await savedLog(s.page);
+  check("free play logs the time spent playing when it's left", log.length === 1 && log[0].pieceTitle === "Free play" && log[0].minutes >= 5 / 60, JSON.stringify(log[0]));
+  await nav(s.page, "Listen"); await sleep(1000);
+  await nav(s.page, "Practice"); await sleep(200);
+  check("and a moment's sound isn't logged", (await savedLog(s.page)).length === 1);
   await s.close();
 }
 
@@ -159,9 +157,10 @@ wav(OUT + "silence.wav", [rest(4)]);
   await s.close();
 }
 
-// Recording from Listen
+// Recording from Listen, in a mode with a run to record.
 {
   const s = await open(OUT + "a440.wav");
+  await seed(s.page, { settings: { listenMode: "guesser", countInOn: false } });
   await setRecord(s.page, true);
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
@@ -297,10 +296,11 @@ wav(OUT + "d4.wav", [note(62, 5)]);
   await s.close();
 }
 
-// Nothing moves as modes and toggles change: Start stays where it is, and the settings panel stays docked at the bottom.
+// Nothing moves as modes and toggles change: the title row's buttons stay where they are, and the settings panel stays
+// docked at the bottom.
 {
   const s = await open(OUT + "a440.wav");
-  const where = async () => (await Promise.all([".listen-start", ".dock"].map((selector) => s.page.locator(selector).boundingBox()))).map((box, index) => Math.round(index ? box.y + box.height : box.y)).join(",");
+  const where = async () => (await Promise.all([".title-tools", ".dock"].map((selector) => s.page.locator(selector).boundingBox()))).map((box, index) => Math.round(index ? box.y + box.height : box.y)).join(",");
   const first = await where();
   const moved = [];
   for (const mode of ["Note guesser", "Technique", "Free play", "Technique"]) {
@@ -311,7 +311,7 @@ wav(OUT + "d4.wav", [note(62, 5)]);
     await s.page.click(`.dock button:text-is("${toggle}")`);
     if ((await where()) !== first) moved.push(`${toggle}: ${await where()}`);
   }
-  check("Start and the settings panel stay put through every mode and label toggle", moved.length === 0, `${first} → ${moved.join(" | ")}`);
+  check("the title row's buttons and the settings panel stay put through every mode and label toggle", moved.length === 0, `${first} → ${moved.join(" | ")}`);
   await s.close();
 }
 
@@ -439,9 +439,10 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
 
 // Free play's note to copy: a tap on the staff picks the natural note there, silently, and lets the speaker in the
 // staff's corner sound it on the violin until pressed again, the staff keeping its size. A second tap takes the note
-// away, and the speaker can't be pressed again until there's another. Only free play has the speaker.
+// away, and the speaker can't be pressed again until there's another, but stays on, so the next note picked sounds.
+// Only free play has the speaker.
 {
-  const s = await open(OUT + "a440.wav");
+  const s = await open(OUT + "silence.wav");
   await seed(s.page, { settings: { listenMode: "free" } });
   await spyOnRecordings(s.page);
   // The middle line of the staff, found from its drawn lines: B4.
@@ -467,9 +468,28 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
   await s.page.mouse.click(middle.x, middle.y); await sleep(200);
   // Away from the staff, so the note a tap would pick doesn't show faintly in its place.
   await s.page.mouse.move(5, 5); await sleep(100);
-  check("a second tap takes the note away and its sound, and the speaker can't be pressed", (await drawn()) === 0 && (await recordings(s.page)).at(-1).stopped && (await speaker.isDisabled()));
+  check("a second tap takes the note away and its sound, and the speaker can't be pressed, but stays on", (await drawn()) === 0 && (await recordings(s.page)).at(-1).stopped && (await speaker.isDisabled()) && (await speaker.getAttribute("aria-pressed")) === "true");
+  await s.page.mouse.click(middle.x, middle.y); await sleep(300);
+  const next = (await recordings(s.page)).at(-1);
+  check("so the next note picked sounds without pressing it again", next?.midi === 71 && !next.stopped, JSON.stringify(next));
+  await s.page.mouse.click(middle.x, middle.y); await s.page.mouse.move(5, 5); await sleep(200);
   await pickMode(s.page, "Note guesser");
   check("only free play has the speaker", await speaker.isHidden());
+  check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}
+
+// Free play's tuner goes full screen alone from its own button, and comes back with the panels. Only free play has it.
+{
+  const s = await open(OUT + "a440.wav");
+  await seed(s.page, { settings: { listenMode: "free" } });
+  await s.page.click(".tuner-full-button"); await sleep(300);
+  const tuner = await s.page.locator(".stage-tuner").boundingBox();
+  check("the tuner's button makes it full screen, alone", (await s.page.evaluate(() => document.documentElement.classList.contains("fullscreen"))) && (await s.page.locator(".stage-staff").isHidden()) && tuner.width > 700, JSON.stringify(tuner));
+  await s.page.keyboard.press("Escape"); await sleep(300);
+  check("and leaving full screen brings the panels back", (await s.page.locator(".stage-staff").isVisible()) && !(await s.page.evaluate(() => document.documentElement.classList.contains("fullscreen"))));
+  await pickMode(s.page, "Technique");
+  check("only free play has it", await s.page.locator(".tuner-full-button").isHidden());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
@@ -504,7 +524,7 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
 
 // Free play's pointer over the staff shows, faintly, the note a tap would pick, and nothing once it leaves.
 {
-  const s = await open(OUT + "a440.wav");
+  const s = await open(OUT + "silence.wav");
   await seed(s.page, { settings: { listenMode: "free" } });
   const box = await s.page.locator(".listen .staff svg").boundingBox();
   await s.page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.55); await sleep(200);

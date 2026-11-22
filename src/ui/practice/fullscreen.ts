@@ -16,9 +16,17 @@ export function createFullscreen(onChange: (on: boolean) => void) {
     button.ariaLabel = text;
   }
 
+  // Record and the metronome stay to hand: in the title row while the sidebar's hidden, and back in it after.
+  function moveRailTools() {
+    const tools = document.querySelectorAll(".record-toggle, .metronome-button");
+    if (on) button.parentElement?.prepend(...tools);
+    else document.querySelector(".rail-tools")?.prepend(...tools);
+  }
+
   function set(value: boolean) {
     on = value;
     document.documentElement.classList.toggle("fullscreen", value);
+    moveRailTools();
     label();
     onChange(value);
   }

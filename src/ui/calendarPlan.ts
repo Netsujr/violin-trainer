@@ -96,7 +96,7 @@ export function planSection({ day, editable, pieces, practised, onChange, pickin
       const done = practised.get(pieceId) ?? 0;
       const { status, percent } = planProgress(done, target);
       const met = status === "✓";
-      minutes.textContent = target ? (met ? t.doneMinutes(target) : t.planTotal(localNumber(done, 0), target)) : met ? t.done : "";
+      minutes.textContent = target ? (met ? t.doneMinutes(target) : t.targetMinutes(target)) : met ? t.done : "";
       piece.title = target ? t.targetProgress(localNumber(done, 0), target) : editable ? t.tapForTime : name;
       // The bar fills as the target is practised, brass, then blue once it's done.
       (bar.firstChild as HTMLElement).style.width = `${met ? 100 : percent}%`;

@@ -10,19 +10,22 @@ const ECHO_MS = 150;
 
 // Free play's note to copy: a tap on the staff picks one, the natural note on the line or space tapped, within the
 // violin's first position, and a second tap takes it away. The speaker in the staff's corner sounds it on the violin
-// until it's pressed again. While it sounds, the mic is ignored, as in Practice, so the speakers don't count as the player.
+// until it's pressed again, and stays on, or off, from one note picked to the next. While it sounds, the mic is ignored, as in Practice, so the speakers don't count as the player.
 // changed redraws the staff.
 export function createFreeTarget(staff: ReturnType<typeof createStaff>, changed: () => void) {
   let midi: number | null = null;
   let tone: ReturnType<typeof startReference> | null = null;
   let mutedUntil = 0;
+  let on = false;
 
-  function stop() {
-    if (!tone) return;
-    tone.stop();
-    tone = null;
-    mutedUntil = performance.now() + ECHO_MS;
-    speaker.ariaPressed = "false";
+  // The note picked sounds while the speaker's on, and stops otherwise.
+  function sound() {
+    if (tone) {
+      tone.stop();
+      tone = null;
+      mutedUntil = performance.now() + ECHO_MS;
+    }
+    if (on && midi !== null) tone = startReference(midi);
   }
 
   const speaker = h("button", {
@@ -33,21 +36,21 @@ export function createFreeTarget(staff: ReturnType<typeof createStaff>, changed:
     ariaPressed: "false",
     disabled: true,
     onclick() {
-      if (tone) return stop();
-      if (midi === null) return;
-      tone = startReference(midi);
-      speaker.ariaPressed = "true";
+      on = !on;
+      speaker.ariaPressed = String(on);
+      sound();
     },
   });
 
   // The note a tap at a height on the screen would pick, within first position.
   const at = (clientY: number) => Math.max(LOWEST_MIDI, Math.min(HIGHEST_MIDI, staff.midiAt(clientY)));
 
-  // Picks a note, or takes it away and its sound with it. The speaker can be pressed only with a note to sound.
+  // Picks a note, sounding it if the speaker's on, or takes it away and its sound with it. The speaker can be pressed
+  // only with a note to sound.
   function pick(next: number | null) {
-    stop();
     midi = next;
     speaker.disabled = midi === null;
+    sound();
   }
 
   return {

@@ -91,9 +91,10 @@ main:has(> .fills-window) {
   fill: currentColor;
 }
 
-/* An outlined button with its word, and the icon-only ones beside it in the title row. */
+/* An outlined button with its word, and the icon-only ones beside it in the title row, where full screen also puts
+   Record and the metronome. */
 .ghost-button,
-.title-tools .icon-button {
+.title-tools :is(.icon-button, .nav-item) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -115,12 +116,12 @@ main:has(> .fills-window) {
 }
 
 .ghost-button:hover,
-.title-tools .icon-button:hover {
+.title-tools :is(.icon-button, .nav-item):hover {
   background: var(--raised);
 }
 
 .ghost-button svg,
-.title-tools .icon-button svg {
+.title-tools :is(.icon-button, .nav-item) svg {
   width: 1.125rem;
   height: 1.125rem;
 }

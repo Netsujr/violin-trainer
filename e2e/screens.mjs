@@ -30,14 +30,14 @@ wav(OUT + "screens-silent.wav", [rest(3)]);
 {
   const s = await open(OUT + "screens-silent.wav", undefined, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const { page } = s;
-  const start = page.locator('button:text-is("Start")');
+  const start = page.locator('.dock button:text-is("Fingers")');
   const clean = await audit(page);
   await page.evaluate(() => { const wide = document.createElement("div"); wide.id = "wide"; wide.style.width = "2000px"; wide.textContent = "wide"; document.querySelector("main").append(wide); });
   const wide = await audit(page);
   check("audit: starts clean, then catches something too wide", clean.sideways <= 0 && !clean.offEdge.length && wide.sideways > 0 && wide.offEdge.length > 0, JSON.stringify(wide.offEdge));
   await page.evaluate(() => document.querySelector("#wide").remove());
   await start.evaluate((button) => { const cover = document.createElement("div"); const box = button.getBoundingClientRect(); cover.style.cssText = `position:absolute;left:${box.left}px;top:${box.top + scrollY}px;width:${box.width}px;height:${box.height}px;z-index:9`; document.querySelector("#app").append(cover); });
-  check("audit: catches a covered control", (await audit(page)).covered.some((text) => text.includes("Start")));
+  check("audit: catches a covered control", (await audit(page)).covered.some((text) => text.includes("Fingers")));
   await page.reload(); await page.waitForSelector("nav button");
   await start.evaluate((button) => { button.style.cssText = "width:60px;white-space:nowrap;overflow:hidden;height:16px;padding:0;min-height:0"; button.textContent = "A much longer label than fits"; });
   const squeezed = await audit(page);

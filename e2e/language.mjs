@@ -41,19 +41,17 @@ await sleep(100);
 
 await page.locator("header > nav > button").nth(0).click();
 await sleep(150);
-await page.locator('.listen button:text-is("Iniciar")').click();
-await page.waitForSelector('button:text-is("Parar")');
-await sleep(800);
+// Free play listens on its own; long enough to count as playing.
+await sleep(5500);
 const shown = await heard(page);
 check("pt: Listen names the note on the staff", shown === "0 Lá A", shown);
 const hertz = await page.locator("main > section").innerText();
 check("pt: a decimal comma", /\d+,\d Hz/.test(hertz));
 await setLanguage(page, "EN");
 await sleep(500);
-check("switching language ends a running session", (await page.locator('.listen button:text-is("Start")').count()) === 1);
 check("en: back to English", (await page.locator("nav button").first().innerText()) === "Listen");
 const logged = await page.evaluate(() => JSON.parse(localStorage.getItem("log")).at(-1));
-check("that session was logged", logged.pieceId === "free-play" && logged.minutes > 0, JSON.stringify(logged).slice(0, 80));
+check("switching language logs the playing so far", logged.pieceId === "free-play" && logged.minutes > 0, JSON.stringify(logged).slice(0, 80));
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();
 

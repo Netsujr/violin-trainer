@@ -38,22 +38,19 @@ flow("1. First visit");
 flow("2. Listen: playing the open strings");
 {
   const s = await open("q-open.wav");
-  await start(s.page);
-  await s.page.waitForSelector('button:text-is("Stop")');
   const seen = []; const t0 = Date.now();
   while (Date.now() - t0 < 7800) { const shown = await heard(s.page); if (seen.at(-1) !== shown) seen.push(shown); await sleep(20); }
   check("each string shows on the staff, with silence between", ["0 Sol G", "0 Ré D", "0 Lá A", "0 Mi E"].every((n) => seen.includes(n)) && seen.includes(""), seen.join(" > "));
-  await stop(s.page); await sleep(200);
-  check("Stop clears the note", (await heard(s.page)) === "");
+  await nav(s.page, "Practice"); await sleep(200);
   const entries = await log(s.page);
-  check("logged as Free play, no passes", entries.length === 1 && entries[0].pieceId === "free-play" && entries[0].passes === 0);
+  check("leaving logs it as Free play, no passes", entries.length === 1 && entries[0].pieceId === "free-play" && entries[0].passes === 0);
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 {
   const s = await open("q-a4.wav");
   const box = (t) => s.page.locator(`.dock button:text-is("${t}")`);
-  await start(s.page); await s.page.waitForSelector('button:text-is("Stop")'); await sleep(800);
+  await sleep(800);
   check("reads the note, with its finger, name and letter", (await heard(s.page)) === "0 Lá A", await heard(s.page));
   await box("Do Ré Mi").click(); await sleep(150);
   check("Note names off leaves the finger and letter", (await heard(s.page)) === "0 A", await heard(s.page));
@@ -69,10 +66,9 @@ flow("2. Listen: playing the open strings");
 flow("3. The microphone is refused");
 {
   const s = await open("q-silent.wav", { grant: false });
-  await start(s.page);
   await sleep(1500);
   const warning = await s.page.locator(".warning").first().innerText().catch(() => "");
-  check("says so, and can be tried again", warning.startsWith("Microphone unavailable") && (await s.page.locator('button:text-is("Start")').isEnabled()), warning);
+  check("free play says so as it opens", warning.startsWith("Microphone unavailable"), warning);
   check("nothing was logged", (await log(s.page)).length === 0);
   await s.page.screenshot({ path: OUT + "3-denied.png" });
   await nav(s.page, "Practice"); await sleep(200);

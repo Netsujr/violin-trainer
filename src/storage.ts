@@ -25,6 +25,8 @@ export type Settings = {
   pattern: number;
   // The staff panel's whole sheet, rather than one line moving with the lanes.
   staffOpen: boolean;
+  // In full screen, the whole sheet fills the panel, as many bars to a line as draws it largest, rather than four.
+  sheetFill: boolean;
   // Practice's panels: the lanes, staff and fingerboard each big, small or off, and the tuner on or off.
   practicePanels: { lanes: PanelSize; staff: PanelSize; board: PanelSize; tuner: boolean };
   toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean };
@@ -91,6 +93,7 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bpm: 60,
   pattern: 0,
   staffOpen: false,
+  sheetFill: true,
   practicePanels: { lanes: "big", staff: "small", board: "off", tuner: false },
   toggles: { fingers: true, noteNames: true, letterNames: true },
   highlighted: [],

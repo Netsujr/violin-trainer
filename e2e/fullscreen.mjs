@@ -18,8 +18,17 @@ check("uses the browser's own fullscreen", await page.evaluate(() => !!document.
 // The panels as set, with Start or Stop, Hear the note and Exit.
 for (const hidden of ["header", ".dock", ".piece-select", ".practice-title h1"]) check(`hides ${hidden}`, await page.locator(hidden).first().isHidden());
 for (const shown of ['button:text-is("Start")', ".reference", 'button[aria-label="Exit fullscreen"]', ".practice-progress", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
+check("Record and the metronome stay, in the title row", (await page.locator('.title-tools button[aria-label="Record"]').isVisible()) && (await page.locator(".title-tools .metronome-button").isVisible()));
 check("the lanes grow into the sidebar's room", (await canvasWidth()) > before, `${before} > ${await canvasWidth()}`);
 check("the staff keeps the whole sheet, as chosen", (await page.locator(".staff.collapsed").count()) === 0 && (await savedSettings(page)).staffOpen === true);
+// The whole sheet fills its panel, in whole bars to a line, or keeps four bars to a line.
+const sheet = () => page.locator(".staff-panel .staff svg").evaluate((svg) => ({ height: Math.round(svg.getBoundingClientRect().height), lines: new Set([...svg.querySelectorAll(".vf-stave")].map((stave) => Math.round(stave.getBoundingClientRect().top))).size }));
+const filled = await sheet();
+await page.click('.sheet-fill:text-is("Fill the screen")'); await sleep(300);
+const four = await sheet();
+check("Fill the screen draws the sheet larger than 4 bars a line", filled.height > four.height && (await savedSettings(page)).sheetFill === false, `${JSON.stringify(filled)} vs ${JSON.stringify(four)}`);
+await page.click('.sheet-fill:text-is("4 bars a line")'); await sleep(300);
+check("and fits inside the panel", await page.locator(".staff-panel .staff").evaluate((box) => box.scrollHeight <= box.clientHeight));
 
 // Playing, with a switch out and back in the middle
 await followNotes(page, { midis: D, delayMs: 300 });
@@ -61,7 +70,9 @@ check("and Esc still leaves it", !(await isFullscreen()) && (await page.locator(
 
 await page.reload(); await page.waitForSelector("nav button");
 await nav(page, "Practice"); await sleep(250);
+check("leaving full screen puts Record and the metronome back in the sidebar", (await page.locator('header button[aria-label="Record"]').isVisible()) && (await page.locator("header .metronome-button").isVisible()));
 check("a reload starts in the normal layout", !(await isFullscreen()) && (await canvasWidth()) === before);
+check("the sheet's fill choice shows only in full screen", await page.locator(".sheet-fill").isHidden());
 await setLanguage(page, "PT");
 check("pt: the button is translated", (await page.locator('button[aria-label="Tela cheia"]').count()) === 1);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));

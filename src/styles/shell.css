@@ -87,12 +87,12 @@ header .nav-item .icon svg,
 }
 
 /* Record: a red dot, ready. On, red and pulsing (style.css). */
-header .record-toggle .icon {
+.record-toggle .icon {
   color: var(--red);
 }
 
 /* A backing track sets Practice's pace, so the metronome and BPM don't apply; they keep their room. */
-.track-tempo header .metronome-button {
+.track-tempo .metronome-button {
   visibility: hidden;
 }
 

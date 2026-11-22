@@ -37,7 +37,20 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
       viewChanged();
     },
   });
-  const staffPanel = h("div", { className: "stage-panel staff-panel" }, staff.element, toggle);
+  // In full screen, the whole sheet fills the panel, or keeps four bars to a line.
+  const fillButton = h("button", {
+    type: "button",
+    className: "sheet-fill",
+    onclick() {
+      settings.sheetFill = !settings.sheetFill;
+      saveSettings();
+      labelFill();
+      refit();
+    },
+  });
+  const labelFill = () => (fillButton.textContent = settings.sheetFill ? t.sheetFill : t.fourBars);
+  labelFill();
+  const staffPanel = h("div", { className: "stage-panel staff-panel" }, staff.element, toggle, fillButton);
   const lanesPanel = h("div", { className: "stage-panel lanes-panel" }, highway.element);
   // The run's score, for the title row.
   const score = h("span", { className: "lane-score" });
@@ -53,6 +66,7 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
   function refit() {
     staffPanel.style.setProperty("--timeline-scale", String(staffScale()));
     highway.resize();
+    staff.setFill(settings.sheetFill && document.documentElement.classList.contains("fullscreen"));
     staff.resize(staffWidth(), staffScale());
     render();
   }

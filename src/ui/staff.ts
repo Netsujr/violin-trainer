@@ -19,7 +19,7 @@ export const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
 // The least room a note in an open sheet's fullest line gets, so a narrow screen shrinks the sheet rather than crowd it.
 const BAR_NOTE_WIDTH = 40;
-// An open sheet always has four bars to a line, however wide the page.
+// An open sheet has four bars to a line, however wide the page, unless it's filling its panel.
 const BARS_PER_LINE = 4;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 3: "hd", 4: "w" };
 // How far a line's rows of fingers and names sit outside the staff and its notes, measured to the text's baseline.
@@ -107,15 +107,18 @@ function toBars(notes: StaffNote[], { beatsPerBar, pickup }: Meter) {
 // A time that isn't 4/4 is written at the start, as 3/4 is.
 export const addTime = (stave: Stave, { beatsPerBar }: Meter) => (beatsPerBar === BAR_BEATS ? stave : stave.addTimeSignature(`${beatsPerBar}/4`));
 
-function layOut(notes: StaffNote[], meter: Meter) {
+function layOut(notes: StaffNote[], meter: Meter, perLine = BARS_PER_LINE) {
   const bars = toBars(notes, meter);
-  return Array.from({ length: Math.ceil(bars.length / BARS_PER_LINE) }, (_, line) => bars.slice(line * BARS_PER_LINE, (line + 1) * BARS_PER_LINE));
+  return Array.from({ length: Math.ceil(bars.length / perLine) }, (_, line) => bars.slice(line * perLine, (line + 1) * perLine));
 }
 
+// The least width a line of bars needs, so none is crowded.
+const lineWidth = (lines: StaffNote[][][]) => CLEF_SPACE + 20 + Math.max(...lines.map((line) => line.flat().length)) * BAR_NOTE_WIDTH;
+
 // The bars on each line of an open sheet, and the width to space each line's notes in.
-export function openLines(notes: StaffNote[], width: number, meter = COMMON_TIME) {
+export function openLines(notes: StaffNote[], width: number, meter = COMMON_TIME, perLine = BARS_PER_LINE) {
   const room = width - CLEF_SPACE;
-  const lines = layOut(notes, meter);
+  const lines = layOut(notes, meter, perLine);
   // Bars can hold different numbers of notes, so the fullest line sets the width of a bar, not the first line.
   const mostBars = Math.max(...lines.map((line) => line.length));
   return lines.map((line) => ({ line, formatWidth: ((room - 20) * line.length) / mostBars }));
@@ -247,6 +250,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   let nudge = 0;
   let section: Section | null = null;
   let followedBeat = 0;
+  // The open sheet drawn as large as its box allows, rather than at its usual size.
+  let fill = false;
   function noteAt(event: MouseEvent) {
     const box = element.querySelector("svg")!.getBoundingClientRect();
     const x = ((event.clientX - box.left) * sheet.width) / box.width;
@@ -258,6 +263,20 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     if (onLine.length === 0 || x < noteXs[onLine[0]] - NOTE_LEAD || x > noteXs[onLine.at(-1)!] + NOTE_TAIL) return -1;
     const distance = (index: number) => Math.abs(noteXs[index] + NOTEHEAD_CENTER - x);
     return onLine.reduce((nearest, index) => (distance(index) < distance(nearest) ? index : nearest));
+  }
+
+  // How many whole bars to a line draw the open sheet largest in its box, and how large, extra being the room above and
+  // below the lines. Never part of a bar on one line and the rest on the next.
+  function fillBox(notes: StaffNote[], extra: number) {
+    const { clientWidth, clientHeight } = element;
+    if (!clientWidth || !clientHeight) return null;
+    let best = { perLine: BARS_PER_LINE, scale: 0 };
+    for (let perLine = 1; perLine <= toBars(notes, meter).length; perLine++) {
+      const lines = layOut(notes, meter, perLine);
+      const scale = Math.min(clientWidth / lineWidth(lines), clientHeight / (extra + lines.length * LINE_HEIGHT));
+      if (scale > best.scale) best = { perLine, scale };
+    }
+    return best;
   }
 
   // A band behind each selected note, line by line, so a section can wrap across the sheet.
@@ -287,8 +306,9 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const labelled = labels.names || labels.fingers || labels.letters;
     const top = labelled ? LABELLED_TOP + (notes.some((note) => note.bow) ? BOW_ROOM : 0) + (notes.some((note) => note.slur) ? SLUR_ROOM : 0) : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
-    const sheetWidth = collapsed ? width : Math.max(width, CLEF_SPACE + 20 + Math.max(...layOut(notes, meter).map((line) => line.flat().length)) * BAR_NOTE_WIDTH);
-    const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter);
+    const fit = !collapsed && fill ? fillBox(notes, top + bottom) : null;
+    const sheetWidth = collapsed ? width : fit ? element.clientWidth / fit.scale : Math.max(width, lineWidth(layOut(notes, meter)));
+    const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter, fit?.perLine);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
     const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : sheetWidth;
     const height = top + lines.length * LINE_HEIGHT + bottom;
@@ -302,9 +322,11 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     // In a box taller than the sheet, as Listen keeps, the sheet sits at the bottom, so its staff barely moves as
     // labels come and go.
     svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
-    // Open, the sheet fills the page, as the CSS says. Collapsed, it keeps the timeline's scale and scrolls.
-    svg.style.width = collapsed ? `${fullWidth * scale}px` : "";
-    svg.style.height = collapsed ? `${height * scale}px` : "";
+    // Open, the sheet fills the page, as the CSS says, or its box when filling it. Collapsed, it keeps the timeline's
+    // scale and scrolls.
+    const drawnAt = collapsed ? scale : fit?.scale;
+    svg.style.width = drawnAt ? `${Math.floor(fullWidth * drawnAt)}px` : "";
+    svg.style.height = drawnAt ? `${Math.floor(height * drawnAt)}px` : "";
 
     const allNotes: StaveNote[] = [];
     lines.forEach(({ line, formatWidth }, lineIndex) => {
@@ -459,6 +481,10 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     setCollapsed(value: boolean) {
       collapsed = value;
       shown = null;
+    },
+    setFill(value: boolean) {
+      if (value !== fill) shown = null;
+      fill = value;
     },
     resize(newWidth: number, newScale: number) {
       width = newWidth;

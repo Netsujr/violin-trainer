@@ -208,8 +208,9 @@
   align-self: flex-start;
 }
 
-/* The gear in the tuner's corner, brass while its settings are open. */
-.tuner-toggle {
+/* The gear in the tuner's corner, brass while its settings are open, and free play's full screen button beside it. */
+.tuner-toggle,
+.tuner-full-button {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
@@ -225,7 +226,8 @@
   border-radius: 50%;
 }
 
-.tuner-toggle:hover {
+.tuner-toggle:hover,
+.tuner-full-button:hover {
   color: var(--text);
   background: var(--raised);
 }
@@ -236,7 +238,8 @@
   border-color: var(--brass);
 }
 
-.tuner-toggle svg {
+.tuner-toggle svg,
+.tuner-full-button svg {
   width: 1.125rem;
   height: 1.125rem;
 }
@@ -417,6 +420,40 @@
 
 .fingerboard-head[aria-pressed="true"] .fingerboard-letter {
   fill: var(--brass-light);
+}
+
+/* The title row's buttons keep Start's height, so hiding it doesn't move them. */
+.listen .title-tools {
+  min-height: 2.75rem;
+}
+
+/* Free play listens on its own, so it has no Start. Its tuner has a full screen button beside the gear, which makes it
+   the only panel, its dial and note as large as fit. */
+.listen[data-mode="free"] .listen-start,
+.listen:not([data-mode="free"]) .tuner-full-button,
+.fullscreen .tuner-full-button {
+  display: none;
+}
+
+.tuner-full-button {
+  right: 3.5rem;
+}
+
+.tuner-full .stage-panels {
+  display: none;
+}
+
+.tuner-full .stage-tuner {
+  flex: 1;
+  width: auto;
+}
+
+.tuner-full .stage-tuner .needle {
+  max-width: min(40rem, 100%, (100dvh - 16rem) * 1.66);
+}
+
+.tuner-full .tuner-letter {
+  font-size: 7rem;
 }
 
 /* Full screen: the panels, with Start or Stop and Exit, and the guesser's score. */

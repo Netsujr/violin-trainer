@@ -242,10 +242,11 @@
   border-top: 1px solid var(--line);
 }
 
+/* The name wraps if it must, and the target keeps its place on the right of the first line. */
 .plan-piece {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
   gap: 0 0.75rem;
   min-width: 0;
   margin: 0;
@@ -274,6 +275,7 @@
 
 .plan-target {
   color: var(--brass-light);
+  font-size: 0.875rem;
   white-space: nowrap;
 }
 
