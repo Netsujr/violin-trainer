@@ -1,6 +1,7 @@
-// tempoChanged is told when the header's metronome or BPM changes. ownsMetronome says the screen plays the clicks
-// itself, in time with what it's doing; otherwise the header's metronome plays them.
-export type Screen = { element: HTMLElement; leave(): void | Promise<void>; tempoChanged?(): void; ownsMetronome?(): boolean };
+// sidebar is the screen's own items, shown under its button in the sidebar, like Listen's modes. tempoChanged is told
+// when the sidebar's metronome or BPM changes. ownsMetronome says the screen plays the clicks itself, in time with what
+// it's doing; otherwise the sidebar's metronome plays them.
+export type Screen = { element: HTMLElement; sidebar?: HTMLElement; leave(): void | Promise<void>; tempoChanged?(): void; ownsMetronome?(): boolean };
 
 export function h<Tag extends keyof HTMLElementTagNameMap>(
   tag: Tag,

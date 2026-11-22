@@ -19,7 +19,7 @@ export type LogEntry = {
   exercise?: true;
   // A play-along with nothing heard: only its minutes count.
   playedAlong?: true;
-  // The tempo of a "Don't wait" run.
+  // The tempo of a Keep moving run.
   bpm?: number;
   // Each pitch's average cents off, sharp above 0, and how many readings that's from. Older entries have none.
   tuning?: Record<string, [cents: number, readings: number]>;

@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { begin, laneScore, open, nav, start, stop, sleep, check, progress, freshPractice, canvasHasColor, D_MAJOR, OUT, pickPiece } from "./lib.mjs";
+import { begin, laneScore, open, nav, start, stop, sleep, check, progress, freshPractice, canvasHasColor, D_MAJOR, OUT, pickPiece, clickLanes, cardOf } from "./lib.mjs";
 
 const indexOf = (text) => Number(text.match(/Note (\d+) of/)?.[1] ?? 99);
 
@@ -51,7 +51,7 @@ wav(OUT + "ended.wav", [note(62, 3)]);
   await nav(s.page, "Practice");
   await pickPiece(s.page, "one");
   await start(s.page);
-  await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 8000 });
+  await s.page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 8000 });
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
@@ -69,9 +69,9 @@ wav(OUT + "ended.wav", [note(62, 3)]);
   await nav(s.page, "Practice");
   await pickPiece(s.page, "one");
   await start(s.page);
-  await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 5000 });
+  await s.page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 5000 });
   await sleep(300);
-  check("finishing clears the played note, even with the note still sounding, and Practice has no needle", (await s.page.locator(".played-note").count()) === 0 && (await s.page.locator(".needle").count()) === 0);
+  check("finishing clears the played note, even with the note still sounding, and the tuner is off by default", (await s.page.locator(".played-note").count()) === 0 && (await s.page.locator(".practice .needle").isHidden()));
   await s.close();
 }
 {
@@ -103,16 +103,15 @@ wav(OUT + "e4.wav", [note(64, 5)]);
 {
   const s = await open(OUT + "e4.wav");
   await nav(s.page, "Practice");
-  const box = await s.page.locator("canvas").boundingBox();
-  await s.page.mouse.click(box.x + 130 + 120 + 40, box.y + 2.5 * 84);
+  await clickLanes(s.page, 130 + 120 + 40, 2.5 * 84);
   await sleep(600);
-  await s.page.click('button[aria-label="Play reference"]');
+  await s.page.click(".reference");
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1500);
   const during = await progress(s.page);
   check("the target doesn't count while the reference sounds", during.startsWith("Note 2 of"), during);
-  await s.page.click('button[aria-label="Stop reference"]');
+  await s.page.click(".reference");
   await sleep(800);
   const after = await progress(s.page);
   check("it counts once the reference stops", after.startsWith("Note 3 of"), after);
@@ -126,7 +125,8 @@ wav(OUT + "c4.wav", [note(60, 6)]);
   await s.page.evaluate(() => localStorage.setItem("settings", JSON.stringify({ holdMs: 500 })));
   await freshPractice(s.page);
   await pickPiece(s.page, "c-major-1oct");
-  const green = () => canvasHasColor(s.page, 76, 208, 125);
+  // The ring is blue, as what's heard is everywhere.
+  const green = () => canvasHasColor(s.page, 108, 196, 255);
   check("no hold ring before playing", !(await green()));
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
@@ -143,10 +143,10 @@ wav(OUT + "silent.wav", [rest(3)]);
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   check("there's no Skip button", (await s.page.locator('button:text-is("Skip")').count()) === 0);
-  await s.page.click('button[aria-label="Play reference"]');
+  await s.page.click(".reference");
   await sleep(200);
-  check("Play reference does not advance", (await progress(s.page)).startsWith("Note 1 of"));
-  await s.page.click('button[aria-label="Stop reference"]');
+  check("Hear the note does not advance", (await progress(s.page)).startsWith("Note 1 of"));
+  await s.page.click(".reference");
   await stop(s.page);
   await s.close();
 }
@@ -159,7 +159,7 @@ wav(OUT + "longbow.wav", [note(62, 4)]);
   await s.page.reload();
   await s.page.waitForSelector("nav button");
   await nav(s.page, "Library");
-  await s.page.locator(".piece", { hasText: "Repeat" }).locator('button[aria-label="Practice"]').click();
+  await (await cardOf(s.page, "Repeat")).locator('button:text-is("Practise")').click();
   await start(s.page);
   await sleep(1000);
   const during = await progress(s.page);
@@ -176,7 +176,7 @@ wav(OUT + "bowed.wav", [note(62, 1), rest(0.15), note(62, 1), rest(0.15), note(6
   await s.page.reload();
   await s.page.waitForSelector("nav button");
   await nav(s.page, "Library");
-  await s.page.locator(".piece", { hasText: "Repeat" }).locator('button[aria-label="Practice"]').click();
+  await (await cardOf(s.page, "Repeat")).locator('button:text-is("Practise")').click();
   await start(s.page);
   await sleep(8000);
   check("a fresh bow stroke clears the repeated note", (await progress(s.page)) === "All 3 notes done", await progress(s.page));

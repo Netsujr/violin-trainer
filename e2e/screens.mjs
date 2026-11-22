@@ -1,7 +1,7 @@
 // Every screen and the main flows on phone and tablet sizes, by touch, plus small computer windows.
 // This is Chrome emulating those sizes: it checks layout and touch handling, not Safari or a real device's mic.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, staffNotes, openDrawers } from "./lib.mjs";
+import { laneScore, open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, staffNotes, setGlide, cardOf } from "./lib.mjs";
 
 const SIZES = [
   ["small phone", 320, 568, true],
@@ -19,7 +19,9 @@ const SIZES = [
   ["narrow window", 500, 700, false],
   ["short window", 900, 450, false],
 ];
-const fillsWidth = (canvas, screen) => Math.abs(canvas - Math.min(960, screen - 32)) <= 2; // style.css caps the page at 960.
+// The room beside the sidebar, or under it on a narrow screen, inside the screen's padding.
+const room = (page) => page.evaluate(() => { const main = document.querySelector("main"), style = getComputedStyle(main); return main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight); });
+const fillsWidth = (canvas, width) => Math.abs(canvas - width) <= 2;
 const LONG_TITLE = "Concerto for Violin and Orchestra in D major, first movement";
 const longPiece = Array(10).fill("D4 E4 F#4 G4").join(" | ");
 wav(OUT + "screens-silent.wav", [rest(3)]);
@@ -56,10 +58,10 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
 
   // Every screen, in English and in the longer Portuguese
   for (const language of ["EN", "PT"]) {
-    await go("header summary"); await go(`.language button:text-is("${language}")`); await sleep(200);
-    const tabs = await page.locator("nav button").allInnerTexts();
+    await go(`.language button:text-is("${language}")`); await sleep(200);
+    const tabs = await page.locator("header > nav > button").allInnerTexts();
     for (let index = 0; index < 4; index++) {
-      await page.locator("nav button").nth(index).click(); await sleep(250);
+      await page.locator("header > nav > button").nth(index).click(); await sleep(250);
       await auditCheck(page, `${tag} ${language} ${tabs[index]}`);
       if (index === 1) {
         await go(".staff-toggle"); await sleep(200);
@@ -67,20 +69,17 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
         await go(".staff-toggle"); await sleep(200);
       }
     }
-    await page.locator("header summary").click(); await sleep(150);
-    const panel = await page.locator(".settings-panel").boundingBox();
-    check(`${tag} ${language} Settings: fits on screen`, panel.x >= 0 && panel.x + panel.width <= width + 1, JSON.stringify(panel));
-    await auditCheck(page, `${tag} ${language} Settings open`, ".settings-panel");
-    await page.keyboard.press("Escape"); await sleep(100);
+    await go("header .set-row nav button"); await sleep(250);
+    await auditCheck(page, `${tag} ${language} Settings`);
   }
-  await go("header summary"); await go('.language button:text-is("EN")'); await sleep(200);
+  await go('.language button:text-is("EN")'); await sleep(200);
   await goNav("Practice"); await sleep(250);
 
   // The timeline and the run buttons can be seen together
-  await page.evaluate(() => document.querySelector(".actions").scrollIntoView({ block: "start", behavior: "instant" })); await sleep(100);
-  const view = await page.evaluate(() => { const a = document.querySelector(".actions").getBoundingClientRect(), c = document.querySelector("canvas").getBoundingClientRect(); return { top: Math.round(a.top), canvasBottom: Math.round(c.bottom), canvasWidth: Math.round(c.width), height: innerHeight, width: innerWidth }; });
+  await page.evaluate(() => document.querySelector(".title-row").scrollIntoView({ block: "start", behavior: "instant" })); await sleep(100);
+  const view = await page.evaluate(() => { const a = document.querySelector(".title-row").getBoundingClientRect(), c = document.querySelector("canvas").getBoundingClientRect(); return { top: Math.round(a.top), canvasBottom: Math.round(c.bottom), canvasWidth: Math.round(c.width), height: innerHeight, width: innerWidth }; });
   check(`${tag}: Start and the timeline fit on one screen`, view.top >= 0 && view.canvasBottom <= view.height, JSON.stringify(view));
-  check(`${tag}: the timeline fills the width`, fillsWidth(view.canvasWidth, view.width), JSON.stringify(view));
+  check(`${tag}: the timeline fills the width`, fillsWidth(view.canvasWidth, await room(page)), JSON.stringify(view));
   await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
 
   // Fullscreen: only the controls, lanes and staff, with nothing to scroll
@@ -89,7 +88,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   check(`${tag} fullscreen: lanes and staff fit with no scrolling`, full.down <= 0 && full.staffBottom <= full.inner && Math.abs(full.canvasWidth - (full.width - 32)) <= 2 && !full.header, JSON.stringify(full));
   await auditCheck(page, `${tag} fullscreen`);
   await go('button[aria-label="Exit fullscreen"]'); await sleep(400);
-  check(`${tag} fullscreen: exits to the normal layout`, fillsWidth(await page.locator("canvas").evaluate((c) => Math.round(c.getBoundingClientRect().width)), width) && (await page.locator("header").isVisible()));
+  check(`${tag} fullscreen: exits to the normal layout`, fillsWidth(await page.locator("canvas").evaluate((c) => Math.round(c.getBoundingClientRect().width)), await room(page)) && (await page.locator("header").isVisible()));
 
   // Tapping a tile, on the D string
   const tile = async (index) => { const box = await page.locator("canvas").boundingBox(); const scale = box.height / (84 * 4); const position = { x: (130 + index * 120 + 40) * scale, y: 2.5 * 84 * scale }; await page.locator(".highway-scroll").scrollIntoViewIfNeeded(); touch ? await page.locator(".highway-scroll").tap({ position }) : await page.locator(".highway-scroll").click({ position }); };
@@ -116,41 +115,41 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await followNotes(page, { midis: D, delayMs: 30 });
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
   try {
-    await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
+    await page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 30000 });
     check(`${tag}: a whole scale plays through`, (await laneScore(page)).includes("15 hit"), await laneScore(page));
   } catch { check(`${tag}: a whole scale plays through`, false, await progress(page)); }
   await auditCheck(page, `${tag} finished`);
   await page.waitForSelector('button:text-is("Start"):not([disabled])'); // A finished run ends by itself.
 
   // Tempo with the metronome, and a pattern
-  await page.locator('.section-bar label:has-text("Tempo")').click();
+  await setGlide(page, true);
   await page.locator('header .metronome-button').click();
-  await go('.patterns button:text-is("4")'); await sleep(200);
+  await go('.dock [aria-label="Pattern"] button:text-is("4")'); await sleep(200);
   await auditCheck(page, `${tag} Tempo and pattern`);
   const notes = Number((await progress(page)).match(/of (\d+)/)[1]);
   check(`${tag}: pattern 4 expands the scale`, notes === 90, String(notes));
-  await go('.patterns button:text-is("1")'); await sleep(200);
+  await go('.dock [aria-label="Pattern"] button:text-is("1")'); await sleep(200);
   await followNotes(page, { midis: D, delayMs: 30 });
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
   try {
-    await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 40000 });
+    await page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 40000 });
     check(`${tag}: Tempo and metronome run through`, true);
   } catch { check(`${tag}: Tempo and metronome run through`, false, await progress(page)); }
   await go('button:text-is("Stop")'); await sleep(200);
-  await page.locator('.section-bar label:has-text("Tempo")').click();
+  await setGlide(page, false);
   await page.locator('header .metronome-button').click();
 
   // Turning the device mid-scale
   if (touch) {
     await followNotes(page, { midis: D, delayMs: 400 });
     await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
-    await page.waitForFunction(() => /^Note [3-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 15000 });
+    await page.waitForFunction(() => /^Note [3-9] of/.test(document.querySelector(".practice-progress").textContent), null, { timeout: 15000 });
     const at = await progress(page);
     await page.setViewportSize({ width: height, height: width }); await sleep(500);
     const turned = await page.evaluate(() => { const c = document.querySelector("canvas").getBoundingClientRect(), current = document.querySelector(".highway-scroll"); return { width: Math.round(c.width), inner: innerWidth, sideways: document.documentElement.scrollWidth - innerWidth, scroll: Math.round(current.scrollLeft) }; });
-    check(`${tag}: turning mid-scale refits the timeline`, fillsWidth(turned.width, turned.inner) && turned.sideways <= 0, JSON.stringify(turned));
+    check(`${tag}: turning mid-scale refits the timeline`, fillsWidth(turned.width, await room(page)) && turned.sideways <= 0, JSON.stringify(turned));
     try {
-      await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
+      await page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 30000 });
       check(`${tag}: and the run carries on to the end`, true, `from ${at}`);
     } catch { check(`${tag}: and the run carries on to the end`, false, `${at} > ${await progress(page)}`); }
     await auditCheck(page, `${tag} turned`);
@@ -161,30 +160,30 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   // A recording, and a long title
   await goNav("Library"); await sleep(200);
   await staffNotes(page, LONG_TITLE, longPiece);
-  await go('.row button:text-is("Save piece")'); await sleep(200);
+  await go('.title-tools button:text-is("Save piece")'); await sleep(200);
   await auditCheck(page, `${tag} Library with a long title`);
-  await page.locator(".piece", { hasText: LONG_TITLE }).locator('button[aria-label="Practice"]').click(); await sleep(400);
+  await (await cardOf(page, LONG_TITLE)).locator('button:text-is("Practise")').click(); await sleep(400);
   await auditCheck(page, `${tag} Practice, long title`);
   await go(".staff-toggle"); await sleep(250);
   const sheet = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), notes = [...document.querySelectorAll(".staff .vf-stavenote")].map((n) => n.getBoundingClientRect()); return { notes: notes.length, outside: notes.filter((n) => n.right > panel.right + 1 || n.left < panel.left - 1).length }; });
   check(`${tag}: a 40-note sheet wraps inside the page`, sheet.notes === 40 && sheet.outside === 0, JSON.stringify(sheet));
   await go(".staff-toggle"); await sleep(200);
   await goNav("Library"); await sleep(200);
-  const columns = await page.locator(".library > div").evaluateAll((columns) => columns.map((column) => Math.round(column.getBoundingClientRect().left)));
-  check(`${tag}: scales and songs ${width >= 716 ? "side by side" : "stacked"}`, (columns[0] !== columns[1]) === width >= 716, JSON.stringify(columns));
-  await openDrawers(page); await sleep(100);
-  await page.locator(".piece", { hasText: "Ode to Joy" }).locator('button[aria-label="Practice"]').click(); await sleep(300);
+  // Cards sit side by side when two of their least width fit beside each other.
+  const cards = await page.evaluate(() => ({ room: document.querySelector(".piece-grid").clientWidth, lefts: [...document.querySelectorAll(".piece")].slice(0, 2).map((card) => Math.round(card.getBoundingClientRect().left)) }));
+  check(`${tag}: cards ${cards.room >= 614 ? "side by side" : "stacked"}`, (cards.lefts[0] !== cards.lefts[1]) === cards.room >= 614, JSON.stringify(cards));
+  await (await cardOf(page, "Ode to Joy")).locator('button:text-is("Practise")').click(); await sleep(300);
   await go(".staff-toggle"); await sleep(250);
   const song = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), notes = [...document.querySelectorAll(".staff .vf-stavenote")].map((n) => n.getBoundingClientRect()); return { notes: notes.length, outside: notes.filter((n) => n.right > panel.right + 1 || n.left < panel.left - 1).length }; });
   check(`${tag}: a song in bars stays inside the page`, song.notes === 62 && song.outside === 0, JSON.stringify(song));
   await auditCheck(page, `${tag} a song's full sheet`);
   await go(".staff-toggle"); await sleep(200);
   await goNav("Library"); await sleep(200);
-  await page.locator(".piece", { hasText: LONG_TITLE }).locator('button[aria-label="Practice"]').click(); await sleep(300);
+  await (await cardOf(page, LONG_TITLE)).locator('button:text-is("Practise")').click(); await sleep(300);
   await go('header button[aria-label="Record"]');
   await followNotes(page, { midis: Array(10).fill([62, 64, 66, 67]).flat(), delayMs: 30 });
   await go('button:text-is("Start")'); await page.waitForSelector('button:text-is("Stop")');
-  await page.waitForFunction(() => /^Note [4-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 15000 });
+  await page.waitForFunction(() => /^Note [4-9] of/.test(document.querySelector(".practice-progress").textContent), null, { timeout: 15000 });
   await go('button:text-is("Stop")'); await page.waitForSelector('button:text-is("Start"):not([disabled])');
   await goNav("Calendar"); await page.waitForSelector(".recording-note"); await go(".recording-note"); await sleep(500);
   await auditCheck(page, `${tag} Calendar with a recording`);

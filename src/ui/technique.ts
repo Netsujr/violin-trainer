@@ -10,8 +10,9 @@ import { h } from "./dom";
 import { levelNotes, toggleLabels } from "./guesser";
 import { createCountIn } from "./practice/countIn";
 import { beatMs, MIC_DELAY_MS } from "./practice/timing";
+import { dockOption } from "./panels";
 import type { createStaff } from "./staff";
-import { boxToggle, chipGroup, PAUSE_ICON } from "./toggles";
+import { chipGroup, wordToggle } from "./toggles";
 
 const NOTES_PER_BOW = [1, 2, 3, 4];
 const BOW_STRINGS: StringName[] = ["G", "D", "A", "E"];
@@ -96,8 +97,8 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
     });
     starts = noteStarts(notes);
     // The pause only fits a long bow, and sets the beats itself. The beats keep their room, so the row doesn't move.
-    pauseButton.hidden = settings.bowNotes !== 1;
-    beatsChoice.style.visibility = pausing() ? "hidden" : "";
+    pauseOption.hidden = settings.bowNotes !== 1;
+    beatsOption.style.visibility = pausing() ? "hidden" : "";
     current = -1;
     round = { firstNoteAt: null, readings: [] };
     countIn.cancel();
@@ -157,7 +158,6 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
     saveSettings();
     start();
   };
-  const captioned = (caption: string, group: HTMLElement) => h("span", { className: "chip-choice" }, caption, group);
   const perBow = chipGroup(t.notesPerBow, NOTES_PER_BOW, String, () => settings.bowNotes, (count) => {
     settings.bowNotes = count;
     changed();
@@ -170,26 +170,21 @@ export function createTechnique(staff: ReturnType<typeof createStaff>, session: 
     settings.bowBeats = count;
     changed();
   });
-  const beatsChoice = captioned(t.beats, beats);
-  const pauseButton = boxToggle(h("span", { className: "icon", innerHTML: PAUSE_ICON }), t.pauseFirstHint, settings.bowPause, (on) => {
+  const beatsOption = dockOption(t.beatsPerNote, beats);
+  const pauseButton = wordToggle(t.beforeEachNote, settings.bowPause, (on) => {
     settings.bowPause = on;
     saveSettings();
     start();
   });
-
-  const panel = h(
-    "div",
-    { className: "technique" },
-    h("div", { className: "row" }, captioned(t.perBow, perBow), captioned(t.bowString, strings), beatsChoice),
-    status,
-    results,
-    countIn.overlay,
-  );
+  const pauseOption = dockOption(t.pause, pauseButton, h("p", { className: "dock-caption" }, t.placeFingerThenBow));
 
   return {
-    panel,
-    // The pause switch, for Listen to put over the staff.
-    pause: pauseButton,
+    // The exercise's settings, for the settings panel; what the round is doing, then how it went, and the count-in,
+    // for the stage.
+    options: [dockOption(t.notesPerBow, perBow), dockOption(t.bowString, strings), beatsOption, pauseOption],
+    status,
+    results,
+    overlay: countIn.overlay,
     // The note to play now, or in a rest or before the round, the next one, for the fingerboard.
     get note() {
       return notes.slice(Math.max(0, current)).find((note) => note.pitch) ?? null;

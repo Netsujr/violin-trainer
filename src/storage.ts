@@ -7,6 +7,8 @@ import type { LogEntry } from "./practice/log";
 
 export type Settings = {
   language: Language;
+  // The sidebar shrunk to its icons.
+  sidebarIcons: boolean;
   // How far off, in cents, is in tune (green), and still counts (yellow), if yellow is on.
   greenCents: number;
   toleranceCents: number;
@@ -22,17 +24,15 @@ export type Settings = {
   metronomeOn: boolean;
   bpm: number;
   pattern: number;
+  // The staff panel's whole sheet, rather than one line moving with the lanes.
   staffOpen: boolean;
-  staffBig: boolean;
-  // The staff on its own, with the lanes hidden. In fullscreen it's the full sheet.
-  staffOnly: boolean;
+  // Practice's panels: the lanes, staff and fingerboard each big, small or off, and the tuner on or off.
+  practicePanels: { lanes: PanelSize; staff: PanelSize; board: PanelSize; tuner: boolean };
   toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean };
   // Pieces marked for practice, in no particular order.
   highlighted: string[];
   // Pieces planned for a day, by its date as "2026-11-10".
   plan: Record<string, string[]>;
-  // Whether Practice's "Today's plan" is open. Closed, it shows just the open piece.
-  todayPlanOpen: boolean;
   // Minutes to practise planned pieces for, by day and piece, and the last target each piece had.
   planTargets: Record<string, Record<string, number>>;
   lastTargets: Record<string, number>;
@@ -53,15 +53,22 @@ export type Settings = {
   bowBeats: number;
   // Technique: a long bow's notes each one beat with a beat's pause before the next, to place the finger before bowing.
   bowPause: boolean;
+  // Listen's panels: the staff and fingerboard each big, small or off, and the tuner on or off.
+  listenPanels: { staff: PanelSize; board: PanelSize; tuner: boolean };
   // Tapes on the fingerboard.
-  // Listen's stage: the staff, the staff and fingerboard, or the fingerboard.
-  listenView: ListenView;
   fingerboardTapes: boolean;
 };
 
 export type ListenMode = "free" | "guesser" | "technique";
 export type GuesserLevel = "easy" | "medium" | "hard";
-export type ListenView = "staff" | "both" | "board";
+export type PanelSize = "big" | "small" | "off";
+// What Listen's one view button showed before it had panels.
+type ListenView = "staff" | "both" | "board";
+const LISTEN_PANELS_FROM_VIEW: Record<ListenView, Settings["listenPanels"]> = {
+  staff: { staff: "big", board: "off", tuner: true },
+  both: { staff: "big", board: "small", tuner: true },
+  board: { staff: "off", board: "big", tuner: true },
+};
 export type GuessBy = "eye" | "ear";
 
 // view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
@@ -71,6 +78,7 @@ export type Recording = { blob: Blob; markers: { pitch: string; seconds: number 
 export const COUNT_IN_CHOICES = [2, 4, 6, 8, 10];
 
 const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
+  sidebarIcons: false,
   greenCents: 10,
   toleranceCents: 40,
   yellowOn: true,
@@ -86,12 +94,10 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bpm: 60,
   pattern: 0,
   staffOpen: false,
-  staffBig: false,
-  staffOnly: false,
+  practicePanels: { lanes: "big", staff: "small", board: "off", tuner: false },
   toggles: { fingers: true, noteNames: true, letterNames: true },
   highlighted: [],
   plan: {},
-  todayPlanOpen: true,
   planTargets: {},
   lastTargets: {},
   listenMode: "free",
@@ -103,7 +109,7 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bowString: "A",
   bowBeats: 4,
   bowPause: false,
-  listenView: "staff",
+  listenPanels: { staff: "big", board: "small", tuner: true },
   fingerboardTapes: true,
 };
 
@@ -130,11 +136,26 @@ export function getSettings() {
       highlighted: stored.highlighted ?? Object.keys((stored as { targetDays?: object }).targetDays ?? {}),
       // The note guesser was a switch before Listen had three modes.
       listenMode: stored.listenMode ?? ((stored as { guesserOn?: boolean }).guesserOn ? "guesser" : "free"),
-      // The stage's view was the note guesser's alone before it was all of Listen's.
-      listenView: stored.listenView ?? (stored as { guesserView?: ListenView }).guesserView ?? DEFAULT_SETTINGS.listenView,
+      // Listen had one button stepping through its views before it had panels, and before that it was the note guesser's.
+      listenPanels: stored.listenPanels ?? listenPanelsFrom(stored as { listenView?: ListenView; guesserView?: ListenView }),
+      // Practice had a button stepping through the lanes and staff, a bigger staff, and the staff alone, before it had panels.
+      practicePanels: stored.practicePanels ?? practicePanelsFrom(stored as { staffBig?: boolean; staffOnly?: boolean }),
     };
+    // The views those panels replaced, and the drawer today's plan was, aren't kept once carried over.
+    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen"]) delete (settings as Record<string, unknown>)[old];
   }
   return settings;
+}
+
+function listenPanelsFrom({ listenView, guesserView }: { listenView?: ListenView; guesserView?: ListenView }) {
+  const view = listenView ?? guesserView;
+  return view ? LISTEN_PANELS_FROM_VIEW[view] : DEFAULT_SETTINGS.listenPanels;
+}
+
+function practicePanelsFrom({ staffBig, staffOnly }: { staffBig?: boolean; staffOnly?: boolean }): Settings["practicePanels"] {
+  if (staffOnly) return { lanes: "off", staff: "big", board: "off", tuner: false };
+  if (staffBig) return { lanes: "small", staff: "big", board: "off", tuner: false };
+  return DEFAULT_SETTINGS.practicePanels;
 }
 
 export const saveSettings = () => write("settings", getSettings());

@@ -3,99 +3,96 @@ import { HIGHEST_MIDI, LOWEST_MIDI, OPEN_STRINGS, stringFor } from "../music/fin
 import { frequencyOf, midiOf, nearestMidi, type PieceNote, type StringName } from "../music/notes";
 import { getSettings, saveSettings } from "../storage";
 import { h, svg } from "./dom";
+import { wordToggle } from "./toggles";
 
-const WIDTH = 160;
-const HEIGHT = 320;
-const NUT_Y = 46;
-const BOTTOM_Y = 312;
+const WIDTH = 1000;
+const HEIGHT = 210;
+const NUT_X = 64;
+const END_X = 990;
 // The board shows each string as far as first position reaches, a little past the third finger, spaced as on a violin.
 const SHOWN_SEMITONES = 7.5;
+// From the bottom of the board to the top, as a player looking down sees them: G nearest, E furthest.
 const STRINGS: StringName[] = ["G", "D", "A", "E"];
-// Where each string crosses the nut and the bottom of the board: they spread apart towards the bridge. The board is
+// Where each string crosses the nut and the end of the board: they spread apart towards the bridge. The board is
 // drawn wider than a real one, so the circles on it are easy to see.
-const NUT_XS = [50, 70, 90, 110];
-const BOTTOM_XS = [30, 63.3, 96.7, 130];
+const NUT_YS = [145, 115, 85, 55];
+const END_YS = [162, 121, 79, 38];
 const STRING_WIDTHS = [3, 2.5, 2, 1.5];
+const LETTER_X = 34;
 // Beginners' tapes: the first finger, the high second and the third, in semitones above the open string.
 const TAPES = [2, 4, 5];
-// An open string is played with no finger down, shown just above the nut.
-const OPEN_Y = NUT_Y - 13;
-const TARGET_COLOR = "#d62828";
-const RIGHT_COLOR = "#14914a";
-const HEARD_COLOR = "#1f6fd1";
+const TAPE_LABEL_Y = 202;
+// An open string is played with no finger down, shown just past the nut.
+const OPEN_X = 100;
+const TARGET_COLOR = "#e6ae48";
+const RIGHT_COLOR = "#6cc4ff";
+const ON_TARGET_COLOR = "#1a1405";
+const HEARD_COLOR = "#6cc4ff";
+const BOARD_COLOR = "#07090d";
+// The board's edges, from the nut to its end, where it's wider.
+const BOARD_TOP = [40, 18];
+const BOARD_BOTTOM = [160, 182];
 
 // How far down a string a note is stopped, as a share of what the board shows: 0 at the nut. A semitone takes up
 // less of the string the higher it goes, as on a real string.
 export const boardShare = (semitones: number) => (1 - 2 ** (-semitones / 12)) / (1 - 2 ** (-SHOWN_SEMITONES / 12));
 
-// Where a note is stopped on a string, open just above the nut.
+const xAt = (share: number) => NUT_X + (END_X - NUT_X) * share;
+const along = ([nut, end]: number[], x: number) => nut + ((end - nut) * (x - NUT_X)) / (END_X - NUT_X);
+
+// Where a note is stopped on a string, open just past the nut.
 function pointOn(string: StringName, semitones: number) {
   const index = STRINGS.indexOf(string);
-  if (semitones <= 0) return { x: NUT_XS[index], y: OPEN_Y };
-  const share = boardShare(semitones);
-  return { x: NUT_XS[index] + (BOTTOM_XS[index] - NUT_XS[index]) * share, y: NUT_Y + (BOTTOM_Y - NUT_Y) * share };
+  const x = semitones <= 0 ? OPEN_X : xAt(boardShare(semitones));
+  return { x, y: along([NUT_YS[index], END_YS[index]], x) };
 }
 
-// A small scroll and pegbox above the nut.
-const drawHead = () =>
-  svg(
-    "g",
-    { class: "fingerboard-head" },
-    svg("path", { d: `M68 ${NUT_Y} L67 20 Q67 14 73 14 L87 14 Q93 14 93 20 L92 ${NUT_Y} Z`, fill: "#7a4424" }),
-    svg("circle", { cx: 80, cy: 10, r: 9, fill: "#7a4424" }),
-    svg("path", { d: "M80 10 m-5 0 a5 5 0 1 1 5 5 a3 3 0 1 1 -3 -3", fill: "none", stroke: "#4a2614", "stroke-width": 1.5 }),
-    ...[22, 34].map((y) => svg("rect", { x: 55, y, width: 13, height: 4, rx: 2, fill: "#2b1d14" })),
-    ...[28, 40].map((y) => svg("rect", { x: 92, y, width: 13, height: 4, rx: 2, fill: "#2b1d14" })),
-  );
-
-// The dark board below the nut, and the nut.
+// The dark board, the nut, and each string's letter beside it.
 const drawBoard = () => [
-  svg("path", { d: `M42 ${NUT_Y} L118 ${NUT_Y} L144 ${BOTTOM_Y + 8} L16 ${BOTTOM_Y + 8} Z`, fill: "#1d1a17" }),
-  svg("rect", { x: 41, y: NUT_Y - 3, width: 78, height: 5, rx: 1, fill: "#efe6d2" }),
+  svg("path", { d: `M${NUT_X} ${BOARD_TOP[0]}L${END_X} ${BOARD_TOP[1]}V${BOARD_BOTTOM[1]}L${NUT_X} ${BOARD_BOTTOM[0]}Z`, fill: BOARD_COLOR }),
+  svg("rect", { x: NUT_X - 6, y: BOARD_TOP[0] - 4, width: 8, height: BOARD_BOTTOM[0] - BOARD_TOP[0] + 8, rx: 2, fill: "#c9c2b0" }),
+  ...STRINGS.map((string, index) =>
+    svg("text", { class: "fingerboard-letter", x: LETTER_X, y: NUT_YS[index] + 6, "text-anchor": "middle" }, document.createTextNode(t.strings[string])),
+  ),
 ];
 
 const drawStrings = () =>
-  STRINGS.map((_, index) => svg("line", { x1: NUT_XS[index], y1: NUT_Y - 3, x2: BOTTOM_XS[index], y2: BOTTOM_Y + 8, stroke: "#d8d0bf", "stroke-width": STRING_WIDTHS[index] }));
+  STRINGS.map((_, index) => svg("line", { x1: NUT_X, y1: NUT_YS[index], x2: END_X, y2: END_YS[index], stroke: "#c9d1dc", "stroke-width": STRING_WIDTHS[index] }));
 
-// A tape across the board, as wide as the board is there.
-function drawTape(semitones: number) {
-  const share = boardShare(semitones);
-  const y = NUT_Y + (BOTTOM_Y - NUT_Y) * share;
-  return svg("rect", { x: 42 - 26 * share, y: y - 2.5, width: 76 + 52 * share, height: 5, fill: "#f6f1e3", opacity: 0.85 });
+// A tape across the board, as wide as the board is there, with its finger under it.
+function drawTape(semitones: number, index: number) {
+  const x = xAt(boardShare(semitones));
+  return svg(
+    "g",
+    {},
+    svg("line", { x1: x, y1: along(BOARD_TOP, x) + 2, x2: x, y2: along(BOARD_BOTTOM, x) - 2, stroke: "#3a4558", "stroke-width": 4 }),
+    svg("text", { class: "fingerboard-tape-finger", x, y: TAPE_LABEL_Y, "text-anchor": "middle" }, document.createTextNode(String(index + 1))),
+  );
 }
 
-// A violin's fingerboard in first position, nut at the top, to show where a note is played: a red circle, with its
-// finger in it, where it's stopped, filling green once it's played in tune. What's heard shows as a blue ghost where
-// it's played, on whichever string, joined to the circle by a dashed line, with a word on top saying which way to go.
-// Its head switches beginners' tapes on and off, and glows while they're on. For use wherever a note to play is shown.
+// A violin's fingerboard in first position, drawn across the screen with the nut on the left and the E string at the
+// top, to show where a note is played: a brass circle, with its finger in it, where it's stopped, turning blue once
+// it's played in tune. What's heard shows as a blue ghost where it's played, on whichever string, joined to the circle
+// by a dashed line, with a word saying which way to go. A small switch in its corner puts beginners' tapes on it. For
+// use wherever a note to play is shown.
 export function createFingerboard() {
   const settings = getSettings();
-  const head = drawHead();
   const tapes = svg("g", { class: "fingerboard-tapes" }, ...TAPES.map(drawTape));
-  const target = svg("circle", { class: "fingerboard-target", r: 10, "stroke-width": 3 });
-  const finger = svg("text", { "text-anchor": "middle", "dominant-baseline": "central", "font-size": 12, "font-weight": 700, "font-family": "system-ui, sans-serif" });
-  const line = svg("line", { stroke: HEARD_COLOR, "stroke-width": 2, "stroke-dasharray": "4 3" });
-  const ghost = svg("circle", { class: "fingerboard-ghost", r: 8, fill: HEARD_COLOR, "fill-opacity": 0.45, stroke: HEARD_COLOR, "stroke-width": 2 });
-  const picture = svg("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}`, "aria-hidden": "true" }, head, ...drawBoard(), tapes, ...drawStrings(), line, target, finger, ghost);
+  const target = svg("circle", { class: "fingerboard-target", r: 15, "stroke-width": 2 });
+  const finger = svg("text", { class: "fingerboard-finger", "text-anchor": "middle", "dominant-baseline": "central", fill: ON_TARGET_COLOR });
+  const line = svg("line", { stroke: HEARD_COLOR, "stroke-width": 2.5, "stroke-dasharray": "6 5" });
+  const nextRing = svg("circle", { class: "fingerboard-next", r: 15, fill: "none", stroke: TARGET_COLOR, "stroke-width": 2, "stroke-dasharray": "5 4" });
+  const ghost = svg("circle", { class: "fingerboard-ghost", r: 12, fill: HEARD_COLOR, "fill-opacity": 0.4, stroke: HEARD_COLOR, "stroke-width": 2.5 });
+  const picture = svg("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}`, "aria-hidden": "true" }, ...drawBoard(), tapes, ...drawStrings(), nextRing, line, target, finger, ghost);
   const hint = h("p", { className: "fingerboard-hint", hidden: true });
-  // A bare button over the head, so it's the head that's pressed.
-  const headButton = h("button", {
-    type: "button",
-    className: "fingerboard-head-button",
-    title: t.tapes,
-    ariaLabel: t.tapes,
-    onclick() {
-      settings.fingerboardTapes = !settings.fingerboardTapes;
-      saveSettings();
-      showTapes();
-    },
+  const tapesToggle = wordToggle(t.tapes, settings.fingerboardTapes, (on) => {
+    settings.fingerboardTapes = on;
+    saveSettings();
+    showTapes();
   });
-  const showTapes = () => {
-    tapes.style.display = settings.fingerboardTapes ? "" : "none";
-    head.classList.toggle("lit", settings.fingerboardTapes);
-    headButton.ariaPressed = String(settings.fingerboardTapes);
-  };
-  const element = h("div", { className: "fingerboard" }, h("div", { role: "img", ariaLabel: t.fingerboard }, picture, hint), headButton);
+  tapesToggle.className = "fingerboard-tapes-toggle";
+  const showTapes = () => (tapes.style.display = settings.fingerboardTapes ? "" : "none");
+  const element = h("div", { className: "fingerboard" }, h("div", { role: "img", ariaLabel: t.fingerboard }, picture, hint), tapesToggle);
   let note: { string: StringName; semitones: number } | null = null;
   showTapes();
 
@@ -108,16 +105,19 @@ export function createFingerboard() {
     hint.textContent = text ?? "";
   };
   const colour = (right: boolean) => {
-    target.setAttribute("fill", right ? RIGHT_COLOR : "#fff");
+    target.setAttribute("fill", right ? RIGHT_COLOR : TARGET_COLOR);
     target.setAttribute("stroke", right ? RIGHT_COLOR : TARGET_COLOR);
-    finger.setAttribute("fill", right ? "#fff" : TARGET_COLOR);
   };
   const hideHeard = () => [ghost, line].forEach((part) => (part.style.display = "none"));
 
   return {
     element,
-    // The note to play, with its string and finger, or none. right shows it as played right.
-    show(next: PieceNote | null, right = false) {
+    // The note to play, with its string and finger, or none. right shows it as played right. upcoming, the note after
+    // it, shows as a dashed ring where it's played.
+    show(next: PieceNote | null, right = false, upcoming: PieceNote | null = null) {
+      const after = upcoming?.pitch && upcoming.string ? pointOn(upcoming.string, midiOf(upcoming.pitch) - OPEN_STRINGS[upcoming.string]) : null;
+      nextRing.style.display = after ? "" : "none";
+      if (after) at(nextRing, after);
       note = next?.pitch && next.string ? { string: next.string, semitones: midiOf(next.pitch) - OPEN_STRINGS[next.string] } : null;
       [target, finger].forEach((part) => (part.style.display = note ? "" : "none"));
       hideHeard();

@@ -5,17 +5,21 @@ import { h } from "./dom";
 import { beatMs } from "./practice/timing";
 import { PLAY_ICON, STOP_ICON } from "./toggles";
 
-// The piece editor's play buttons, one for each line of the staff, so a piece can be heard as it's written. A line
-// plays at Practice's BPM, one line at a time, and pressing its button again stops it.
+// The piece editor's Hear this line, so a piece can be heard as it's written. A line plays at Practice's BPM, and
+// pressing the button again stops it.
 export function createLinePlayer() {
   // The violin recordings start loading now, so the first line plays at once.
   loadRecordings();
   let playing: { button: HTMLButtonElement; stop: () => void } | null = null;
 
+  const label = (button: HTMLButtonElement, on: boolean) => {
+    button.innerHTML = on ? STOP_ICON : PLAY_ICON;
+    button.append(on ? t.stop : t.playLine);
+  };
+
   function reset() {
     if (!playing) return;
-    playing.button.innerHTML = PLAY_ICON;
-    playing.button.title = playing.button.ariaLabel = t.playLine;
+    label(playing.button, false);
     playing = null;
   }
 
@@ -24,9 +28,10 @@ export function createLinePlayer() {
     reset();
   }
 
-  // The button for one line. It reads the line's notes when pressed, so a note just dragged plays where it is now.
+  // The button for a line. It reads the line's notes when pressed, so a note just dragged plays where it is now.
   function button(lineNotes: () => PieceNote[]) {
-    const button = h("button", { className: "editor-play", innerHTML: PLAY_ICON, title: t.playLine, ariaLabel: t.playLine });
+    const button = h("button", { type: "button", className: "ghost-button editor-play" });
+    label(button, false);
     button.onclick = () => {
       const again = playing?.button === button;
       stop();
@@ -35,8 +40,7 @@ export function createLinePlayer() {
         if (playing?.stop === stopLine) reset();
       });
       playing = { button, stop: stopLine };
-      button.innerHTML = STOP_ICON;
-      button.title = button.ariaLabel = t.stop;
+      label(button, true);
     };
     return button;
   }

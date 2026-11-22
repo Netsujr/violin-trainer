@@ -25,7 +25,11 @@ Read this file before making any change, and follow it.
 ## UI
 
 - **Hide what doesn't apply.** Don't grey it out.
-- Keep controls compact. Prefer small icon toggles and single buttons that step through choices over large panels.
+- Controls show their words. Only the icons everyone knows stand alone: + for add, full screen, back, previous and
+  next, and a bin for delete or clear. An icon-only button has an `aria-label`, and no control relies on a tooltip.
+- Choices are joined segments (`chipGroup`), the one picked solid brass. A panel's button steps big, small and off.
+- Listen and Practice fill the window: a title row, the panels taking the height that's left, and the settings panel
+  docked at the bottom. A screen's own items, like Listen's modes, go in the sidebar under its button.
 - Ask before anything that can't be undone, with `confirmAction`.
 - Every string goes in `src/i18n.ts` in **both English and Portuguese**.
 - The layout must work at phone width (about 400px).

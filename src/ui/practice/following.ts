@@ -22,7 +22,7 @@ type Deps = {
   moveOn: (session: Session) => void;
 };
 
-// "Don't wait": the lanes hold on the first note until it's played in tune, then keep moving at the BPM,
+// Keep moving: the lanes hold on the first note until it's played in tune, then keep moving at the BPM,
 // judging each note as it passes.
 export function createFollowing({ metronome, highway, staff, isMuted, endIndex, track, moveOn }: Deps) {
   const settings = getSettings();

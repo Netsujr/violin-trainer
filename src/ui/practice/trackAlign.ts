@@ -3,17 +3,18 @@ import { localNumber, t } from "../../i18n";
 import type { Track } from "../../storage";
 import { h } from "../dom";
 import { BEAT_WIDTH, HIT_X } from "../highway";
-import { contentWidth, timelineScale } from "../layout";
 
 const STRIP_HEIGHT = 72;
 const PEAKS_PER_SECOND = 200;
 const NUDGE_SECONDS = 0.02;
-const WAVE_COLOR = "#e0a050";
-const BEAT_LINE_COLOR = "rgba(255, 255, 255, 0.14)";
-const FIRST_NOTE_COLOR = "#4cd07d";
-const HIT_LINE_COLOR = "rgba(176, 48, 32, 0.8)";
+const WAVE_COLOR = "#e6ae48";
+const BEAT_LINE_COLOR = "rgba(255, 255, 255, 0.1)";
+const FIRST_NOTE_COLOR = "#6cc4ff";
+const HIT_LINE_COLOR = "rgba(232, 236, 242, 0.8)";
 
-type Deps = { track: () => Track | null; audio: HTMLAudioElement; save: () => void; onDone: () => void };
+// lanes is how large the lanes are drawn and how wide they are, which the waveform under them matches.
+export type Lanes = { readonly scale: number; readonly width: number };
+type Deps = { track: () => Track | null; audio: HTMLAudioElement; save: () => void; onDone: () => void; lanes: Lanes };
 
 // The recording's speed, 50% to 100%, keeping its pitch. It applies as it moves, and is saved once let go.
 export function createSpeedSlider(audio: HTMLAudioElement, save: () => void) {
@@ -46,7 +47,7 @@ export function createSpeedSlider(audio: HTMLAudioElement, save: () => void) {
 
 // Lining a backing track up with its piece. The recording's waveform runs under the lanes on the same timeline, and is
 // dragged until its notes sit under the tiles. Tempo, first note and speed can be set by hand too, all while it plays.
-export function createTrackAlign({ track, audio, save, onDone }: Deps) {
+export function createTrackAlign({ track, audio, save, onDone, lanes }: Deps) {
   // The loudest sound in each short stretch of the recording.
   let peaks: Float32Array | null = null;
   let beatAtHit = 0;
@@ -57,8 +58,7 @@ export function createTrackAlign({ track, audio, save, onDone }: Deps) {
   let offsetInput = h("input");
 
   function draw() {
-    const scale = timelineScale();
-    const width = contentWidth();
+    const { scale, width } = lanes;
     const height = STRIP_HEIGHT * scale;
     strip.width = width * devicePixelRatio;
     strip.height = height * devicePixelRatio;
@@ -104,7 +104,7 @@ export function createTrackAlign({ track, audio, save, onDone }: Deps) {
     if (!current) return;
     strip.setPointerCapture(down.pointerId);
     const startOffset = current.offset;
-    const toSeconds = (pixels: number) => ((pixels / (BEAT_WIDTH * timelineScale())) * 60) / current.bpm;
+    const toSeconds = (pixels: number) => ((pixels / (BEAT_WIDTH * lanes.scale)) * 60) / current.bpm;
     strip.onpointermove = (move) => setOffset(startOffset - toSeconds(move.clientX - down.clientX), false);
     strip.onpointerup = strip.onpointercancel = () => {
       strip.onpointermove = null;

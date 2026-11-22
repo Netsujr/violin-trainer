@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm, spyOnRecordings, recordings } from "./lib.mjs";
+import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm, spyOnRecordings, recordings, cardOf } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -31,13 +31,15 @@ const shot = (label) => page.screenshot({ path: `${OUT}qa-${name}-${label}.png` 
 const button = (text) => page.getByRole("button", { name: text, exact: true });
 const press = (locator, options) => (touch ? locator.tap(options) : locator.click(options));
 const tab = async (text) => { await press(button(text)); await sleep(300); };
-const showing = () => page.locator("section > p").first().textContent();
+const showing = () => page.locator(".practice-progress").first().textContent();
 const startRun = async () => { await press(button("Start")); await button("Stop").waitFor(); };
 // A finished run ends by itself, so Stop may be gone already, or go as it's pressed.
 const stopRun = async () => { if (await button("Stop").count()) await press(button("Stop"), { timeout: 1500 }).catch(() => {}); await page.locator('button:text-is("Start"):not([disabled])').first().waitFor(); await sleep(150); };
 // Options are always shown now, above the lanes.
 const options = async () => {};
-const setOption = async (label, on) => { await options(); const box = page.locator(`.section-bar label:has-text("${label}") input`); if ((await box.isChecked()) !== on) await press(box); await sleep(100); };
+// A choice in the settings panel, by its group and its words.
+const choice = (group, name) => page.locator(`.dock [aria-label="${group}"] button:text-is("${name}")`);
+const setGlide = async (on) => { const glide = page.locator('.dock button:text-is("Glide")'); if ((await glide.getAttribute("aria-pressed")) !== String(on)) await press(glide); await sleep(100); };
 // Practice at a speed, through Options, which starts closed on a phone.
 const practiceAt = async (bpm) => {
   await freshPractice(page);
@@ -105,9 +107,9 @@ await shot("2-listen-note");
 await page.evaluate(() => window.playTone(62));
 await sleep(700);
 check("follows to a D", (await heard(page)) === "0 Ré D", await heard(page));
-await press(page.locator('.listen .box-toggle[aria-label^="Letter names"]')); await sleep(100);
+await press(page.locator('.dock button:text-is("A B C")')); await sleep(100);
 check("a switch changes what shows", (await heard(page)) === "0 Ré", await heard(page));
-await press(page.locator('.listen .box-toggle[aria-label^="Letter names"]')); await sleep(100);
+await press(page.locator('.dock button:text-is("A B C")')); await sleep(100);
 await page.evaluate(() => window.playTone(0));
 await sleep(600);
 check("goes quiet in silence", (await heard(page)) === "", await heard(page));
@@ -125,7 +127,7 @@ check("Practice says so too", (await page.locator(".warning").first().innerText(
 
 flow("4. Practice: a whole scale, waiting for each note");
 await freshPractice(page);
-check("Tempo and the count-in are on the lanes' bar", (await page.locator('.section-bar label:has-text("Tempo")').isVisible()) && (await page.locator(".section-bar .count-in").isVisible()));
+check("Glide and the count-in are in the settings panel", (await page.locator('.dock button:text-is("Glide")').isVisible()) && (await page.locator(".dock .count-in").isVisible()));
 await auditCheck(page, "Practice");
 await shot("4-practice");
 await options();
@@ -151,22 +153,22 @@ await setCountIn(page, 0);
 await followNotes(page, { midis: Array(16).fill(64) });
 await startRun(); await sleep(500);
 const ghost = () => page.evaluate(() => { const group = document.querySelector(".played-note"); return group ? { arrow: group.querySelector("text").textContent, color: group.querySelector("ellipse").getAttribute("fill") } : null; });
-check("too high shows a blue ghost pointing down", (await ghost())?.arrow === "↓" && (await ghost())?.color === "#1f6fd1", JSON.stringify(await ghost()));
+check("too high shows a red ghost pointing down", (await ghost())?.arrow === "↓" && (await ghost())?.color === "#f08a8d", JSON.stringify(await ghost()));
 check("and the note waits", (await progress(page)) === "Note 1 of 15");
 await page.locator(".staff").scrollIntoViewIfNeeded();
 await shot("5-ghost");
 await stopRun();
 check("Stop clears it", (await ghost()) === null);
 await spyOnRecordings(page);
-await press(button("Play reference")); await sleep(1500);
+await press(page.locator(".reference")); await sleep(1500);
 const tone = await recordings(page);
-check("the reference, a violin note, keeps sounding, audio running", tone.length === 1 && tone[0].midi === 62 && !tone[0].stopped && tone[0].state === "running" && (await button("Stop reference").count()) === 1, JSON.stringify(tone));
-await press(button("Stop reference")); await sleep(150);
-check("and turns off", (await button("Play reference").count()) === 1);
+check("the reference, a violin note, keeps sounding, audio running", tone.length === 1 && tone[0].midi === 62 && !tone[0].stopped && tone[0].state === "running" && (await page.locator(".reference").getAttribute("aria-pressed")) === "true", JSON.stringify(tone));
+await press(page.locator(".reference")); await sleep(150);
+check("and turns off", (await page.locator(".reference").getAttribute("aria-pressed")) === "false");
 
 flow("6. Tempo and the metronome");
 await practiceAt(90);
-await setOption("Tempo", true);
+await setGlide(true);
 await press(page.locator('header .metronome-button')); await sleep(100);
 await followNotes(page, { midis: D, delayMs: 120 });
 await spyOnSounds();
@@ -177,22 +179,22 @@ const clicks = (await sounds()).filter((sound) => sound.hz >= 2500);
 check("the run finishes on the beat", (await laneScore(page)).includes("15 hit"), await laneScore(page));
 check("the metronome clicks, audio running", clicks.length >= 10 && clicks.every((click) => click.state === "running") && clicks.some((click) => click.hz === 3200), `${clicks.length} clicks, ${clicks.at(-1)?.state}`);
 await stopRun();
-await setOption("Tempo", false);
+await setGlide(false);
 await press(page.locator('header .metronome-button')); await sleep(100);
 
-flow("7. Don't wait");
+flow("7. Keep moving");
 await practiceAt(120);
-await press(button("Don't wait")); await sleep(300);
-check("the icon turns green", (await button("Don't wait").evaluate((element) => getComputedStyle(element).color)) === "rgb(76, 208, 125)");
-check("Tempo no longer applies, so it's hidden", await page.locator('.section-bar label:has-text("Tempo")').isHidden());
+await press(choice("Pace", "Keep moving")); await sleep(300);
+check("Keep moving is picked", (await choice("Pace", "Keep moving").getAttribute("aria-pressed")) === "true");
+check("Glide no longer applies, so it's hidden", await page.locator('.dock button:text-is("Glide")').isHidden());
 await followNotes(page, { midis: D, delays: { 3: 60000 } });
 await startRun();
 await waitForText(page, "Note 3 of 15");
 await sleep(120);
-check("hit notes fill pale green", await canvasHasColor(page, 201, 237, 212));
+check("hit notes fill pale blue", await canvasHasColor(page, 158, 216, 255));
 await waitForText(page, "Note 4 of 15");
 await sleep(120);
-check("missed notes fill pale red as they pass", await canvasHasColor(page, 246, 207, 200));
+check("missed notes fill a muted red as they pass", await canvasHasColor(page, 232, 163, 163));
 await page.locator(".highway").scrollIntoViewIfNeeded();
 await shot("7-dont-wait");
 await waitForText(page, "All 15 notes done");
@@ -201,20 +203,20 @@ const score = await laneScore(page);
 check("ends with a score: 14 of 15 is 93%", (await laneScore(page)) === "Score: 93% · 14 hit, 1 missed" && score.includes("14 hit, 1 missed"), score.replaceAll("\n", " / "));
 await stopRun();
 check("the score goes in the log", (await savedLog(page)).at(-1).score === 93);
-await press(button("Don't wait")); await sleep(100);
+await press(choice("Pace", "Wait for me")); await sleep(100);
 
 flow("8. Loop and the top note twice");
 await freshPractice(page);
-await press(button("Repeat the top note")); await sleep(300);
-check("×2 adds the note", (await progress(page)) === "Note 1 of 16", await progress(page));
-await press(button("Repeat the top note")); await sleep(300);
-await press(button("Loop")); await sleep(100);
+await press(choice("Top note", "Twice")); await sleep(300);
+check("Twice adds the note", (await progress(page)) === "Note 1 of 16", await progress(page));
+await press(choice("Top note", "Once")); await sleep(300);
+await press(choice("Repeat", "Loop")); await sleep(100);
 await followNotes(page, { midis: D, delayMs: 120 });
 await startRun();
 await waitForText(page, "Loop 2", 60000);
 check("Loop goes round again", (await progress(page)).startsWith("Note 1 of 15"), await progress(page));
 await stopRun();
-await press(button("Loop")); await sleep(100);
+await press(choice("Repeat", "Once")); await sleep(100);
 
 flow("9. Picking notes");
 await freshPractice(page);
@@ -239,7 +241,7 @@ if (!isPhone) {
   const { x, y } = await staffNoteAt(4);
   await page.keyboard.down("Shift"); await page.mouse.click(x, y); await page.keyboard.up("Shift");
   await sleep(500);
-  check("Shift+click selects a section, highlighted", (await page.locator(".staff .section-band").count()) === 3 && (await page.locator(".mode-note").innerText()).startsWith("Section: notes 3 to 5"), await page.locator(".mode-note").innerText());
+  check("Shift+click selects a section, highlighted", (await page.locator(".staff .section-band").count()) === 3 && (await page.locator(".practice-section").innerText()) === "Notes 3 to 5", await page.locator(".practice-section").innerText());
   await shot("9-section");
   await followNotes(page, { midis: D, delayMs: 120 });
   await startRun();
@@ -266,26 +268,24 @@ check("the results show on screen", card.y >= 0 && card.y + card.height <= view.
 await shot("10-results");
 await stopRun();
 await press(button("Exit fullscreen")); await sleep(400);
-check("and back out to the normal layout", (await page.locator("header").isVisible()) && (await page.locator(".mode-note").count()) === 1);
+check("and back out to the normal layout", (await page.locator("header").isVisible()) && (await page.locator(".dock").isVisible()));
 
 flow("11. Library");
 await tab("Library");
-const columns = await page.locator(".library > div").evaluateAll((list) => list.map((column) => Math.round(column.getBoundingClientRect().left)));
-check(`scales and songs ${isPhone ? "stack" : "sit side by side"}`, (columns[0] === columns[1]) === isPhone, JSON.stringify(columns));
-const shownCards = await page.locator(".library > div").evaluateAll((groups) => groups.map((group) => group.querySelectorAll(":scope > .piece").length));
-const drawers = await page.locator(".library .more-pieces > summary").allInnerTexts();
-check("three groups, three cards each, the rest in drawers", shownCards.join() === "3,3,2" && drawers.join() === "Show 14 more,Show 5 more", `${shownCards.join()} | ${drawers.join()}`);
+const groupCounts = await page.locator(".nav-sub .sub-hint").allInnerTexts();
+check("three groups in the sidebar, with their counts, the first shown whole", groupCounts.join() === "17 pieces,8 pieces,2 pieces" && (await page.locator(".library .piece").count()) === 17, groupCounts.join());
 await auditCheck(page, "Library");
 await shot("11-library");
+await press(page.locator('.nav-sub .sub-item:has-text("Classic tunes")')); await sleep(150);
 const row = page.locator(".piece", { hasText: "Twinkle" });
 await press(row.locator(".piece-name"));
-check("tapping a card highlights it, and its group counts it", (await row.evaluate((card) => card.classList.contains("highlighted"))) && (await page.locator(".library h3").nth(1).innerText()) === "Classic tunes (1 selected)", await page.locator(".library h3").nth(1).innerText());
+check("tapping a title highlights it, and the count says so", (await row.evaluate((card) => card.classList.contains("highlighted"))) && (await page.locator(".library .title-caption").innerText()) === "8 pieces · 1 selected", await page.locator(".library .title-caption").innerText());
 await staffNotes(page, "My tune", "D4 E4 F#4");
 await press(saveStaff(page)); await sleep(200);
 const mine = page.locator(".piece", { hasText: "My tune" });
-check("a new piece joins My songs", (await page.locator(".library > div").nth(2).locator(".piece", { hasText: "My tune" }).count()) === 1);
-await press(mine.getByRole("button", { name: "Practice", exact: true })); await sleep(400);
-check("the play icon opens it in Practice", (await progress(page)) === "Note 1 of 3", await progress(page));
+check("a new piece joins My songs, which saving goes back to", (await page.locator(".library h1").innerText()) === "My songs" && (await mine.count()) === 1);
+await press(mine.getByRole("button", { name: "Practise", exact: true })); await sleep(400);
+check("Practise opens it in Practice", (await progress(page)) === "Note 1 of 3", await progress(page));
 await tab("Library");
 const modal = page.locator("dialog[open]");
 const say = async (label) => { await press(modal.getByRole("button", { name: label, exact: true })); await sleep(200); };
@@ -299,47 +299,49 @@ await press(page.locator(".piece", { hasText: "My tune" }).getByRole("button", {
 await say("Delete");
 check("and it can be deleted", (await page.locator(".piece", { hasText: "My tune" }).count()) === 0);
 
-// Writing one on the staff, editing it, and saving it as a PDF.
-const staffNames = () => page.$$eval(".editor-column button.editor-name", (names) => names.map((name) => name.textContent).join());
+// Writing one on Add piece's staff, editing it, and saving it as a PDF.
+const notesOnStaff = () => page.locator(".editor-column:not(.blank):not(.spill)").count();
+const selectedNote = () => page.locator(".selected-note").innerText();
 const blankStaff = () => page.locator(".editor-column.blank .editor-sheet").first();
-const staffSave = page.locator("section > .row").last().getByRole("button", { name: "Save piece", exact: true });
+const staffSave = saveStaff(page);
 const storedPiece = (title) => page.evaluate((title) => JSON.parse(localStorage.getItem("pieces")).find((piece) => piece.title === title), title);
-await page.fill('input[placeholder="Title"]', "Written here");
-await blankStaff().scrollIntoViewIfNeeded();
+await press(page.locator('.library button[aria-label="Add piece"]')); await sleep(250);
+check("+ opens Add piece", (await page.locator(".add-piece h1").innerText()) === "Add piece");
+await page.fill('input[aria-label="Title"]', "Written here");
 await press(blankStaff(), { position: { x: 20, y: 90 } }); await sleep(250);
-check("a press on the staff places a note, with its name", (await staffNames()) === "Sol", await staffNames());
-await page.locator('.editor-column[data-index="0"] select').selectOption("2"); await sleep(150);
-await press(page.locator('.editor-column[data-index="0"] button.editor-name')); await sleep(150);
-check("the note's name changes its sharp or flat", (await staffNames()) === "Sol♯", await staffNames());
-await auditCheck(page, "Library, writing on the staff");
+check("a press on the staff places a note, picked out for the tools under it", (await notesOnStaff()) === 1 && (await selectedNote()).startsWith("Sol (G)"), await selectedNote());
+await press(page.locator('.note-tools [aria-label="Beats"] button:text-is("2")')); await sleep(150);
+await press(page.locator('.note-tools button:text-is("♯ Sharp")')); await sleep(150);
+check("the tools change its beats and its sharp or flat", (await selectedNote()).startsWith("Sol♯") && (await page.locator('.note-tools [aria-label="Beats"] button[aria-pressed="true"]').innerText()) === "2", await selectedNote());
+await auditCheck(page, "Add piece, writing on the staff");
 await shot("11-staff");
-await staffSave.scrollIntoViewIfNeeded();
 await press(staffSave); await sleep(250);
 const written = await storedPiece("Written here");
 check("it saves with its length and a fingering", written?.notes[0].beats === 2 && written.notes[0].finger !== undefined, JSON.stringify(written));
-check("and the staff is blank again", (await staffNames()) === "");
-await press(page.locator(".piece", { hasText: "Written here" }).getByRole("button", { name: "Edit piece", exact: true })); await sleep(300);
-check("the pencil opens it for editing", (await page.locator("section > h2").last().textContent()) === "Edit piece" && (await staffNames()) === "Sol♯");
-await page.fill('input[placeholder="Title"]', "Rewritten");
+check("and the staff is blank again", (await page.evaluate(() => JSON.parse(localStorage.getItem("pieceDraft")).notes.length)) === 0);
+await press(page.locator(".piece", { hasText: "Written here" }).getByRole("button", { name: "Edit", exact: true })); await sleep(300);
+check("Edit opens it on Add piece", (await page.locator(".add-piece h1").innerText()) === "Edit piece" && (await notesOnStaff()) === 1);
+await page.fill('input[aria-label="Title"]', "Rewritten");
 await press(staffSave); await sleep(250);
 check("saving updates it in place", (await storedPiece("Rewritten"))?.id === written.id && (await storedPiece("Written here")) === undefined);
 const rewritten = page.locator(".piece", { hasText: "Rewritten" });
 await auditCheck(page, "Library, with a custom song", ".library");
 await rewritten.scrollIntoViewIfNeeded();
 await shot("11-custom-row");
-const [pdf] = await Promise.all([page.waitForEvent("download"), press(rewritten.getByRole("button", { name: "Download PDF", exact: true }))]);
+const [pdf] = await Promise.all([page.waitForEvent("download"), press(rewritten.getByRole("button", { name: "PDF", exact: true }))]);
 const pdfPath = `${OUT}qa-${name}.pdf`;
 await pdf.saveAs(pdfPath);
-check("Download saves a PDF, named after the song", pdf.suggestedFilename() === "Rewritten.pdf" && readFileSync(pdfPath).subarray(0, 5).toString() === "%PDF-", pdf.suggestedFilename());
-await blankStaff().scrollIntoViewIfNeeded();
+check("PDF saves a PDF, named after the song", pdf.suggestedFilename() === "Rewritten.pdf" && readFileSync(pdfPath).subarray(0, 5).toString() === "%PDF-", pdf.suggestedFilename());
+await press(page.locator('.library button[aria-label="Add piece"]')); await sleep(250);
 await press(blankStaff(), { position: { x: 20, y: 90 } }); await sleep(250);
-await press(page.locator("section > .row").last().getByRole("button", { name: "Clear", exact: true })); await sleep(200);
+await press(page.locator('.title-tools button:text-is("Clear")')); await sleep(200);
 check("Clear asks first", (await modal.innerText()).includes("Remove all the notes"));
 await say("Clear");
-check("and then empties the staff", (await staffNames()) === "");
+check("and then empties the staff", (await notesOnStaff()) === 0);
+await press(page.locator('.add-piece button[aria-label="Back to My songs"]')); await sleep(250);
 await press(rewritten.getByRole("button", { name: "Delete", exact: true })); await sleep(200);
 await say("Delete");
-await press(page.locator(".piece", { hasText: "Hot Cross Buns" }).getByRole("button", { name: "Practice", exact: true })); await sleep(400);
+await press((await cardOf(page, "Hot Cross Buns")).getByRole("button", { name: "Practise", exact: true })); await sleep(400);
 await options();
 await setBpm(page, 120);
 await setCountIn(page, 0);
@@ -373,23 +375,19 @@ check("Delete, once confirmed, removes only the recording, leaving the day's sum
 
 flow("13. Calendar");
 const logText = await page.locator("section").innerText();
-check("reads sensibly", ["min practised", "Score: 93%", "D (Ré) major", "Plan"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
+check("reads sensibly", ["Practised for", "Score: 93%", "D (Ré) major", "Plan"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
 await shot("13-calendar");
 
 flow("14. Settings");
-await press(page.locator("header summary")); await sleep(250);
-const panel = await page.locator(".settings-panel").boundingBox();
-check("fits on screen", panel.x >= 0 && panel.x + panel.width <= page.viewportSize().width + 1, JSON.stringify(panel));
-await auditCheck(page, "Settings", ".settings-panel");
+await press(page.locator("header .set-row nav button")); await sleep(250);
+await auditCheck(page, "Settings");
 await shot("14-settings");
 await page.locator('input[aria-label="Close enough"]').fill("25"); await sleep(100);
-check("Tolerance applies and saves", (await savedSettings(page)).toleranceCents === 25 && (await page.evaluate(() => document.documentElement.style.getPropertyValue("--tolerance"))) === "25%");
+check("Close enough applies and saves", (await savedSettings(page)).toleranceCents === 25 && (await page.locator(".dial-key").innerText()).includes("within 25 cents"));
 await page.locator('input[aria-label="Close enough"]').fill("40");
-await tapPoint({ x: page.viewportSize().width / 2, y: page.viewportSize().height - 8 }); await sleep(200);
-check("tapping elsewhere closes it", await page.locator(".settings-panel").isHidden());
 
 flow("15. Portuguese");
-await press(page.locator("header summary")); await press(button("PT")); await sleep(300);
+await press(button("PT")); await sleep(300);
 check("the app switches over", (await page.title()) === "Treinador de Notas para Violino" && (await button("Praticar").count()) === 1);
 for (const screen of ["Ouvir", "Praticar", "Biblioteca", "Calendário"]) {
   await tab(screen);
@@ -397,8 +395,8 @@ for (const screen of ["Ouvir", "Praticar", "Biblioteca", "Calendário"]) {
 }
 await tab("Praticar");
 await shot("15-portuguese");
-check("Practice is translated", (await button("Iniciar").count()) === 1 && (await page.locator(".mode-note").innerText()).startsWith("Espera cada nota"), await page.locator(".mode-note").innerText());
-await press(page.locator("header summary")); await press(button("EN")); await sleep(300);
+check("Practice is translated", (await button("Iniciar").count()) === 1 && (await page.locator(".dock").innerText()).includes("Esperar por mim"), await page.locator(".dock").innerText());
+await press(button("EN")); await sleep(300);
 
 flow("16. Coming back later");
 await page.reload(); await page.waitForSelector("nav button");

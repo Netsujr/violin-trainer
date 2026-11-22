@@ -1,90 +1,117 @@
-import { t, type Language } from "../i18n";
+import { localNumber, t } from "../i18n";
 import { getSettings, passCents, saveSettings } from "../storage";
-import { h } from "./dom";
-import { GEAR_ICON } from "./toggles";
-
-const LANGUAGES: [Language, string][] = [
-  ["en", "EN"],
-  ["pt", "PT"],
-];
+import { backupButtons } from "./backup";
+import { h, type Screen } from "./dom";
+import { createNeedle } from "./needle";
 
 type SliderKey = "greenCents" | "toleranceCents" | "holdMs" | "minRms";
+// Past this, the storage used shows as a warning.
+const STORAGE_WARNING_BYTES = 500 * 1024 * 1024;
 
-// changeLanguage switches the app to another language.
-export function createSettingsPanel(changeLanguage: (language: Language) => void) {
+// A setting's name with a line saying what it does, then its control.
+const setting = (name: string, caption: string, ...controls: Node[]) =>
+  h("div", { className: "setting" }, h("div", {}, h("p", { className: "setting-name" }, name), ...(caption ? [h("p", { className: "setting-caption" }, caption)] : [])), ...controls);
+
+// Tuning, listening and your data, on a screen of their own. Tuning shows the dial as it will look, redrawn as the
+// sliders move.
+export function settingsScreen(): Screen {
   const settings = getSettings();
-  // The needle's zones, on the page for its CSS: green either side of the middle, and yellow out to what still counts.
-  const showZones = () => {
-    document.documentElement.style.setProperty("--green", `${settings.greenCents}%`);
-    document.documentElement.style.setProperty("--tolerance", `${passCents()}%`);
+  const dial = createNeedle();
+  const key = h("div", { className: "dial-key" });
+  const showTuning = () => {
+    dial.drawZones();
+    key.replaceChildren(
+      h("span", { className: "in-tune" }, t.inTuneWithin(settings.greenCents)),
+      ...(settings.yellowOn ? [h("span", { className: "close-enough" }, t.closeEnoughWithin(passCents()))] : []),
+    );
   };
 
-  // A slider for one setting, named label, with its value beside it.
-  const range = (label: string, key: SliderKey, min: number, max: number, step: number, unit: string) => {
-    const show = () => `${settings[key].toLocaleString(t.locale)} ${unit}`;
+  // A slider for one setting, named label for screen readers, with its value beside it.
+  const slider = (label: string, settingKey: SliderKey, min: number, max: number, step: number, unit = "") => {
+    const show = () => `${settings[settingKey].toLocaleString(t.locale)}${unit && ` ${unit}`}`;
     const value = h("output", { textContent: show() });
     const input = h("input", {
       type: "range",
       min: String(min),
       max: String(max),
       step: String(step),
-      value: String(settings[key]),
+      value: String(settings[settingKey]),
       ariaLabel: label,
       oninput: () => {
-        settings[key] = Number(input.value);
+        settings[settingKey] = Number(input.value);
         value.textContent = show();
         saveSettings();
-        showZones();
+        showTuning();
       },
     });
-    return [input, value] as const;
+    return h("label", { className: "slide" }, input, value);
   };
-  const slider = (label: string, key: SliderKey, min: number, max: number, step: number, unit: string) =>
-    h("label", { className: "setting" }, `${label} `, ...range(label, key, min, max, step, unit));
 
-  // Each zone is a small box in its colour, named only in its tooltip, with its slider beside it. The yellow box
-  // switches yellow on and off, its slider hidden while it's off, when only green counts.
-  const yellowRange = range(t.yellowZone, "toleranceCents", 10, 50, 1, "cents");
-  const yellowButton = h("button", {
-    type: "button",
-    className: "zone-cell",
-    title: t.yellowZone,
-    ariaLabel: t.yellowZone,
-    onclick() {
-      settings.yellowOn = !settings.yellowOn;
-      saveSettings();
-      showYellow();
-    },
-  }, h("span", { className: "zone yellow" }));
+  // Close enough switches on and off, its slider hidden while it's off, when only in tune counts.
+  const yellowSlider = slider(t.yellowZone, "toleranceCents", 10, 50, 1, "cents");
+  const yellowButtons = [true, false].map((on) =>
+    h("button", {
+      type: "button",
+      textContent: on ? t.on : t.off,
+      onclick() {
+        settings.yellowOn = on;
+        saveSettings();
+        showYellow();
+      },
+    }),
+  );
   const showYellow = () => {
-    yellowButton.ariaPressed = String(settings.yellowOn);
-    yellowRange.forEach((part) => (part.hidden = !settings.yellowOn));
-    showZones();
+    yellowButtons.forEach((button, index) => (button.ariaPressed = String(settings.yellowOn === !index)));
+    yellowSlider.hidden = !settings.yellowOn;
+    showTuning();
   };
   showYellow();
 
-  return h(
-    "details",
-    {},
-    // A gear, named in its tooltip and for screen readers.
-    h("summary", { className: "settings-gear", innerHTML: GEAR_ICON, title: t.settings, ariaLabel: t.settings }),
+  const storage = h("p", { className: "storage-used" });
+  void navigator.storage.estimate().then(({ usage = 0 }) => {
+    storage.textContent = `${localNumber(usage / 1024 / 1024, 1)} MB`;
+    storage.classList.toggle("warning", usage > STORAGE_WARNING_BYTES);
+  });
+  const sayProblem = (problem: string) => {
+    storage.textContent = problem;
+    storage.classList.add("warning");
+  };
+
+  const element = h(
+    "section",
+    { className: "settings" },
+    h("h1", {}, t.screens.Settings),
     h(
-      "div",
-      { className: "settings-panel" },
+      "section",
+      { className: "settings-section" },
+      h("h2", {}, t.tuning),
+      h("p", { className: "setting-caption" }, t.tuningCaption),
       h(
         "div",
-        { className: "setting language-setting" },
-        t.language,
+        { className: "tuning" },
+        h("div", {}, dial.element, key),
         h(
           "div",
-          { role: "group", className: "language", ariaLabel: t.language },
-          ...LANGUAGES.map(([language, label]) => h("button", { textContent: label, ariaPressed: String(language === settings.language), onclick: () => changeLanguage(language) })),
+          {},
+          setting(t.greenZone, t.greenCaption, slider(t.greenZone, "greenCents", 3, 25, 1, "cents")),
+          setting(t.yellowZone, t.yellowCaption, h("div", { role: "group", className: "segments", ariaLabel: t.yellowZone }, ...yellowButtons), yellowSlider),
         ),
       ),
-      h("div", { className: "setting zone-setting" }, h("span", { className: "zone-cell", title: t.greenZone }, h("span", { className: "zone green" })), ...range(t.greenZone, "greenCents", 3, 25, 1, "cents")),
-      h("div", { className: "setting zone-setting" }, yellowButton, ...yellowRange),
-      slider(t.holdTime, "holdMs", 100, 500, 10, "ms"),
-      slider(t.micSensitivity, "minRms", 0.002, 0.05, 0.001, "RMS"),
+    ),
+    h(
+      "section",
+      { className: "settings-section" },
+      h("h2", {}, t.listening),
+      setting(t.holdTime, t.holdCaption, slider(t.holdTime, "holdMs", 100, 500, 10, "ms")),
+      setting(t.micSensitivity, t.micCaption, slider(t.micSensitivity, "minRms", 0.002, 0.05, 0.001)),
+    ),
+    h(
+      "section",
+      { className: "settings-section" },
+      h("h2", {}, t.yourData),
+      setting(t.backUp, t.backUpWarning, h("div", { className: "row" }, ...backupButtons(sayProblem))),
+      setting(t.storageUsed, "", storage),
     ),
   );
+  return { element, leave() {} };
 }

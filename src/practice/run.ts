@@ -21,7 +21,10 @@ export async function startRun(
 
   const mic = await startMic(() => settings.minRms, onReading);
   const recorder = record ? startRecorder(mic.stream) : null;
-  const view = settings.staffOnly ? "staffOnly" : settings.staffBig ? "bigStaff" : "lanes";
+  // How Practice looked, as the views recordings were saved with before it had panels: the staff alone with the lanes
+  // off, a bigger staff with it big and the lanes small, and otherwise the lanes.
+  const { lanes, staff } = settings.practicePanels;
+  const view = lanes === "off" ? "staffOnly" : staff === "big" && lanes === "small" ? "bigStaff" : "lanes";
   const fullscreen = document.documentElement.classList.contains("fullscreen");
   const session = new Session(piece, performance.now());
 

@@ -2,8 +2,8 @@ import { t } from "../../i18n";
 import type { PieceNote } from "../../music/notes";
 import { getTrack, saveTrack, type Track } from "../../storage";
 import { h } from "../dom";
-import { boxToggle, EAR_ICON, MUSIC_ICON } from "../toggles";
-import { createSpeedSlider, createTrackAlign } from "./trackAlign";
+import { wordToggle } from "../toggles";
+import { createSpeedSlider, createTrackAlign, type Lanes } from "./trackAlign";
 
 // Starting partway, the recording starts this many beats before the note, to come in on.
 const LEAD_IN_BEATS = 4;
@@ -16,14 +16,13 @@ type Options = {
   // Ends a running session, before a change it can't carry on through.
   stopRun: () => Promise<unknown>;
   onChange: () => void;
-  // Puts a switch on the bar above the lanes.
-  addToBar: (node: Node) => void;
+  lanes: Lanes;
 };
 
 // The piece's backing track in a run. Tracks are added in Library: Practice just switches one on, and aligning shows the
 // controls to line it up. During a run the lanes follow its playback, so speed and any change to the alignment carry
 // straight through.
-export function createBackingTrack({ aligning, stopRun, onChange, addToBar }: Options) {
+export function createBackingTrack({ aligning, stopRun, onChange, lanes }: Options) {
   let pieceId = "";
   let track: Track | null = null;
   const audio = new Audio();
@@ -34,18 +33,17 @@ export function createBackingTrack({ aligning, stopRun, onChange, addToBar }: Op
   const save = () => {
     if (track) saveTrack(pieceId, track);
   };
-  const align = aligning ? createTrackAlign({ track: () => track, audio, save, onDone: aligning }) : null;
+  const align = aligning ? createTrackAlign({ track: () => track, audio, save, onDone: aligning, lanes }) : null;
   const active = () => Boolean(track && (aligning || track.on));
-  // On the lanes' bar: whether a run plays along with it, and whether the mic listens meanwhile.
-  const listenToggle = boxToggle(h("span", { className: "icon", innerHTML: EAR_ICON }), t.listenToNotes, false, async (on) => {
+  // In the settings panel: whether a run plays along with it, and whether the mic listens meanwhile.
+  const listenToggle = wordToggle(t.listenToNotes, false, async (on) => {
     await stopRun();
     track!.listen = on;
     save();
   });
-  const barToggle = boxToggle(h("span", { className: "icon", innerHTML: MUSIC_ICON }), "", false, (on) => setOn(on));
-  listenToggle.hidden = barToggle.hidden = true;
-  addToBar(listenToggle);
-  addToBar(barToggle);
+  const barToggle = wordToggle(t.playAlong, false, (on) => setOn(on));
+  const switches = h("div", { role: "group", className: "segments", ariaLabel: t.backingTrack }, barToggle, listenToggle);
+  switches.hidden = true;
   const speed = createSpeedSlider(audio, save);
 
   async function setOn(on: boolean) {
@@ -67,19 +65,20 @@ export function createBackingTrack({ aligning, stopRun, onChange, addToBar }: Op
   }
 
   function renderToggle() {
-    listenToggle.hidden = barToggle.hidden = !track || Boolean(aligning);
+    switches.hidden = !track || Boolean(aligning);
     if (!track || aligning) return;
 
     barToggle.ariaPressed = String(track.on);
-    barToggle.title = barToggle.ariaLabel = t.playWithTrack(track.name);
+    barToggle.title = t.playWithTrack(track.name);
     listenToggle.ariaPressed = String(track.listen);
     speed.use(track);
   }
 
 
   return {
-    // The speed, for Practice to show in place of the BPM.
+    // The speed, for Practice to show in place of the BPM, and the switches, for its settings panel.
     speedControl: speed.element,
+    switches,
     // While aligning: the controls, in place of Options, and the waveform, under the lanes.
     panel: align?.panel ?? null,
     strip: align?.strip ?? null,

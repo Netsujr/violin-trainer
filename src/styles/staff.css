@@ -1,0 +1,68 @@
+/* The staff, light on the dark panels. VexFlow leaves its notes and lines uncoloured, so they take the ink here;
+   staff.ts colours the labels itself. */
+.staff {
+  width: fit-content;
+  padding-inline: 0.5rem;
+  background: var(--panel);
+  border-radius: var(--pico-border-radius);
+}
+
+.staff svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  fill: var(--text);
+  stroke: var(--text);
+}
+
+.staff .vf-stave path {
+  stroke: #6f7a8d;
+}
+
+/* The note to play now, in brass. */
+.staff .current :is(text, rect) {
+  fill: var(--brass);
+}
+
+.staff .current path {
+  stroke: var(--brass);
+}
+
+/* A note played right in the note guesser turns blue, with a little pop. */
+.staff .right :is(text, rect) {
+  fill: var(--blue);
+}
+
+.staff .right path {
+  stroke: var(--blue);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .staff .right {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: right-pop 0.4s ease-out;
+  }
+}
+
+/* "Keep moving": the pitch played, as a line through the staff, in the blue of what's heard. In tune, it crosses the
+   middle of the notehead. */
+.pitch-trace {
+  pointer-events: none;
+}
+
+.pitch-trace polyline {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+/* Where a note sounded when it shouldn't have, as Technique's finger timing finds: a highlighter under the line. */
+.pitch-trace polyline.mark {
+  stroke: var(--brass);
+  stroke-width: 10;
+  opacity: 0.45;
+}

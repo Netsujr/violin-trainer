@@ -1,6 +1,6 @@
 // Tempo mode, rhythm patterns and the metronome.
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, D_MAJOR as D, OUT, pickPiece, setBpm, savedSettings } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, seed, followNotes, trackNotes, noteGaps, near, progress, D_MAJOR as D, OUT, pickPiece, setBpm, savedSettings, bpmShown, clickLanes, laneScale } from "./lib.mjs";
 
 const REPEAT = [{ id: "r", title: "Repeat", source: "imported", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
 const TWO = [{ id: "two", title: "Two", source: "built-in", notes: [{ pitch: "D4", string: "D", finger: "0" }, { pitch: "E4", string: "D", finger: "1" }] }];
@@ -46,7 +46,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.page.evaluate(() => {
     window.scrolls = [];
     const tick = () => {
-      if (document.querySelector("section > p").textContent.startsWith("Note")) window.scrolls.push(document.querySelector(".highway-scroll").scrollLeft);
+      if (document.querySelector(".practice-progress").textContent.startsWith("Note")) window.scrolls.push(document.querySelector(".highway-scroll").scrollLeft);
       requestAnimationFrame(tick);
     };
     tick();
@@ -115,19 +115,19 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await start(s.page);
   await s.page.waitForFunction(() => document.querySelector(".highway-scroll").scrollLeft > 5);
   const box = await s.page.locator("canvas").boundingBox();
-  await s.page.mouse.click(box.x + 130 + 5 * 120 - (await scroll(s.page)), box.y + 126);
+  await clickLanes(s.page, 130 + 5 * 120, 126, await scroll(s.page));
   await sleep(700);
-  check("tempo: clicking a note during a glide goes there", (await progress(s.page)) === "Note 6 of 15" && Math.abs((await scroll(s.page)) - 600) <= 1);
+  check("tempo: clicking a note during a glide goes there", (await progress(s.page)) === "Note 6 of 15" && Math.abs((await scroll(s.page)) - 5 * 120 * (await laneScale(s.page))) <= 1);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 {
   const s = await practice("t-silent.wav", {});
   const metronome = s.page.locator("header .metronome-button");
-  const badge = () => metronome.locator(".bpm-badge").innerText();
+  const badge = async () => String(await bpmShown(s.page));
   await metronome.focus();
   await s.page.keyboard.press("ArrowRight");
-  check("BPM moves in single steps, shown in the metronome's corner", (await badge()) === "61" && (await savedSettings(s.page)).bpm === 61);
+  check("BPM moves in single steps, shown in the metronome's name", (await badge()) === "61" && (await savedSettings(s.page)).bpm === 61);
   await metronome.hover();
   await s.page.mouse.wheel(0, -100);
   check("and the mouse wheel steps it too", (await badge()) === "62");
@@ -149,15 +149,15 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.page.reload();
   await s.page.waitForSelector("nav button");
   await nav(s.page, "Practice");
-  check("BPM survives a reload", (await s.page.locator("header .metronome-button .bpm-badge").innerText()) === "62");
+  check("BPM survives a reload", (await bpmShown(s.page)) === 62);
   await s.close();
 }
 
 // Patterns
-const buttons = (page) => page.locator(".patterns button");
+const buttons = (page) => page.locator('.dock [aria-label="Pattern"] button');
 {
   const s = await practice("t-silent.wav", {});
-  check("five patterns, the first chosen", (await buttons(s.page).count()) === 5 && (await s.page.locator('.patterns button[aria-pressed="true"]').innerText()) === "1");
+  check("five patterns, the first chosen", (await buttons(s.page).count()) === 5 && (await s.page.locator('.dock [aria-label="Pattern"] button[aria-pressed="true"]').innerText()) === "1");
   check("pattern 1 is as written", (await progress(s.page)) === "Note 1 of 15");
   const staffFacts = () => s.page.evaluate(() => { const staff = document.querySelector(".staff"); return { notes: staff.querySelectorAll(".vf-stavenote").length, beams: staff.querySelectorAll(".vf-beam").length }; });
   await buttons(s.page).nth(1).click();
@@ -174,7 +174,7 @@ const buttons = (page) => page.locator(".patterns button");
   await s.page.reload();
   await s.page.waitForSelector("nav button");
   await nav(s.page, "Practice");
-  check("the pattern survives a reload", (await s.page.locator('.patterns button[aria-pressed="true"]').innerText()) === "5");
+  check("the pattern survives a reload", (await s.page.locator('.dock [aria-label="Pattern"] button[aria-pressed="true"]').innerText()) === "5");
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   await buttons(s.page).nth(0).click();
@@ -215,7 +215,7 @@ for (const [label, count, pattern, ms, expected] of [
   const s = await practice("t-two.wav", { settings: { tempoOn: true, bpm: 60, pattern: 1 }, pieces: TWO });
   await pickPiece(s.page, "two");
   await run(s);
-  await s.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 12000 });
+  await s.page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 12000 });
   const stats = await s.page.locator(".stats").innerText();
   check("a finished pattern says so", stats.includes("Pattern 2 done in") && stats.includes("2 hit"), stats.replaceAll("\n", " / "));
   await stop(s.page);

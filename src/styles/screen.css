@@ -1,0 +1,234 @@
+/* The parts every screen builds from: joined segments, the title row, panels and the settings panel docked at the
+   bottom. */
+/* Options as joined segments: one bar, a thin line between buttons, the one picked solid brass. */
+[role="group"].segments {
+  width: auto;
+  margin: 0;
+}
+
+[role="group"].segments:not(:has(:focus-visible)) {
+  box-shadow: none;
+}
+
+.segments > button {
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0 0.75rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+}
+
+.segments > button + button {
+  border-left: none;
+  box-shadow: inset 2px 0 0 var(--ground);
+}
+
+.segments > button[aria-pressed="true"] {
+  color: var(--on-brass);
+  font-weight: 700;
+  background: var(--brass);
+  border-color: var(--brass);
+}
+
+/* Listen and Practice fill the window: a title row on top, the panels taking whatever height is left, and the
+   settings panel docked at the bottom, never moving. */
+main:has(> .fills-window) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 40rem;
+  padding-bottom: 1.75rem;
+}
+
+.fills-window {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 0;
+}
+
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.875rem 1.25rem;
+}
+
+.title-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  margin-left: auto;
+}
+
+/* Start and Stop: the brightest thing on the screen. */
+.start-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0 1.375rem;
+  color: var(--on-brass);
+  font-weight: 700;
+  background: var(--brass);
+  border: none;
+  border-radius: 1.375rem;
+}
+
+.start-button:is(:hover, :focus-visible) {
+  background: var(--brass-light);
+}
+
+.start-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: currentColor;
+}
+
+/* An outlined button with its word, and the icon-only ones beside it in the title row. */
+.ghost-button,
+.title-tools .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  margin: 0;
+  padding: 0 0.875rem;
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 1.25rem;
+}
+
+.title-tools .icon-button {
+  width: 2.5rem;
+  padding: 0;
+}
+
+.ghost-button:hover,
+.title-tools .icon-button:hover {
+  background: var(--raised);
+}
+
+.ghost-button svg,
+.title-tools .icon-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* A panel on the stage: the staff, the fingerboard, the lanes or the tuner. */
+.stage-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0.875rem 1.375rem;
+  background: var(--panel);
+  border-radius: 1rem;
+}
+
+.stage-panel[data-size="big"] {
+  grid-column: 1 / -1;
+}
+
+.stage-panel[data-size="small"] {
+  order: 1;
+}
+
+/* The settings panel, docked at the bottom: each setting its name over its control, in one wrapping row. */
+.dock {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.875rem 2rem;
+  margin: 0;
+  padding: 1rem 1.5rem;
+  background: var(--dock);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+.dock-mode {
+  display: contents;
+}
+
+.dock-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+
+.dock-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.dock-caption {
+  max-width: 15rem;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+/* A switch on its own in the settings panel, like Sound: outlined, lit brass when on. */
+.dock-option > button[aria-pressed] {
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 1.125rem;
+}
+
+.dock-option > button[aria-pressed="true"] {
+  color: var(--brass-light);
+  background: rgb(230 174 72 / 0.12);
+  border-color: var(--brass);
+}
+
+/* A panel's size in the On screen group: big is solid brass, small a dim brass, off plain. */
+.segments > button[data-size="big"] {
+  color: var(--on-brass);
+  font-weight: 700;
+  background: var(--brass);
+  border-color: var(--brass);
+}
+
+.segments > button[data-size="small"] {
+  color: var(--brass-light);
+  font-weight: 600;
+  background: var(--brass-dim);
+}
+
+/* Phones: a group too wide for the row wraps onto another, rather than running off the panel. */
+@media (max-width: 600px) {
+  [role="group"].segments {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 900px) {
+  main:has(> .fills-window) {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 1rem;
+  }
+}

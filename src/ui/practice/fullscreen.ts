@@ -1,6 +1,5 @@
 import { t } from "../../i18n";
 import { h } from "../dom";
-import { setFullscreenLayout } from "../layout";
 import { COMPRESS_ICON, EXPAND_ICON } from "../toggles";
 import { ICON_BUTTON } from "./options";
 
@@ -19,7 +18,6 @@ export function createFullscreen(onChange: (on: boolean) => void) {
 
   function set(value: boolean) {
     on = value;
-    setFullscreenLayout(value);
     document.documentElement.classList.toggle("fullscreen", value);
     label();
     onChange(value);

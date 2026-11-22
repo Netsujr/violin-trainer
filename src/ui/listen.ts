@@ -1,25 +1,23 @@
-import { localNumber, t } from "../i18n";
+import { t } from "../i18n";
 import { fillFingering } from "../music/fingering";
 import { centsFrom, nearestMidi, pitchOf } from "../music/notes";
-import { getSettings, passCents, saveSettings, type ListenMode, type ListenView } from "../storage";
+import { getSettings, passCents, saveSettings, type ListenMode } from "../storage";
 import { h, type Screen } from "./dom";
 import { createGuesser, toggleLabels } from "./guesser";
-import { createNeedle } from "./needle";
 import { createFingerboard } from "./fingerboard";
 import { createFreeTarget } from "./freeTarget";
+import { createListenDock } from "./listenDock";
+import { createListenStage } from "./listenStage";
+import { dockOption } from "./panels";
 import { createFullscreen } from "./practice/fullscreen";
-import { ICON_BUTTON } from "./practice/options";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
 import { createTechnique } from "./technique";
-import { BOWING_ICON, CHART_ICON, createIconToggle, FINGERBOARD_ICON, GUESS_ICON, MUSIC_ICON, STAFF_AND_BOARD_ICON, STAFF_ICON } from "./toggles";
+import { CHART_ICON } from "./toggles";
 import { createVolumeCurve } from "./volumeCurve";
 
 const SILENCE_MS = 300;
 const MODES: ListenMode[] = ["free", "guesser", "technique"];
-const MODE_ICONS = { free: MUSIC_ICON, guesser: GUESS_ICON, technique: BOWING_ICON };
-const VIEWS: ListenView[] = ["staff", "both", "board"];
-const VIEW_ICONS = { staff: STAFF_ICON, both: STAFF_AND_BOARD_ICON, board: FINGERBOARD_ICON };
 // The staff's width, in its own units: Technique's rounds have up to eight notes, each with its name under it.
 const SHEET_WIDTH = 300;
 const WIDE_SHEET_WIDTH = 480;
@@ -36,7 +34,6 @@ export const SCORED_MODES = [LOGGED_AS.guesser, LOGGED_AS.technique];
 // goProgress opens the note guesser's and Technique's scores over time.
 export function listenScreen(goProgress: () => void): Screen {
   const settings = getSettings();
-  const hertz = h("p");
   const volume = createVolumeCurve();
   const staff = createStaff();
   let midi: number | null = null;
@@ -44,7 +41,6 @@ export function listenScreen(goProgress: () => void): Screen {
   const board = createFingerboard();
   const guesser = createGuesser(staff, () => controls.session, board);
   const technique = createTechnique(staff, () => controls.session, () => controls.finish(() => true));
-  const needle = createNeedle();
   const target = createFreeTarget(staff, () => {
     renderNote();
     showBoard(null);
@@ -66,27 +62,30 @@ export function listenScreen(goProgress: () => void): Screen {
     hover = null;
     renderNote();
   });
-  const progressLabel = t.progressOf(t.screens.Listen);
-  const progressButton = h("button", { type: "button", className: `${ICON_BUTTON} listen-progress`, innerHTML: CHART_ICON, title: progressLabel, ariaLabel: progressLabel, onclick: goProgress });
+  const progressButton = h("button", { type: "button", className: "ghost-button listen-progress", innerHTML: CHART_ICON, onclick: goProgress }, t.progress);
   const modeNames = { free: t.freePlay, guesser: t.noteGuesser, technique: t.technique };
-  // The modes as icons, with the one picked named under the needle.
-  const modeButtons = MODES.map((mode) => h("button", { type: "button", innerHTML: MODE_ICONS[mode], title: modeNames[mode], ariaLabel: modeNames[mode], onclick: () => setMode(mode) }));
-  const modeTitle = h("p", { className: "listen-mode-title" });
+  // The modes, in the sidebar under Listen, each with a line saying what it does.
+  const modeButtons = MODES.map((mode) =>
+    h("button", { type: "button", className: "sub-item", onclick: () => setMode(mode) }, h("span", { className: "sub-name" }, modeNames[mode]), h("span", { className: "sub-hint" }, t.modeHints[mode])),
+  );
+  const title = h("h1");
+  // What a tap on the staff does, under it: in free play it picks a note to copy, and by ear it sounds the note again.
+  // The CSS shows the one that applies.
+  const staffHint = h("p", { className: "stage-hint" }, h("span", { className: "hint-free" }, t.pickNoteHint), h("span", { className: "hint-ear" }, t.hearAgain));
 
-  // Each mode has its own row of choices under the buttons, hidden in the others. Technique also shows how loud the
-  // playing is, under the needle. The CSS shows each mode's parts from data-mode, keeping their room in the others.
+  // Each mode has its own settings in the settings panel, and its own parts on the stage, which the CSS shows from
+  // data-mode: Technique also shows how loud the playing is, under the tuner.
   function setMode(mode: ListenMode) {
     element.dataset.mode = mode;
     settings.listenMode = mode;
     saveSettings();
     modeButtons.forEach((button, index) => (button.ariaPressed = String(MODES[index] === mode)));
-    modeTitle.textContent = modeNames[mode];
+    title.textContent = modeNames[mode];
+    dock.showMode(mode);
     const width = mode === "technique" ? WIDE_SHEET_WIDTH : SHEET_WIDTH;
     staff.resize(width, 1);
-    staff.element.style.setProperty("--sheet", String(width));
     staff.hidePlayed();
     staff.clearTrace();
-    staff.element.title = mode === "free" ? t.pickNoteHint : "";
     staff.element.classList.remove("preview");
     staff.centre(mode === "free");
     target.clear();
@@ -97,23 +96,6 @@ export function listenScreen(goProgress: () => void): Screen {
     if (mode === "technique") technique.start();
     renderNote();
     showBoard(null);
-  }
-
-  // One button for what the stage shows, stepping through the staff, the staff and fingerboard, and the fingerboard,
-  // which the CSS reads.
-  const viewButton = h("button", {
-    type: "button",
-    className: `${ICON_BUTTON} listen-view`,
-    onclick() {
-      settings.listenView = VIEWS[(VIEWS.indexOf(settings.listenView) + 1) % VIEWS.length];
-      saveSettings();
-      showView();
-    },
-  });
-  function showView() {
-    element.dataset.view = settings.listenView;
-    viewButton.innerHTML = VIEW_ICONS[settings.listenView];
-    viewButton.title = viewButton.ariaLabel = t.listenViews[settings.listenView];
   }
 
   // The fingerboard: in free play the note picked, with what's heard against it, or else the note heard, where it's
@@ -153,8 +135,7 @@ export function listenScreen(goProgress: () => void): Screen {
       renderNote();
     }
 
-    needle.show(centsFrom(frequency, heardMidi));
-    hertz.textContent = `${localNumber(frequency, 1)} Hz`;
+    stage.hear(frequency);
     // Against the note picked, what's played shows as a ghost, with its arrow.
     if (settings.listenMode === "free" && target.midi !== null) {
       const cents = centsFrom(frequency, target.midi);
@@ -164,8 +145,7 @@ export function listenScreen(goProgress: () => void): Screen {
 
   function goQuiet() {
     midi = null;
-    needle.show(null);
-    hertz.textContent = "";
+    stage.hear(null);
     guesser.quiet();
     renderNote();
   }
@@ -200,53 +180,31 @@ export function listenScreen(goProgress: () => void): Screen {
     },
   });
 
-  // Fullscreen hides the header and makes the staff as large as fits; CSS lays it out.
+  // Fullscreen leaves the panels with Start or Stop and Exit, and the guesser's score; CSS lays it out.
   const fullscreen = createFullscreen(() => {});
   controls.startButton.classList.add("listen-start");
 
+  const dock = createListenDock(relabel, () => stage.arrange(), {
+    free: [dockOption(t.sound, target.speaker)],
+    guesser: guesser.options,
+    technique: technique.options,
+  });
+  const stage = createListenStage([staff.element, staffHint, guesser.banner, technique.status, technique.results, technique.overlay], board.element, [volume.element]);
   const element = h(
     "section",
-    { className: "listen" },
-    // The staff comes first, with the fingerboard beside it, and how in tune under them. The labels' toggles
-    // sit small in its top left corner, and Technique's pause switch, or free play's speaker, in its top right.
-    h(
-      "div",
-      { className: "listen-stage" },
-      h(
-        "div",
-        { className: "stage-sheet" },
-        staff.element,
-        h("div", { className: "row toggles stage-labels" }, ...(["fingers", "noteNames", "letterNames"] as const).map((key) => createIconToggle(key, relabel))),
-        h("div", { className: "stage-pause" }, technique.pause),
-        h("div", { className: "stage-speaker" }, target.speaker),
-      ),
-      board.element,
-      guesser.banner,
-    ),
-    needle.element,
-    modeTitle,
-    volume.element,
-    hertz,
-    h(
-      "div",
-      { className: "row" },
-      h("div", { role: "group", className: "listen-modes" }, ...modeButtons),
-      controls.startButton,
-      viewButton,
-      fullscreen.button,
-      progressButton,
-      controls.message,
-    ),
-    // In one place, as tall as the tallest, so nothing moves as modes change.
-    h("div", { className: "listen-panels" }, guesser.panel, technique.panel),
+    { className: "listen fills-window" },
+    h("div", { className: "title-row" }, title, guesser.score, h("div", { className: "title-tools" }, progressButton, fullscreen.button, controls.startButton)),
+    controls.message,
+    stage.element,
+    dock.element,
   );
 
   setMode(settings.listenMode);
-  showView();
   goQuiet();
 
   return {
     element,
+    sidebar: h("div", { role: "group", ariaLabel: t.screens.Listen }, ...modeButtons),
     // A Technique round plays its own clicks, on its beats.
     ownsMetronome: () => settings.listenMode === "technique" && controls.session !== null,
     // A Technique round is timed to the BPM, so it starts again.

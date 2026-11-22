@@ -43,9 +43,9 @@ export const trackNotes = (page) =>
   page.evaluate(() => {
     window.noteTimes = [];
     window.noteOrder = [];
-    let last = document.querySelector("section > p").textContent;
+    let last = document.querySelector(".practice-progress").textContent;
     const tick = () => {
-      const text = document.querySelector("section > p")?.textContent;
+      const text = document.querySelector(".practice-progress")?.textContent;
       if (text && text !== last) {
         window.noteTimes.push(performance.now());
         window.noteOrder.push(text);
@@ -81,7 +81,7 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
     };
     let current = 0;
     const tick = () => {
-      const note = Number(document.querySelector("section > p")?.textContent.match(/^Note (\d+) of/)?.[1] ?? 0);
+      const note = Number(document.querySelector(".practice-progress")?.textContent.match(/^Note (\d+) of/)?.[1] ?? 0);
       if (note !== current) {
         current = note;
         const wait = delays[note] ?? delayMs;
@@ -101,7 +101,7 @@ export const followNotes = (page, { midis, delayMs = 0, delays = {} }) =>
     tick();
   }, { midis, delayMs, delays });
 export const near = (values, expected, tolerance = 60) => values.length > 0 && values.every((value, index) => Math.abs(value - (expected[index % expected.length])) <= tolerance);
-export const progress = (page) => page.locator("section > p").first().innerText();
+export const progress = (page) => page.locator(".practice-progress").first().innerText();
 // Watches the violin recordings the app plays, for recordings() to read.
 export const spyOnRecordings = (page) => page.evaluate(() => {
   window.recordings = [];
@@ -130,20 +130,62 @@ export async function setRecord(page, on) {
   if ((await button.getAttribute("aria-pressed")) !== String(on)) await button.click();
 }
 export const recordArmed = async (page) => (await page.locator('button[aria-label="Record"]').first().getAttribute("aria-pressed")) === "true";
-// The run's result, on the bar above the lanes: its score, or the summary of a run that waited for each note.
+// The run's result, in the title row: its score, or the summary of a run that waited for each note.
 export const laneScore = (page) => page.locator(".lane-score").innerText();
 // Menu items only show on hover, so this clicks the piece's item directly, as a tap would.
 export const pickPiece = (page, id) => page.locator(`.piece-menu button[value="${id}"]`).evaluate((item) => item.click());
-// The piece Practice has open, by the menu button's label.
-export const pickedPiece = (page) => page.locator(".piece-select").innerText();
-// Library shows a few pieces per group, with the rest in drawers. Tests that need every card open them all.
-export const openDrawers = (page) => page.locator(".more-pieces:not([open]) > summary").evaluateAll((summaries) => summaries.forEach((summary) => summary.click()));
-// The count-in button steps off, ×2, ×4 and on to ×10. This presses it until it shows beats, or off with 0.
-export async function setCountIn(page, beats) {
-  const want = beats ? `×${beats}` : "off";
-  for (let i = 0; i < 7 && !(await page.locator(".count-in").getAttribute("aria-label")).endsWith(want); i++) await page.locator(".count-in").click();
+// The piece Practice has open, by its title.
+export const pickedPiece = (page) => page.locator(".practice-title h1").innerText();
+// Library shows one group at a time, picked in the sidebar under Library.
+export const showGroup = (page, name) => page.click(`.nav-sub .sub-item:has-text("${name}")`);
+// A piece's card in Library, from whichever group holds it.
+export async function cardOf(page, title) {
+  const card = page.locator(".piece", { hasText: title }).first();
+  for (const group of ["Scales", "Classic tunes", "My songs"]) {
+    if (await card.count()) break;
+    await showGroup(page, group);
+  }
+  return card;
 }
+// The count-in, in the settings panel: − down to Off, then + up to the beats wanted, or left Off with 0.
+export async function setCountIn(page, beats) {
+  const value = () => page.locator(".count-in .stepper-value").innerText();
+  for (let i = 0; i < 6 && (await value()) !== "Off"; i++) await page.locator('.count-in button[aria-label="Fewer beats"]').click();
+  for (let i = 0; i < 6 && beats && (await value()) !== `${beats} beats`; i++) await page.locator('.count-in button[aria-label="More beats"]').click();
+}
+// Clicks the lanes at a spot in their own units, before scaling, as x across and y down from their top left corner:
+// they draw as large as their panel allows, 84 units a lane. scrolled is how far they've moved, in pixels on screen.
+export async function clickLanes(page, x, y, scrolled = 0) {
+  const box = await page.locator("canvas").boundingBox();
+  const scale = box.height / (84 * 4);
+  await page.mouse.click(box.x + x * scale - scrolled, box.y + y * scale);
+}
+// How large the lanes are drawn, as against their own units: beats are 120 units wide.
+export const laneScale = async (page) => (await page.locator("canvas").boundingBox()).height / (84 * 4);
+// Glide on or off, in the settings panel.
+export async function setGlide(page, on) {
+  const button = page.locator('.dock button:text-is("Glide")');
+  if ((await button.getAttribute("aria-pressed")) !== String(on)) await button.click();
+}
+// Pace, in the settings panel: "Wait for me" or "Keep moving".
+export const setPace = (page, name) => page.click(`.dock [aria-label="Pace"] button:text-is("${name}")`);
+// A button in the settings panel, by its words, like "Keep moving" or "Loop".
+export const dockButton = (page, text) => page.locator(`.dock button:text-is("${text}")`);
 export const nav = (page, name) => page.click(`nav button:text-is("${name}")`);
+// Picks one of Listen's modes, from the sidebar under Listen.
+export const pickMode = (page, name) => page.click(`.nav-sub .sub-item:has-text("${name}")`);
+// A panel's button in the settings panel's On screen group, which steps it big, small and off, or switches the tuner.
+export const panelButton = (page, name) => page.locator(`.dock [role="group"]:has(button:text-is("Tuner")) button:text-is("${name}")`);
+// Switches the language with the sidebar's EN | PT, beside Settings.
+export const setLanguage = async (page, language) => {
+  await page.click(`.language button:text-is("${language}")`);
+  await sleep(250);
+};
+// The Settings screen, from the bottom of the sidebar, in either language.
+export const openSettings = async (page) => {
+  await page.click("header .set-row nav button");
+  await page.waitForSelector(".settings");
+};
 export const start = (page) => page.click('button:text-is("Start")');
 // Stops a run if one is going. A finished run has already stopped by itself, and one can finish just as this clicks.
 export const stop = (page) => page.locator('button:text-is("Stop")').click({ timeout: 1000 }).catch(() => {});
@@ -156,9 +198,9 @@ export function check(name, ok, detail = "") {
 export const staffNotes = async (page, title, text) => {
   const notes = text.split(/\s+/).filter((token) => token && token !== "|").map((token) => ({ pitch: token.split(":")[0], beats: Number(token.split(":")[1] ?? 1) }));
   await page.evaluate((draft) => localStorage.setItem("pieceDraft", JSON.stringify(draft)), { title, notes });
-  await nav(page, "Calendar"); await nav(page, "Library"); await sleep(150);
+  await nav(page, "Library"); await page.click('.library button[aria-label="Add piece"]'); await sleep(150);
 };
-export const saveStaff = (page) => page.locator('.row button:text-is("Save piece")');
+export const saveStaff = (page) => page.locator('.title-tools button:text-is("Save piece")');
 // Answers the question that's up, by the name of its button.
 export const answer = async (page, label) => {
   await page.locator("dialog[open]").getByRole("button", { name: label, exact: true }).click();
@@ -169,7 +211,7 @@ export const begin = async (page) => {
   await page.waitForSelector('button:text-is("Stop")');
 };
 export const waitForText = (page, text, timeout = 30000) =>
-  page.waitForFunction((text) => document.querySelector("section > p").textContent.includes(text), text, { timeout }).catch(async (error) => {
+  page.waitForFunction((text) => document.querySelector(".practice-progress").textContent.includes(text), text, { timeout }).catch(async (error) => {
     // A timeout alone doesn't say how far the run got.
     error.message += ` | waiting for "${text}", showing "${await progress(page).catch(() => "nothing")}"`;
     throw error;
@@ -188,15 +230,17 @@ export const freshPractice = async (page, bpm) => {
   await sleep(250);
   if (bpm) await setBpm(page, bpm);
 };
-// Sets the header's BPM, a step at a time with the arrow keys on the metronome, as a keyboard can.
+// The sidebar metronome's BPM, from its name, as in "Metronome 60".
+export const bpmShown = async (page) => Number((await page.locator("header .metronome-button").innerText()).match(/\d+/)[0]);
+// Sets the sidebar's BPM, a step at a time with the arrow keys on the metronome, as a keyboard can.
 export async function setBpm(page, bpm) {
   const button = page.locator("header .metronome-button");
-  const now = Number(await button.locator(".bpm-badge").innerText());
+  const now = await bpmShown(page);
   await button.focus();
   for (let step = 0; step < Math.abs(bpm - now); step++) await page.keyboard.press(bpm > now ? "ArrowRight" : "ArrowLeft");
 }
 // What Listen's staff says about the note heard in free play: its finger, name and letter, or "" when nothing is heard.
-export const heard = async (page) => (await page.locator(".listen .staff text[font-family^=system-ui]").allTextContents()).join(" ");
+export const heard = async (page) => (await page.locator(".listen .staff text[font-family^=Barlow]").allTextContents()).join(" ");
 export const savedLog = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("log") ?? "[]"));
 export const savedSettings = (page) => page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
 export const canvasHasColor = (page, r, g, b) =>

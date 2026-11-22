@@ -1,0 +1,380 @@
+/* The app: a sidebar beside the screen. On screens that scroll, the sidebar stays put, and scrolls by itself only when
+   its own list is long. */
+#app {
+  display: grid;
+  grid-template-columns: 17rem minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+main {
+  min-width: 0;
+  padding: 1.5rem 2.25rem 2.25rem;
+}
+
+#app > header {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-sizing: border-box;
+  height: 100dvh;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-left: 0.875rem;
+}
+
+.brand {
+  font-family: var(--title-font);
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+header nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* A screen, Record, the metronome and Settings: an icon and a word, lit when it's the screen shown. */
+header .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3rem;
+  margin: 0;
+  padding: 0 0.875rem;
+  color: var(--muted);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-radius: 0.625rem;
+  box-shadow: none;
+}
+
+header .nav-item:hover,
+header .nav-item[aria-current="page"] {
+  color: var(--text);
+  background: var(--raised);
+}
+
+header .nav-item:focus-visible,
+.rail-toggle:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: -3px;
+}
+
+header .nav-item .icon svg,
+.rail-toggle svg {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Record: a red dot, ready. On, red and pulsing (style.css). */
+header .record-toggle .icon {
+  color: var(--red);
+}
+
+/* A backing track sets Practice's pace, so the metronome and BPM don't apply; they keep their room. */
+.track-tempo header .metronome-button {
+  visibility: hidden;
+}
+
+/* The metronome: slid sideways for its BPM, so a touch doesn't scroll the page. */
+.metronome-button {
+  touch-action: none;
+  user-select: none;
+}
+
+.metronome-button[aria-pressed="true"] {
+  color: var(--brass-light);
+}
+
+.nav-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.25rem 0 0.625rem 1.375rem;
+}
+
+.rail-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.set-row nav {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A long name for Settings, as in Portuguese, is cut short rather than pushing the language off the sidebar. */
+.set-row .nav-word {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Shrinks the sidebar to its icons, and back. */
+.rail-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 1.25rem;
+}
+
+.rail-toggle:hover {
+  background: var(--raised);
+}
+
+/* The language, beside Settings: quieter than the options, as it's rarely changed. */
+.language > button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  color: var(--muted);
+  font-weight: 600;
+  background: none;
+}
+
+.language > button[aria-pressed="true"] {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--raised);
+  border-color: var(--raised);
+}
+
+/* Icons only, beside the screen: no names, no screen's own items and no language, which come back with the full
+   sidebar. The bar across the top on narrower screens always has its words. */
+@media (min-width: 901px) {
+  #app.sidebar-icons {
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+  }
+
+  .sidebar-icons > header {
+    align-items: center;
+    padding: 1.25rem 0.875rem;
+  }
+
+  .sidebar-icons .brand-row {
+    padding-left: 0;
+  }
+
+  .sidebar-icons :is(.brand, .nav-sub, .language) {
+    display: none;
+  }
+
+  .sidebar-icons header .nav-item {
+    justify-content: center;
+    width: 3rem;
+    padding: 0;
+  }
+
+  .sidebar-icons .nav-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* A screen's own items in the sidebar, like Listen's modes: a name and a line saying what it is, the one picked brass. */
+.nav-sub > * {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.sub-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.125rem;
+  width: 100%;
+  min-height: 3.5rem;
+  margin: 0;
+  padding: 0.375rem 0.875rem;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0.625rem;
+  box-shadow: none;
+}
+
+.sub-item:hover {
+  background: var(--raised);
+}
+
+.sub-name {
+  color: #c3cad5;
+  font-weight: 600;
+}
+
+.sub-hint {
+  color: var(--faint);
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.sub-item[aria-pressed="true"] {
+  background: var(--brass);
+}
+
+.sub-item[aria-pressed="true"] .sub-name {
+  color: var(--on-brass);
+}
+
+.sub-item[aria-pressed="true"] .sub-hint {
+  color: #4a3a12;
+}
+
+/* Full screen: the screen alone. */
+.fullscreen #app {
+  display: block;
+}
+
+.fullscreen #app > header {
+  display: none;
+}
+
+.fullscreen main {
+  min-height: 0;
+  padding: 0.5rem 1rem;
+}
+
+/* Tablets in portrait and phones: the sidebar becomes a bar across the top, with a screen's own items scrolling
+   sideways under it. */
+@media (max-width: 900px) {
+  #app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  main {
+    padding: 1rem;
+  }
+
+  #app > header {
+    position: static;
+    gap: 0.625rem;
+    height: auto;
+    padding: 0.75rem 1rem;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rail-toggle {
+    display: none;
+  }
+
+  .brand-row {
+    padding-left: 0;
+  }
+
+  header nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  header .nav-item {
+    width: auto;
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+  }
+
+  .nav-sub {
+    order: 9;
+    width: 100%;
+    padding: 0;
+    overflow-x: auto;
+  }
+
+  .nav-sub > * {
+    flex-direction: row;
+  }
+
+  .sub-item {
+    flex: 1;
+    min-width: 9.5rem;
+  }
+
+
+  .rail-tools {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+}
+
+/* Phones: the screens share the row, each its icon over its word, like a tab bar. */
+@media (max-width: 600px) {
+  .brand {
+    font-size: 1.25rem;
+  }
+
+  header > nav .nav-item {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.125rem;
+    min-width: 0;
+    padding: 0.375rem 0.25rem;
+    font-size: 0.8125rem;
+  }
+
+  header .rail-tools .nav-item {
+    padding: 0 0.625rem;
+    font-size: 0.9375rem;
+  }
+
+  /* Record and Settings as icons, so the row fits; the metronome keeps its BPM. */
+  .rail-tools :is(.record-toggle, .set-row) .nav-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .rail-tools .set-row nav {
+    flex: none;
+  }
+}

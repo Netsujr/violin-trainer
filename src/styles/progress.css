@@ -1,0 +1,109 @@
+/* Progress: a card a piece, its name, days and out-of-tune notes on the left, its score and tempo charts on the right. */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.progress-piece {
+  display: grid;
+  grid-template-columns: 17.5rem repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1.75rem;
+  margin: 0;
+  padding: 1.25rem 1.375rem;
+  background: var(--panel);
+  border-radius: 1rem;
+}
+
+.progress-about {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.progress-piece header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.progress-piece header strong {
+  font-family: var(--title-font);
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.progress-piece h4 {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.progress-note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+.progress-not-yet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.progress-chart {
+  margin: 0;
+}
+
+.progress-chart figcaption {
+  margin-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.progress-chart svg {
+  display: block;
+  overflow: visible;
+}
+
+/* The charts: a brass line, with the grid in the panel's greys. */
+.chart-text {
+  fill: var(--faint);
+  font-size: 11px;
+}
+
+.chart-value {
+  fill: var(--text);
+  font-weight: 600;
+}
+
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-dot {
+  fill: var(--brass);
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+
+.chart-hit {
+  fill: transparent;
+}
+
+@media (max-width: 900px) {
+  .progress-piece {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

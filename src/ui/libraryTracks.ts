@@ -6,8 +6,7 @@ import { confirmAction } from "./confirm";
 import { h } from "./dom";
 import { ALIGN_ICON, REMOVE_TRACK_ICON, UPLOAD_ICON } from "./toggles";
 
-// Backing tracks on Library's cards: a button to add one to a piece, and once it has one, buttons to line it up and to
-// remove it. Adding one finds its tempo and first note, then opens it to line up. onChange is a track added or removed.
+// Backing tracks on Library's cards: Add track, and once a piece has one, Line up and Remove track. Adding one finds its tempo and first note, then opens it to line up. onChange is a track added or removed.
 export function createCardTracks(goAlign: (pieceId: string) => void, onChange: () => void) {
   // Each piece's track, by its file name.
   const names = new Map<string, string>();
@@ -29,8 +28,7 @@ export function createCardTracks(goAlign: (pieceId: string) => void, onChange: (
     file.value = "";
   }
 
-  const iconButton = (icon: string, label: string, onclick: () => void) =>
-    h("button", { type: "button", className: "secondary outline icon-button", innerHTML: icon, title: label, ariaLabel: label, onclick });
+  const button = (icon: string, label: string, onclick: () => void) => h("button", { type: "button", className: "card-button", innerHTML: icon, onclick }, label);
 
   listTracks().then((tracks) => {
     tracks.forEach(({ pieceId, track }) => names.set(pieceId, track.name));
@@ -44,15 +42,15 @@ export function createCardTracks(goAlign: (pieceId: string) => void, onChange: (
     buttons(piece: Piece) {
       if (!names.has(piece.id)) {
         return [
-          iconButton(UPLOAD_ICON, t.addTrack, () => {
+          button(UPLOAD_ICON, t.addTrack, () => {
             adding = piece.id;
             file.click();
           }),
         ];
       }
       return [
-        iconButton(ALIGN_ICON, t.alignTrack, () => goAlign(piece.id)),
-        iconButton(REMOVE_TRACK_ICON, t.removeTrack, async () => {
+        button(ALIGN_ICON, t.alignTrack, () => goAlign(piece.id)),
+        button(REMOVE_TRACK_ICON, t.removeTrack, async () => {
           if (!(await confirmAction(t.removeTrackConfirm(names.get(piece.id)!, localTitle(piece.id, piece.title)), t.removeTrack))) return;
           await deleteTrack(piece.id);
           names.delete(piece.id);

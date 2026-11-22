@@ -17,7 +17,7 @@ export class Session {
   lastRunSeconds = 0;
   // The lanes set the pace, so a run's length says nothing about the playing and it isn't a timed pass.
   following = false;
-  // The tempo the lanes moved at, for "Don't wait".
+  // The tempo the lanes moved at, for Keep moving.
   bpm?: number;
   // A Listen exercise's score out of 100, from the note guesser or Technique, which have no notes of their own.
   exerciseScore?: number;

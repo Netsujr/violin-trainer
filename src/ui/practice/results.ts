@@ -18,7 +18,7 @@ export function scoreLine(results: Map<number, boolean> | null) {
   return `${t.score(percent)} · ${t.hitMissed(hit, missed)}`;
 }
 
-// The card after a "Don't wait" run: the score, and how many notes were hit and missed.
+// The card after a Keep moving run: the score, and how many notes were hit and missed.
 export function scoreCard(results: Map<number, boolean>) {
   const { hit, missed, percent } = tally(results);
   return [h("p", { className: "score" }, t.score(percent)), h("p", {}, t.hitMissed(hit, missed))];

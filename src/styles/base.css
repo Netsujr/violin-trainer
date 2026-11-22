@@ -1,0 +1,128 @@
+/* Pico, imported first in main.ts, styles the native elements. This file sets the type and the palette. */
+/* The fonts are in the app, so it keeps working offline. */
+@font-face {
+  font-family: Barlow;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/barlow-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Barlow;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../assets/fonts/barlow-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Barlow;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../assets/fonts/barlow-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Barlow;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/barlow-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-weight: 600;
+  font-display: swap;
+  src: url("../assets/fonts/barlow-condensed-600.woff2") format("woff2");
+}
+
+:root {
+  /* Room for the scrollbar is kept, so the page doesn't shift sideways as a screen grows past the window. */
+  scrollbar-gutter: stable;
+  --pico-font-family: Barlow, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pico-font-size: 100%; /* Pico grows text with the viewport, which pushes the highway below the fold. */
+  --pico-form-element-spacing-vertical: 0.5rem;
+  --pico-form-element-spacing-horizontal: 0.875rem;
+  --pico-border-radius: 0.625rem;
+  --title-font: "Barlow Condensed", var(--pico-font-family);
+  /* The palette. The canvases can't read these, so highway.ts and staff.ts repeat the ones they draw with. */
+  --ground: #0f131a;
+  --rail: #0b0e13;
+  --panel: #171d27;
+  --dock: #131821;
+  --line: #222a37;
+  --line-strong: #2c3442;
+  --text: #e8ecf2;
+  --muted: #98a2b3;
+  --faint: #8590a2;
+  --brass: #e6ae48;
+  --on-brass: #1a1405;
+  --brass-dim: #3a3220;
+  --brass-light: #f1c976;
+  --blue: #6cc4ff;
+  --blue-light: #9ed8ff;
+  --red: #e5484d;
+  --raised: #1c2330;
+}
+
+[data-theme="dark"] {
+  --pico-background-color: var(--ground);
+  --pico-color: var(--text);
+  --pico-text-selection-color: rgb(230 174 72 / 0.25);
+  --pico-muted-color: var(--muted);
+  --pico-muted-border-color: var(--line);
+  --pico-h1-color: var(--text);
+  --pico-h2-color: var(--text);
+  --pico-h3-color: var(--text);
+  --pico-primary: var(--brass);
+  --pico-primary-background: var(--brass);
+  --pico-primary-border: var(--brass);
+  --pico-primary-underline: rgb(230 174 72 / 0.5);
+  --pico-primary-hover: var(--brass-light);
+  --pico-primary-hover-background: var(--brass-light);
+  --pico-primary-hover-border: var(--brass-light);
+  --pico-primary-focus: rgb(108 196 255 / 0.5);
+  --pico-primary-inverse: var(--on-brass);
+  --pico-secondary: var(--muted);
+  --pico-secondary-background: var(--line-strong);
+  --pico-secondary-border: var(--line-strong);
+  --pico-secondary-underline: rgb(152 162 179 / 0.5);
+  --pico-secondary-hover: var(--text);
+  --pico-secondary-hover-background: #3a4456;
+  --pico-secondary-hover-border: #3a4456;
+  --pico-secondary-focus: rgb(108 196 255 / 0.4);
+  --pico-secondary-inverse: var(--text);
+  --pico-del-color: #f08a8d;
+  --pico-card-background-color: var(--panel);
+  --pico-card-border-color: var(--panel);
+  --pico-card-sectioning-background-color: var(--panel);
+  --pico-dropdown-background-color: var(--panel);
+  --pico-dropdown-border-color: var(--line-strong);
+  --pico-dropdown-hover-background-color: var(--raised);
+  --pico-form-element-background-color: var(--ground);
+  --pico-form-element-active-background-color: var(--ground);
+  --pico-form-element-selected-background-color: var(--raised);
+  --pico-form-element-border-color: var(--line-strong);
+  --pico-form-element-active-border-color: var(--brass);
+  --pico-form-element-focus-color: var(--blue);
+  --pico-form-element-color: var(--text);
+  --pico-form-element-placeholder-color: var(--faint);
+  --pico-range-border-color: var(--line-strong);
+  --pico-range-active-border-color: var(--line-strong);
+  --pico-range-thumb-color: var(--brass);
+  --pico-range-thumb-active-color: var(--brass-light);
+  --pico-progress-background-color: var(--line);
+  --pico-modal-overlay-background-color: rgb(8 10 14 / 0.8);
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--title-font);
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+/* Pico puts a margin under every type="button", which only pushes rows apart. */
+[type="button"] {
+  margin-bottom: 0;
+}

@@ -6,8 +6,9 @@ import type { Session } from "../practice/session";
 import { getSettings, passCents, saveSettings, type GuessBy, type GuesserLevel } from "../storage";
 import { h } from "./dom";
 import type { createFingerboard } from "./fingerboard";
+import { dockOption } from "./panels";
 import type { createStaff } from "./staff";
-import { chipGroup, EAR_ICON, EYE_ICON } from "./toggles";
+import { chipGroup } from "./toggles";
 
 export const GUESS_COUNTS = [1, 2, 4];
 export const LEVELS: GuesserLevel[] = ["easy", "medium", "hard"];
@@ -77,7 +78,7 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
   // When the note to play came up, and how long each note played right took, this run.
   let upSince = performance.now();
   let msPerNote: number[] = [];
-  const score = h("strong", { className: "guess-score" });
+  const score = h("span", { className: "guess-score" });
   // Over the staff, so it shows in fullscreen too: the round is right, and when the next one comes.
   const banner = h("p", { className: "guess-banner", hidden: true });
   const byEar = () => settings.guesserBy === "ear";
@@ -127,22 +128,15 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
     newRound();
   };
 
-  // One button for the level, stepping through them.
-  const levelButton = h("button", {
-    type: "button",
-    className: "guess-level",
-    onclick() {
-      settings.guesserLevel = LEVELS[(LEVELS.indexOf(settings.guesserLevel) + 1) % LEVELS.length];
-      saveSettings();
-      showLevel();
-      newRound();
-    },
+  // The level, with which notes it draws from under it.
+  const levelHint = h("p", { className: "dock-caption" });
+  const showLevel = () => (levelHint.textContent = t.levelHints[settings.guesserLevel]);
+  const levels = chipGroup(t.level, LEVELS, (level) => t.levels[level], () => settings.guesserLevel, (level) => {
+    settings.guesserLevel = level;
+    saveSettings();
+    showLevel();
+    newRound();
   });
-  const showLevel = () => {
-    levelButton.textContent = t.levels[settings.guesserLevel];
-    levelButton.title = t.levelHints[settings.guesserLevel];
-    levelButton.ariaLabel = `${t.level}: ${t.levels[settings.guesserLevel]}`;
-  };
   showLevel();
 
   const counts = chipGroup(t.notesAtATime, GUESS_COUNTS, String, () => settings.guesserCount, (count) => {
@@ -151,37 +145,21 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
     newRound();
   });
 
-  // By eye or by ear, two icons side by side, the one picked pressed. Changing starts a new game.
-  const byButtons = GUESS_BY.map((by) =>
-    h("button", {
-      type: "button",
-      innerHTML: by === "eye" ? EYE_ICON : EAR_ICON,
-      title: t.guessBy[by],
-      ariaLabel: t.guessBy[by],
-      onclick() {
-        settings.guesserBy = by;
-        saveSettings();
-        showBy();
-        stopSound?.();
-        restart();
-      },
-    }),
-  );
-  const showBy = () => {
-    byButtons.forEach((button, at) => (button.ariaPressed = String(GUESS_BY[at] === settings.guesserBy)));
-    // By ear, the CSS hides the notes until they're played right, and a tap on the staff sounds the note again.
-    staff.element.classList.toggle("by-ear", byEar());
-    staff.element.title = byEar() ? t.hearAgain : "";
-  };
-
-  const panel = h(
-    "div",
-    { className: "guesser" },
-    h("div", { className: "row" }, h("div", { role: "group", className: "guess-by" }, ...byButtons), levelButton, t.notesAtATime, counts, score),
-  );
+  // By eye or by ear, the one picked pressed. Changing starts a new game.
+  const guessBy = chipGroup(t.guessByLabel, GUESS_BY, (by) => t.guessBy[by], () => settings.guesserBy, (by) => {
+    settings.guesserBy = by;
+    saveSettings();
+    showBy();
+    stopSound?.();
+    restart();
+  });
+  // By ear, the CSS hides the notes until they're played right, and a tap on the staff sounds the note again.
+  const showBy = () => staff.element.classList.toggle("by-ear", byEar());
 
   return {
-    panel,
+    // The guesser's settings, for the settings panel, and its score, for the title row.
+    options: [dockOption(t.guessByLabel, guessBy), dockOption(t.level, levels, levelHint), dockOption(t.notesAtATime, counts)],
+    score,
     banner,
     // A new game.
     start() {

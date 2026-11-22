@@ -1,26 +1,29 @@
 // Selecting a section with click, then Shift+click, on the lanes or the staff: what it shows, and what plays.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece, setLanguage, laneScale, setGlide } from "./lib.mjs";
 
 const BEAT = 120, HIT_X = 130, LANE = 84;
 wav(OUT + "section-silent.wav", [rest(3)]);
 const s = await open(OUT + "section-silent.wav");
 const { page } = s;
-// The run's result, on the lanes' bar.
+// The run's result, in the title row.
 const stats = () => page.locator(".lane-score").innerText();
-const line = () => page.locator(".mode-note").innerText();
+// The section's notes, in the title row, empty with none.
+const line = () => page.locator(".practice-section").innerText();
 const bands = () => page.locator(".staff .section-band").count();
 const scrollLeft = () => page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);
 // Clicks a D-major tile by its note index (the first eight notes run D D D D A A A A up the lanes).
 const laneOf = (index) => ([0, 1, 2, 3, 12, 13, 14].includes(index) ? 2.5 : 1.5);
+// The lanes draw as large as their panel allows, so their units are scaled to the screen.
 const clickTile = async (index, shift = false) => {
   const box = await page.locator("canvas").boundingBox();
+  const scale = box.height / (4 * LANE);
   const inView = (position) => position > 0 && position < box.width;
-  if (!inView(HIT_X + index * BEAT - (await scrollLeft()) + 40)) {
-    await page.locator(".highway-scroll").evaluate((e, left) => (e.scrollLeft = left), index * BEAT);
+  if (!inView((HIT_X + index * BEAT + 40) * scale - (await scrollLeft()))) {
+    await page.locator(".highway-scroll").evaluate((e, left) => (e.scrollLeft = left), index * BEAT * scale);
     await sleep(150);
   }
-  const x = box.x + HIT_X + index * BEAT - (await scrollLeft()) + 40, y = box.y + laneOf(index) * LANE;
+  const x = box.x + (HIT_X + index * BEAT + 40) * scale - (await scrollLeft()), y = box.y + laneOf(index) * LANE * scale;
   if (shift) await page.keyboard.down("Shift");
   await page.mouse.click(x, y);
   if (shift) await page.keyboard.up("Shift");
@@ -42,9 +45,9 @@ const pixel = (x, y) => page.locator("canvas").evaluate((canvas, [x, y]) => {
 await nav(page, "Practice"); await sleep(250);
 const plain = await pixel(HIT_X + 60, 20);
 await clickTile(2);
-check("a plain click still just moves the start", (await progress(page)) === "Note 3 of 15" && (await bands()) === 0 && !(await line()).includes("Section"), await progress(page));
+check("a plain click still just moves the start", (await progress(page)) === "Note 3 of 15" && (await bands()) === 0 && (await line()) === "", await progress(page));
 await clickTile(4, true);
-check("Shift+click selects from there", (await progress(page)) === "Note 3 of 15" && (await line()).startsWith("Section: notes 3 to 5"), await line());
+check("Shift+click selects from there", (await progress(page)) === "Note 3 of 15" && (await line()) === "Notes 3 to 5", await line());
 check("the staff highlights those notes", (await bands()) === 3, String(await bands()));
 await sleep(500);
 const inside = await pixel(HIT_X + 60, 20), outside = await pixel(HIT_X + 4.5 * BEAT, 20);
@@ -57,7 +60,7 @@ await followNotes(page, { midis: D, delayMs: 150 });
 await begin(page);
 await waitForText(page, "All 3 notes done"); await sleep(150);
 check("Start plays only the section, and stops at its end", (await stats()).includes("Notes 3 to 5 done in") && (await stats()).includes("3 hit"), (await stats()).replaceAll("\n", " / "));
-check("the view stays on the section's last note", Math.abs((await scrollLeft()) - 4 * BEAT) <= 1, String(await scrollLeft()));
+check("the view stays on the section's last note", Math.abs((await scrollLeft()) - 4 * BEAT * (await laneScale(page))) <= 1, String(await scrollLeft()));
 const onStaff = await page.locator(".staff .vf-stavenote").evaluateAll((notes) => notes.findIndex((note) => note.classList.contains("current")));
 check("and so does the staff", onStaff === 4, String(onStaff));
 await page.waitForSelector('button:text-is("Start"):not([disabled])');
@@ -70,11 +73,11 @@ let entry = (await savedLog(page)).at(-1);
 check("a section isn't logged as a pass", entry.passes === 0 && entry.averagePassSeconds === null && entry.notesHit >= 3, JSON.stringify({ passes: entry.passes, hit: entry.notesHit }));
 
 await clickTile(5, true);
-check("Shift+click again moves its end, from the same first note", (await line()).startsWith("Section: notes 3 to 6"), await line());
+check("Shift+click again moves its end, from the same first note", (await line()) === "Notes 3 to 6", await line());
 await clickTile(1, true);
-check("and selecting backwards works", (await line()).startsWith("Section: notes 2 to 3") && (await progress(page)) === "Note 2 of 15", await line());
+check("and selecting backwards works", (await line()) === "Notes 2 to 3" && (await progress(page)) === "Note 2 of 15", await line());
 await clickTile(1);
-check("a plain click clears it", !(await line()).includes("Section") && (await bands()) === 0 && (await progress(page)) === "Note 2 of 15", await line());
+check("a plain click clears it", (await line()) === "" && (await bands()) === 0 && (await progress(page)) === "Note 2 of 15", await line());
 const cleared = await pixel(HIT_X + 60, 20);
 check("from the lanes too", cleared === plain, cleared);
 
@@ -117,31 +120,31 @@ await begin(page);
 await clickTile(2);
 check("during a run, a click jumps there", (await progress(page)) === "Note 3 of 15", await progress(page));
 await clickTile(3, true);
-check("and Shift+click sets the section right away", (await line()).startsWith("Section: notes 3 to 4") && (await page.locator('button:text-is("Stop")').count()) === 1, await line());
+check("and Shift+click sets the section right away", (await line()) === "Notes 3 to 4" && (await page.locator('button:text-is("Stop")').count()) === 1, await line());
 await stop(page); await sleep(200);
 
-// Don't wait
+// Keep moving
 await freshPractice(page, 120);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
 await clickTile(4); await clickTile(6, true);
 await followNotes(page, { midis: D });
 await begin(page);
 await waitForText(page, "All 3 notes done"); await sleep(200);
-check("Don't wait scores only the section", (await laneScore(page)) === "Score: 100% · 3 hit, 0 missed" && (await stats()).includes("3 hit, 0 missed"), (await stats()).replaceAll("\n", " / "));
-check("the lanes stop at its end", Math.abs((await scrollLeft()) - 7 * BEAT) <= 2, String(await scrollLeft()));
+check("Keep moving scores only the section", (await laneScore(page)) === "Score: 100% · 3 hit, 0 missed" && (await stats()).includes("3 hit, 0 missed"), (await stats()).replaceAll("\n", " / "));
+check("the lanes stop at its end", Math.abs((await scrollLeft()) - 7 * BEAT * (await laneScale(page))) <= 2, String(await scrollLeft()));
 await stop(page); await sleep(200);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
 
 // Tempo
 await freshPractice(page);
-await page.locator('.section-bar label:has-text("Tempo") input').check();
+await setGlide(page, true);
 await clickTile(0); await clickTile(2, true);
 await followNotes(page, { midis: D, delayMs: 150 });
 await begin(page);
 await waitForText(page, "All 3 notes done"); await sleep(150);
-check("Tempo stops at the section's end too, with no glide past it", (await stats()).includes("3 hit") && Math.abs((await scrollLeft()) - 2 * BEAT) <= 2, String(await scrollLeft()));
+check("Tempo stops at the section's end too, with no glide past it", (await stats()).includes("3 hit") && Math.abs((await scrollLeft()) - 2 * BEAT * (await laneScale(page))) <= 2, String(await scrollLeft()));
 await stop(page); await sleep(200);
-await page.locator('.section-bar label:has-text("Tempo") input').uncheck();
+await setGlide(page, false);
 
 // The staff
 await freshPractice(page);
@@ -149,7 +152,7 @@ await clickStaffNote(5);
 check("clicking a note on the staff starts from it", (await progress(page)) === "Note 6 of 15", await progress(page));
 await sleep(600);
 await clickStaffNote(7, true);
-check("Shift+click on the staff selects, as on the lanes", (await line()).startsWith("Section: notes 6 to 8") && (await bands()) === 3, await line());
+check("Shift+click on the staff selects, as on the lanes", (await line()) === "Notes 6 to 8" && (await bands()) === 3, await line());
 check("still with no text selected", (await page.evaluate(() => getSelection().toString())) === "");
 await page.locator(".staff").evaluate((staff) => getComputedStyle(staff).cursor).then((cursor) => check("the staff shows it can be clicked", cursor === "pointer", cursor));
 await page.locator(".staff-toggle").click(); await sleep(300);
@@ -165,19 +168,19 @@ await pickPiece(page, "g-major-2oct"); await sleep(300);
 const rows = await page.locator(".staff .vf-stave").count();
 await clickStaffNote(3);
 await clickStaffNote(26, true);
-check("a section can wrap across the sheet's lines", rows >= 2 && (await bands()) === 24 && (await line()).startsWith("Section: notes 4 to 27"), `${rows} lines, ${await bands()} bands, ${await line()}`);
+check("a section can wrap across the sheet's lines", rows >= 2 && (await bands()) === 24 && (await line()) === "Notes 4 to 27", `${rows} lines, ${await bands()} bands, ${await line()}`);
 const wrapped = await page.locator(".staff .section-band").evaluateAll((bands) => new Set(bands.map((band) => band.getAttribute("y"))).size);
 check("with its highlight on each line", wrapped === rows, `${wrapped} of ${rows}`);
 await page.screenshot({ path: OUT + "section-wrapped.png", fullPage: true });
 
 // Changing the piece
 await pickPiece(page, "d-major-1oct"); await sleep(300);
-check("changing the piece clears it", (await bands()) === 0 && !(await line()).includes("Section"), await line());
+check("changing the piece clears it", (await bands()) === 0 && (await line()) === "", await line());
 await page.locator(".staff-toggle").click(); await sleep(300);
 await clickTile(0); await clickTile(1, true);
-await page.locator('.patterns button:text-is("2")').click(); await sleep(300);
+await page.locator('.dock [aria-label="Pattern"] button:text-is("2")').click(); await sleep(300);
 check("so does changing the pattern", (await bands()) === 0, String(await bands()));
-await page.locator('.patterns button:text-is("1")').click(); await sleep(300);
+await page.locator('.dock [aria-label="Pattern"] button:text-is("1")').click(); await sleep(300);
 await clickTile(0); await clickTile(1, true);
 await page.locator('button[aria-label="Repeat the top note"]').click(); await sleep(300);
 check("and repeating the top note", (await bands()) === 0 && (await progress(page)) === "Note 1 of 16", await progress(page));
@@ -190,11 +193,11 @@ await clickStaffNote(4, true);
 check("the staff can be clicked in fullscreen", (await bands()) === 3 && (await progress(page)) === "Note 3 of 15", await progress(page));
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(300);
 check("and the section survives leaving it", (await bands()) === 3);
-await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
-await page.locator("nav button").nth(1).click(); await sleep(250);
+await setLanguage(page, "PT");
+await page.locator("header > nav > button").nth(1).click(); await sleep(250);
 await clickTile(0); await clickTile(1, true);
-check("pt: translated", (await line()).startsWith("Trecho: notas 1 a 2"), await line());
-await page.click("header summary"); await page.click('.language button:text-is("EN")'); await sleep(200);
+check("pt: translated", (await line()) === "Notas 1 a 2", await line());
+await setLanguage(page, "EN");
 await nav(page, "Listen"); await sleep(200);
 const listenStaff = await page.locator(".staff").evaluate((staff) => getComputedStyle(staff).cursor);
 check("the staff on Listen isn't clickable", listenStaff !== "pointer", listenStaff);

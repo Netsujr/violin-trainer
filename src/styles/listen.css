@@ -1,0 +1,323 @@
+/* The tuning dial: in tune in blue, close enough in brass, the needle white. */
+.needle {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dial-track,
+.dial-green,
+.dial-yellow {
+  fill: none;
+  stroke-width: 14;
+}
+
+.dial-track {
+  stroke: #283141;
+  stroke-linecap: round;
+}
+
+.dial-yellow {
+  stroke: var(--brass);
+}
+
+.dial-green {
+  stroke: var(--blue);
+}
+
+.dial-needle {
+  stroke: var(--text);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transform-origin: 160px 160px;
+  transition: transform 80ms linear;
+}
+
+.dial-hub {
+  fill: var(--text);
+}
+
+.dial-sign {
+  fill: var(--muted);
+  font-size: 22px;
+}
+
+/* Listen: the staff and fingerboard panels, with the tuner in its own column on the right. */
+.stage {
+  display: flex;
+  flex: 1;
+  gap: 1.25rem;
+  min-height: 0;
+}
+
+.stage-panels {
+  display: grid;
+  flex: 1;
+  gap: 1.25rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The staff fills its panel, its sheet sitting at the bottom so it barely moves as labels come and go. */
+.stage-staff .staff {
+  display: flex;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  background: none;
+}
+
+.stage-staff .staff svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* What a tap on the staff does, under it, when it does something. */
+.stage-hint {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.stage-hint > span,
+.listen[data-mode="technique"] .stage-hint,
+.listen[data-mode="guesser"] .staff:not(.by-ear) ~ .stage-hint {
+  display: none;
+}
+
+.listen[data-mode="free"] .hint-free,
+.listen[data-mode="guesser"] .hint-ear {
+  display: inline;
+}
+
+/* Each mode's own parts show only in it. */
+.listen:not([data-mode="guesser"]) :is(.guess-score, .guess-banner),
+.listen:not([data-mode="technique"]) :is(.technique-status, .stage-staff > .chip-row, .volume-curve),
+.listen[data-mode="free"] .listen-progress {
+  display: none;
+}
+
+/* In free play a tap on the staff picks a note to copy, and the note a tap would pick shows faintly under the pointer.
+   By ear in the note guesser, a tap sounds the note again, and the notes stay hidden, but for their labels as hints,
+   until they're played right. */
+.listen[data-mode="free"] .staff,
+.listen[data-mode="guesser"] .staff.by-ear {
+  cursor: pointer;
+}
+
+.listen[data-mode="free"] .staff.preview .vf-stavenote,
+.listen[data-mode="free"] .staff.preview svg > text {
+  opacity: 0.35;
+}
+
+.listen[data-mode="guesser"] .staff.by-ear .vf-stavenote:not(.right) {
+  visibility: hidden;
+}
+
+/* The guesser's score, beside the mode's name, keeping its width as it counts. */
+.guess-score {
+  color: var(--muted);
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A round played right, and when the next comes, over the top of the staff. */
+.guess-banner {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  z-index: 1;
+  translate: -50% 0;
+  margin: 0;
+  padding: 0.25rem 0.875rem;
+  color: var(--ground);
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--blue);
+  border-radius: 1rem;
+  pointer-events: none;
+}
+
+.fullscreen .guess-banner {
+  font-size: 1.5rem;
+}
+
+/* Technique: what the round is doing, then how it went, under the staff. Each keeps its line, so nothing jumps. */
+.technique-status {
+  min-height: 1lh;
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.stage-staff > .chip-row {
+  justify-content: center;
+  min-height: 1.75rem;
+  margin: 0;
+}
+
+/* The tuner: the note heard, large, with its name and how in tune it is under the dial. */
+.stage-tuner {
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: 18.75rem;
+}
+
+.stage-tuner > .dock-label {
+  align-self: flex-start;
+}
+
+.stage-tuner .needle {
+  max-width: 15.5rem;
+}
+
+.tuner-note {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.tuner-letter {
+  font-family: var(--title-font);
+  font-size: 4rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tuner-letter small {
+  font-size: 0.55em;
+  vertical-align: 0.6em;
+}
+
+.tuner-solfege {
+  color: var(--muted);
+  font-size: 1.375rem;
+}
+
+.tuner-caption {
+  min-height: 1lh;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+/* How loud the playing is, under the tuner, in Technique. */
+.volume-curve {
+  display: block;
+  width: 100%;
+  height: 2rem;
+  margin-top: 0.5rem;
+  color: var(--brass);
+}
+
+/* The fingerboard fills its panel, its picture as large as fits, with the tapes switch in the corner. */
+.fingerboard {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fingerboard > [role="img"] {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.fingerboard svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.fingerboard-letter {
+  fill: var(--muted);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.fingerboard-tape-finger {
+  fill: var(--faint);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.fingerboard-finger {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Which way to move the finger, over the bottom of the fingerboard. */
+.fingerboard-hint {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
+  margin: 0;
+  padding: 0.125rem 0.625rem;
+  color: var(--ground);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--blue-light);
+  border-radius: 1rem;
+}
+
+.fingerboard-tapes-toggle {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.75rem;
+  z-index: 1;
+  min-height: 1.875rem;
+  margin: 0;
+  padding: 0 0.625rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.9375rem;
+}
+
+.fingerboard-tapes-toggle[aria-pressed="true"] {
+  color: var(--brass-light);
+  border-color: var(--brass);
+}
+
+/* Full screen: the panels, with Start or Stop and Exit, and the guesser's score. */
+.fullscreen .listen :is(h1, .listen-progress, .dock) {
+  display: none;
+}
+
+/* Tablets in portrait and phones: the panels stack, each a set height, with the tuner under them. */
+@media (max-width: 900px) {
+  .stage {
+    flex-direction: column;
+  }
+
+  .stage-panels {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important;
+  }
+
+  .stage-staff {
+    height: 15rem;
+  }
+
+  .stage-board {
+    height: 10rem;
+  }
+
+  .stage-tuner {
+    width: auto;
+  }
+
+  .stage-tuner .needle {
+    max-width: 11rem;
+  }
+}

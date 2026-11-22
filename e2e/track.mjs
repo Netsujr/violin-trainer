@@ -1,9 +1,10 @@
 // Backing tracks: added from a Library card with their beat found, lined up in Align by dragging the waveform under the
 // lanes and by hand, then switched on in Practice to play along, with the mic optional.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, sleep, check, progress, laneScore, followNotes, savedLog, answer, OUT } from "./lib.mjs";
+import { open, nav, sleep, check, progress, laneScore, followNotes, savedLog, answer, OUT, setLanguage, laneScale, showGroup } from "./lib.mjs";
 
-const BEAT_PX = 120;
+// A beat's width on screen, once the lanes are drawn at their panel's scale.
+let BEAT_PX = 120;
 const SILENT = OUT + "track-silent.wav";
 const CLICKS = OUT + "track-clicks-100.wav";
 wav(SILENT, [rest(3)]);
@@ -32,18 +33,19 @@ const lanes = () => page.evaluate(() => ({ media: window.trackAudio.currentTime,
 // Where the lanes should be for where the recording has got to.
 const expected = async ({ media }) => Math.max(0, ((media - Number(await field("First note at (s)").inputValue())) * Number(await field("BPM").inputValue())) / 60) * BEAT_PX;
 const card = () => page.locator(".piece", { hasText: "Hot Cross Buns" });
-const cardButtons = () => card().evaluate((row) => [...row.querySelectorAll("button.icon-button")].map((button) => button.ariaLabel).join());
+const cardButtons = () => card().evaluate((row) => [...row.querySelectorAll(".card-button")].map((button) => button.textContent).join());
 const alignPanel = (text) => page.locator(".track-align-panel button", { hasText: text });
 
 // Adding one from its card
-await nav(page, "Library"); await sleep(250);
-check("each card has a small upload button, and nothing else for tracks", (await cardButtons()) === "Practice,Download PDF,Add a backing track", await cardButtons());
+await nav(page, "Library"); await showGroup(page, "Classic tunes"); await sleep(250);
+check("each card has Add track, and nothing else for tracks", (await cardButtons()) === "Practise,PDF,Add track", await cardButtons());
 const chooser = page.waitForEvent("filechooser");
-await card().locator('button[aria-label="Add a backing track"]').click();
+await card().locator('button:text-is("Add track")').click();
 await (await chooser).setFiles(CLICKS);
 await page.waitForSelector(".track-align-panel .track-align-title", { timeout: 15000 });
 check("choosing a file finds its beat and opens it to line up", (await page.locator(".track-align-title").innerText()).startsWith("Aligning track-clicks-100.wav") && (await field("BPM").inputValue()) === "100" && (await field("First note at (s)").inputValue()) === "2");
-check("with the track's controls, the lanes and the waveform boxed together in place of Options", (await page.locator(".options").count()) === 0 && (await page.locator(".track-align > .track-align-panel + .timeline-section + .waveform").isVisible()) && (await progress(page)) === "Note 1 of 17");
+BEAT_PX = 120 * (await laneScale(page));
+check("with the track's controls above the panels, the waveform under the lanes, and no settings panel", (await page.locator(".track-align-panel").isVisible()) && (await page.locator(".lanes-panel .highway + .waveform").isVisible()) && (await page.locator(".dock").count()) === 0 && (await progress(page)) === "Note 1 of 17");
 check("at full speed to start", (await page.locator(".track-align-panel .speed input").inputValue()) === "100" && (await page.locator(".track-align-panel .speed output").innerText()) === "Speed 100%");
 
 // Lining it up
@@ -75,34 +77,35 @@ await page.waitForFunction(() => document.querySelector(".track-align-panel .tra
 check("Detect again puts back what it found", (await field("First note at (s)").inputValue()) === "2" && (await field("BPM").inputValue()) === "100");
 await page.locator(".track-align-panel .speed input").fill("100");
 await alignPanel("Done").click(); await sleep(300);
-check("Done goes back to Library", (await page.locator("main h2").first().innerText()) === "Library");
-check("where the card names its track, with buttons to line it up and remove it", (await card().innerText()).includes("♪ track-clicks-100.wav") && (await cardButtons()) === "Practice,Download PDF,Align backing track,Remove backing track", await cardButtons());
+check("Done goes back to Library", (await page.locator(".library h1").count()) === 1);
+check("where the card names its track, with buttons to line it up and remove it", (await card().innerText()).includes("♪ track-clicks-100.wav") && (await cardButtons()) === "Practise,PDF,Line up,Remove track", await cardButtons());
 
 // Playing along in Practice
-await card().locator('button[aria-label="Practice"]').click(); await sleep(500);
-const playAlong = () => page.locator('.section-bar .box-toggle[title^="Play along with"]');
-const ear = () => page.locator('.section-bar .box-toggle[aria-label="Listen to my notes"]');
-check("Practice puts its switches on the lanes' bar: playing along on, the mic off", (await playAlong().isVisible()) && (await playAlong().getAttribute("aria-pressed")) === "true" && (await ear().getAttribute("aria-pressed")) === "false" && (await page.locator(".waveform").count()) === 0);
-check("and its speed stands in for the header's BPM", (await page.locator(".section-bar .speed").isVisible()) && !(await page.locator("header .metronome-button").isVisible()) && (await page.locator(".section-bar .speed output").innerText()) === "Speed 100%");
-check("the line says so", (await page.locator(".mode-note").innerText()).startsWith("Plays along with the track"), await page.locator(".mode-note").innerText());
+await card().locator('button:text-is("Practise")').click(); await sleep(500);
+const playAlong = () => page.locator('.dock button:text-is("Play along")');
+const ear = () => page.locator('.dock button:text-is("Listen to my notes")');
+const paceShown = () => page.locator('.dock [aria-label="Pace"]').isVisible();
+check("Practice puts its switches in the settings panel: playing along on, the mic off", (await playAlong().isVisible()) && (await playAlong().getAttribute("aria-pressed")) === "true" && (await ear().getAttribute("aria-pressed")) === "false" && (await page.locator(".waveform").count()) === 0);
+check("and its speed, in the title row, stands in for the sidebar's BPM", (await page.locator(".title-tools .speed").isVisible()) && !(await page.locator("header .metronome-button").isVisible()) && (await page.locator(".title-tools .speed output").innerText()) === "Speed 100%");
+check("the track sets the pace, so Pace is hidden", !(await paceShown()));
 await page.click('button:text-is("Start")'); await sleep(3500);
 check("Start plays along, with the lanes moving", (await lanes()).left > 0 && !(await page.evaluate(() => window.trackAudio.paused)));
 await page.click('button:text-is("Stop")'); await sleep(300);
 const along = await savedLog(page);
 check("a play-along with the mic off logs its minutes, as played along", along.length === 1 && along[0].playedAlong === true && along[0].minutes > 0 && along[0].score === undefined, JSON.stringify(along));
 await playAlong().click(); await sleep(150);
-check("switched off, the piece waits for each note again, with the BPM back", (await page.locator(".mode-note").innerText()).startsWith("Waits for each note") && (await page.locator("header .metronome-button").isVisible()));
+check("switched off, Pace and the BPM are back", (await paceShown()) && (await page.locator("header .metronome-button").isVisible()));
 await playAlong().click(); await sleep(150);
 await page.locator(".piece-menu button[value='a-major-1oct']").evaluate((item) => item.click()); await sleep(400);
 check("a piece with no track has no switches for one", !(await playAlong().isVisible()) && !(await ear().isVisible()));
 
-// Listening too: scored like "Don't wait", in step with the recording
+// Listening too: scored like Keep moving, in step with the recording
 await nav(page, "Library"); await sleep(250);
-await card().locator('button[aria-label="Practice"]').click(); await sleep(500);
+await card().locator('button:text-is("Practise")').click(); await sleep(500);
 await ear().click(); await sleep(100);
 await followNotes(page, { midis: [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62] });
 await page.click('button:text-is("Start")');
-await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 30000 });
+await page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 30000 });
 await sleep(200);
 check("with the mic on, playing along is scored", (await laneScore(page)) === "Score: 100% · 17 hit, 0 missed", await laneScore(page));
 await page.click('button:text-is("Stop")'); await sleep(300);
@@ -110,17 +113,17 @@ check("and logged", (await savedLog(page)).length === 2);
 
 // Removing it
 await nav(page, "Library"); await sleep(250);
-await card().locator('button[aria-label="Remove backing track"]').click();
+await card().locator('button:text-is("Remove track")').click();
 check("Remove asks first", (await page.locator("dialog[open]").innerText()).includes('Remove "track-clicks-100.wav" from Hot Cross Buns?'));
 await answer(page, "Cancel");
-check("and Cancel keeps it", (await cardButtons()).includes("Remove backing track"));
-await card().locator('button[aria-label="Remove backing track"]').click();
-await answer(page, "Remove backing track"); await sleep(200);
-check("Remove takes it away, leaving the upload button", (await cardButtons()) === "Practice,Download PDF,Add a backing track" && !(await card().innerText()).includes("♪"));
-await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(300);
-check("for good", (await cardButtons()) === "Practice,Download PDF,Add a backing track");
+check("and Cancel keeps it", (await cardButtons()).includes("Remove track"));
+await card().locator('button:text-is("Remove track")').click();
+await answer(page, "Remove track"); await sleep(200);
+check("Remove takes it away, leaving Add track", (await cardButtons()) === "Practise,PDF,Add track" && !(await card().innerText()).includes("♪"));
+await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await showGroup(page, "Classic tunes"); await sleep(300);
+check("for good", (await cardButtons()) === "Practise,PDF,Add track");
 
-await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
-check("pt: translated", (await card().locator("button.icon-button").last().getAttribute("aria-label")) === "Adicionar faixa de acompanhamento");
+await setLanguage(page, "PT");
+check("pt: translated", (await card().locator(".card-button").last().innerText()) === "Adicionar faixa");
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

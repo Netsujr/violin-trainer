@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, savedLog, heard, spyOnRecordings, recordings, OUT } from "./lib.mjs";
+import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, savedLog, heard, spyOnRecordings, recordings, OUT, openSettings, pickMode, panelButton } from "./lib.mjs";
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
@@ -95,7 +95,7 @@ wav(OUT + "silence.wav", [rest(4)]);
 {
   const s = await open(OUT + "a440.wav");
   for (const [mode, title] of [["Note guesser", "Note guesser"], ["Technique", "Technique"]]) {
-    await s.page.click(`.listen-modes button[aria-label="${mode}"]`);
+    await pickMode(s.page, mode);
     await start(s.page);
     await sleep(500);
     await stop(s.page);
@@ -112,13 +112,14 @@ wav(OUT + "silence.wav", [rest(4)]);
   const day = (date) => new Date(2026, 10, date, 10).toISOString();
   const game = (date, score) => ({ id: `g${date}`, startedAt: day(date), pieceId: "note-guesser", pieceTitle: "Note guesser", minutes: 2, passes: 0, notesHit: 0, notesSkipped: 0, averageCents: null, averagePassSeconds: null, slowest: [], score, exercise: true });
   await seed(s.page, { settings: { listenMode: "free" }, log: [game(3, 40), game(4, 70)] });
-  const chart = s.page.locator('.listen button[aria-label="Listen: progress"]');
-  check("free play has no progress button", await chart.isHidden());
-  await s.page.click('.listen-modes button[aria-label="Note guesser"]');
+  const chart = s.page.locator(".listen-progress");
+  check("free play has no Progress button", await chart.isHidden());
+  await pickMode(s.page, "Note guesser");
   await chart.click();
   const text = await s.page.locator(".progress").innerText();
-  check("it shows the guesser's score chart, and Technique waiting for a round", text.includes("Listen: progress") && (await s.page.locator(".progress-piece .progress-chart").count()) === 1 && text.includes("Not practised yet: Technique"), text.slice(0, 200));
-  await s.page.click('.progress button:text-is("‹ Listen")');
+  check("it shows the guesser's score chart, and Technique waiting for a round", text.includes("Listen: progress") && (await s.page.locator(".progress-piece .progress-chart").count()) === 1 && text.includes("Not practised yet\nTechnique"), text.slice(0, 200));
+  check("its back button is named for Listen", (await s.page.locator(".progress-back").getAttribute("aria-label")) === "Back to Listen");
+  await s.page.click(".progress-back");
   check("its back button returns to Listen", await s.page.locator(".listen").isVisible());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -139,13 +140,13 @@ wav(OUT + "silence.wav", [rest(4)]);
   await s.close();
 }
 
-// Fullscreen in Listen: no header, a bigger staff, and back again.
+// Fullscreen in Listen: no sidebar or settings panel, a bigger staff, and back again.
 {
   const s = await open(OUT + "a440.wav");
   const staffWidth = async () => (await s.page.locator(".listen .staff").boundingBox()).width;
   const before = await staffWidth();
   await s.page.click('.listen button[aria-label="Fullscreen"]');
-  check("Listen's fullscreen hides the header and enlarges the staff", (await s.page.locator("header").isHidden()) && (await staffWidth()) > before, `${before} → ${await staffWidth()}`);
+  check("Listen's fullscreen hides the sidebar and the settings panel, and enlarges the staff", (await s.page.locator("header").isHidden()) && (await s.page.locator(".dock").isHidden()) && (await staffWidth()) > before, `${before} → ${await staffWidth()}`);
   const fits = await s.page.evaluate(() => document.documentElement.scrollHeight <= innerHeight);
   check("and all of Listen fits on the screen, with nothing to scroll", fits, `${await s.page.evaluate(() => document.documentElement.scrollHeight)} > ${await s.page.evaluate(() => innerHeight)}`);
   await s.page.click('.listen button[aria-label="Exit fullscreen"]');
@@ -184,13 +185,13 @@ wav(OUT + "a440-short.wav", [{ hz: 440, seconds: 2.5, wave: "sine" }, rest(5)]);
   const before = await staffTop();
   const started = Date.now();
   await start(s.page);
-  check("a game is 10 notes", (await score()) === "0 of 10", await score());
+  check("a game is 10 notes", (await score()) === "0 of 10 right", await score());
   await banner.waitFor({ state: "visible", timeout: 8000 });
   const t0 = Date.now();
   check("a note counts only after a second held in tune", t0 - started >= 1000, `${t0 - started} ms`);
-  check("the note played right turns green", (await s.page.locator(".listen .staff .vf-stavenote.right").count()) === 1);
-  check("with the toggles off, its note shows unnamed, and the staff stays put as notes start", (await s.page.locator(".listen .staff text[font-family^=system-ui]").count()) === 0 && Math.abs((await staffTop()) - before) < 1, `${before} → ${await staffTop()}`);
-  check("a banner over the staff says it's right, holding at 3 while the note still sounds", (await banner.innerText()).startsWith("Right! Next in 3") && (await score()) === "1 of 10", `${await banner.innerText()} | ${await score()}`);
+  check("the note played right turns blue", (await s.page.locator(".listen .staff .vf-stavenote.right").count()) === 1);
+  check("with the toggles off, its note shows unnamed, and the staff stays put as notes start", (await s.page.locator(".listen .staff text[font-family^=Barlow]").count()) === 0 && Math.abs((await staffTop()) - before) < 1, `${before} → ${await staffTop()}`);
+  check("a banner over the staff says it's right, holding at 3 while the note still sounds", (await banner.innerText()).startsWith("Right! Next in 3") && (await score()) === "1 of 10 right", `${await banner.innerText()} | ${await score()}`);
   await s.page.screenshot({ path: OUT + "listen-guesser.png" });
   await banner.waitFor({ state: "hidden", timeout: 10000 });
   const waited = Date.now() - t0;
@@ -204,156 +205,163 @@ wav(OUT + "a440-short.wav", [{ hz: 440, seconds: 2.5, wave: "sine" }, rest(5)]);
   await s.close();
 }
 
-// The guesser's fingerboard: one button steps from the staff alone to the fingerboard beside it, as tall, then the
-// fingerboard alone, the stage keeping its height. Its head is the tapes switch, a red circle
-// where the note to play goes, and, for a note played flat, a ghost and a word saying which way to move. With yellow
-// switched off in Settings only green counts: the needle loses its yellow at once, and a note 40 cents flat isn't right.
+// The guesser's fingerboard, stepped from the settings panel: off, then big, taking a row of its own under the staff,
+// then small, sharing a row with the staff once that's small too. The last panel on never goes off. Its corner switch
+// takes its tapes off. A brass circle shows where the note to play goes, and, for a note played flat, a ghost and a
+// word saying which way to move. With Close enough switched off in Settings only in tune counts: the dial loses its
+// brass at once, and a note 40 cents flat isn't right.
 wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
 {
   const s = await open(OUT + "a430.wav");
   await s.page.addInitScript(dealDThenA);
-  await seed(s.page, { settings: { countInOn: false, listenMode: "guesser", toggles: { fingers: false, noteNames: false, letterNames: false } } });
+  await seed(s.page, { settings: { countInOn: false, listenMode: "guesser", listenPanels: { staff: "big", board: "off", tuner: true }, toggles: { fingers: false, noteNames: false, letterNames: false } } });
   const board = s.page.locator(".fingerboard");
-  check("the fingerboard is off at first, and so is its tapes switch", (await board.isHidden()) && (await s.page.locator('.fingerboard button[aria-label="Finger tapes"]').isHidden()));
-  await s.page.click('.listen-view[aria-label="Staff"]');
-  const staffBox = await s.page.locator(".listen .staff svg").boundingBox();
-  const boardBox = await board.boundingBox();
-  check("switched on, it sits beside the staff, as tall", boardBox.x >= staffBox.x + staffBox.width - 1 && Math.abs(boardBox.height - staffBox.height) < 2, JSON.stringify({ staffBox, boardBox }));
+  const tapes = s.page.locator('.fingerboard button:text-is("Finger tapes")');
+  check("the fingerboard is off at first, and so is its tapes switch", (await board.isHidden()) && (await tapes.isHidden()));
+  await panelButton(s.page, "Fingerboard").click();
+  const box = (selector) => s.page.locator(selector).boundingBox();
+  let [staffBox, boardBox] = [await box(".stage-staff"), await box(".stage-board")];
+  check("switched on, it's big, a row of its own under the staff, as wide", boardBox.y >= staffBox.y + staffBox.height - 1 && Math.abs(boardBox.width - staffBox.width) < 2, JSON.stringify({ staffBox, boardBox }));
+  check("and its button says so to screen readers", (await panelButton(s.page, "Fingerboard").getAttribute("aria-label")) === "Fingerboard: big");
   const tapesShown = () => s.page.evaluate(() => document.querySelector(".fingerboard-tapes").style.display !== "none");
-  const headLit = async () => (await s.page.locator(".fingerboard-head.lit").count()) === 1;
-  check("with its tapes on, and its head lit", (await tapesShown()) && (await headLit()));
-  await s.page.click('.fingerboard button[aria-label="Finger tapes"]');
-  check("which a press on its head takes off, the head going dark", !(await tapesShown()) && !(await headLit()));
-  const needleTolerance = () => s.page.evaluate(() => document.documentElement.style.getPropertyValue("--tolerance"));
-  const loose = await needleTolerance();
-  await s.page.click("header summary");
-  await s.page.click('button[aria-label="Close enough"]');
-  check("yellow off takes the needle's yellow away at once, and hides its slider", loose === "40%" && (await needleTolerance()) === "10%" && (await s.page.locator('input[aria-label="Close enough"]').isHidden()), `${loose} → ${await needleTolerance()}`);
-  await s.page.click("header summary");
+  check("with its tapes on", (await tapesShown()) && (await tapes.getAttribute("aria-pressed")) === "true");
+  await tapes.click();
+  check("which its corner switch takes off", !(await tapesShown()) && (await tapes.getAttribute("aria-pressed")) === "false");
+  const yellowShown = () => s.page.locator(".needle .dial-yellow").evaluate((arc) => arc.style.visibility !== "hidden");
+  const loose = await yellowShown();
+  await openSettings(s.page);
+  await s.page.click('.settings [aria-label="Close enough"] button:text-is("Off")');
+  check("yellow off takes the dial's yellow away at once, and hides its slider", loose && (await s.page.locator('input[aria-label="Close enough"]').isHidden()));
+  await nav(s.page, "Listen");
+  check("and the dial on Listen has no yellow", !(await yellowShown()));
   await start(s.page);
   await sleep(1800);
   const seen = await s.page.evaluate(() => {
     const [target, heard] = [".fingerboard-target", ".fingerboard-ghost"].map((selector) => document.querySelector(selector));
     return {
       zone: document.querySelector(".needle").dataset.zone,
-      tolerance: document.documentElement.style.getPropertyValue("--tolerance"),
+      yellow: document.querySelector(".needle .dial-yellow").style.visibility,
       hint: document.querySelector(".fingerboard-hint").textContent,
       stroke: target.getAttribute("stroke"),
       dot: heard.style.display !== "none",
     };
   });
-  check("yellow off: 40 cents flat reads out, with no yellow on the needle", seen.zone === "out" && seen.tolerance === "10%", JSON.stringify(seen));
-  check("the circle stays red, the ghost shows, and the word says slide down", seen.stroke === "#d62828" && seen.dot && seen.hint === "↓ Slide down", JSON.stringify(seen));
-  check("and the note isn't counted", (await s.page.locator(".guess-score").innerText()) === "0 of 10");
+  check("yellow off: 40 cents flat reads out, with no yellow on the dial", seen.zone === "out" && seen.yellow === "hidden", JSON.stringify(seen));
+  check("the circle stays brass, the ghost shows, and the word says slide down", seen.stroke === "#e6ae48" && seen.dot && seen.hint === "↓ Slide down", JSON.stringify(seen));
+  check("and the note isn't counted", (await s.page.locator(".guess-score").innerText()) === "0 of 10 right");
   await s.page.screenshot({ path: OUT + "listen-fingerboard.png" });
-  const stageHeight = async () => (await s.page.locator(".listen-stage").boundingBox()).height;
-  const bothHeight = await stageHeight();
-  await s.page.click('.listen-view[aria-label="Staff and fingerboard"]');
-  check("next, the fingerboard alone, the stage as tall", (await s.page.locator(".stage-sheet").isHidden()) && (await board.isVisible()) && Math.abs((await stageHeight()) - bothHeight) < 2);
-  await s.page.click('.listen-view[aria-label="Fingerboard"]');
-  check("then back to the staff alone", (await s.page.locator(".stage-sheet").isVisible()) && (await board.isHidden()));
+  await panelButton(s.page, "Fingerboard").click();
+  await panelButton(s.page, "Staff").click();
+  [staffBox, boardBox] = [await box(".stage-staff"), await box(".stage-board")];
+  check("both small, they share a row", Math.abs(staffBox.y - boardBox.y) < 2 && boardBox.x > staffBox.x, JSON.stringify({ staffBox, boardBox }));
+  await panelButton(s.page, "Staff").click();
+  check("the staff off leaves the fingerboard alone", (await s.page.locator(".stage-staff").isHidden()) && (await board.isVisible()));
+  await panelButton(s.page, "Fingerboard").click();
+  check("and the last panel on skips off, back to big", (await board.isVisible()) && (await panelButton(s.page, "Fingerboard").getAttribute("aria-label")) === "Fingerboard: big");
+  await panelButton(s.page, "Tuner").click();
+  check("the tuner switches off", (await s.page.locator(".stage-tuner").isHidden()) && (await savedSettings(s.page)).listenPanels.tuner === false);
   await stop(s.page);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-// A wrong note on another string: D4 against the A string's open A shows as a ghost on the D string, and the word
-// says to go across to the A string.
+// A wrong note on another string: D4 against the A string's open A shows as a ghost on the D string, below it, and the
+// word says to go up to the A string.
 wav(OUT + "d4.wav", [note(62, 5)]);
 {
   const s = await open(OUT + "d4.wav");
   await s.page.addInitScript(dealDThenA);
-  await seed(s.page, { settings: { countInOn: false, listenMode: "guesser", listenView: "both", toggles: { fingers: false, noteNames: false, letterNames: false } } });
+  await seed(s.page, { settings: { countInOn: false, listenMode: "guesser", listenPanels: { staff: "big", board: "small", tuner: true }, toggles: { fingers: false, noteNames: false, letterNames: false } } });
   await start(s.page);
   await sleep(1500);
   const seen = await s.page.evaluate(() => ({
     hint: document.querySelector(".fingerboard-hint").textContent,
-    ghostX: Number(document.querySelector(".fingerboard-ghost").getAttribute("cx")),
-    targetX: Number(document.querySelector(".fingerboard-target").getAttribute("cx")),
+    ghostY: Number(document.querySelector(".fingerboard-ghost").getAttribute("cy")),
+    targetY: Number(document.querySelector(".fingerboard-target").getAttribute("cy")),
   }));
-  check("a note on another string: its ghost on that string, left of the target, and the word says where to go", seen.hint === "A string →" && seen.ghostX < seen.targetX, JSON.stringify(seen));
+  check("a note on another string: its ghost on that string, below the target, and the word says where to go", seen.hint === "↑ A string" && seen.ghostY > seen.targetY, JSON.stringify(seen));
   await stop(s.page);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-// Nothing moves as modes and toggles change: the needle and the Start button stay where they are.
+// Nothing moves as modes and toggles change: Start stays where it is, and the settings panel stays docked at the bottom.
 {
   const s = await open(OUT + "a440.wav");
-  const where = async () => (await Promise.all([".needle", ".listen-start"].map((selector) => s.page.locator(selector).boundingBox()))).map((box) => Math.round(box.y)).join(",");
+  const where = async () => (await Promise.all([".listen-start", ".dock"].map((selector) => s.page.locator(selector).boundingBox()))).map((box, index) => Math.round(index ? box.y + box.height : box.y)).join(",");
   const first = await where();
   const moved = [];
   for (const mode of ["Note guesser", "Technique", "Free play", "Technique"]) {
-    await s.page.click(`.listen-modes button[aria-label="${mode}"]`);
+    await pickMode(s.page, mode);
     if ((await where()) !== first) moved.push(`${mode}: ${await where()}`);
   }
-  for (const toggle of ["Fingers", "Note names (Do Ré Mi)", "Letter names (A G D)"]) {
-    await s.page.click(`.listen .toggles button[aria-label="${toggle}"]`);
+  for (const toggle of ["Fingers", "Do Ré Mi", "A B C"]) {
+    await s.page.click(`.dock button:text-is("${toggle}")`);
     if ((await where()) !== first) moved.push(`${toggle}: ${await where()}`);
   }
-  check("the needle and Start stay put through every mode and label toggle", moved.length === 0, `${first} → ${moved.join(" | ")}`);
+  check("Start and the settings panel stay put through every mode and label toggle", moved.length === 0, `${first} → ${moved.join(" | ")}`);
   await s.close();
 }
 
-// The level: one button stepping through Easy, Medium and Hard, and kept. The toggles label the notes to play, or not.
-// The guesser switched on before Listen had three modes opens on the guesser.
+// The level: three buttons, Easy, Medium and Hard, with what each draws from under them, and kept. The toggles label
+// the notes to play, or not. The guesser switched on before Listen had three modes opens on the guesser.
 {
   const s = await open(OUT + "a440.wav");
   await seed(s.page, { settings: { guesserOn: true, toggles: { fingers: false, noteNames: false, letterNames: false } } });
-  check("an old note guesser switch opens on the note guesser", (await s.page.locator('.listen-modes button[aria-pressed="true"]').getAttribute("aria-label")) === "Note guesser");
-  const level = s.page.locator(".guess-level");
-  check("the level starts on Easy", (await level.innerText()) === "Easy");
-  await level.click();
-  await level.click();
-  check("pressing it steps through Medium to Hard, kept", (await level.innerText()) === "Hard" && (await savedSettings(s.page)).guesserLevel === "hard");
-  await level.click();
-  check("and round to Easy again", (await level.innerText()) === "Easy");
-  const labels = () => s.page.locator(".listen .staff text[font-family^=system-ui]").allTextContents();
+  check("an old note guesser switch opens on the note guesser", (await s.page.locator('.nav-sub .sub-item[aria-pressed="true"] .sub-name').innerText()) === "Note guesser");
+  const level = (name) => s.page.locator(`.dock [aria-label="Level"] button:text-is("${name}")`);
+  const hint = () => s.page.locator('.dock-option:has([aria-label="Level"]) .dock-caption').innerText();
+  check("the level starts on Easy, saying what it draws from", (await level("Easy").getAttribute("aria-pressed")) === "true" && (await hint()) === "D and A strings, fingers 0 to 3");
+  await level("Hard").click();
+  check("Hard is picked and kept, with its own line", (await level("Hard").getAttribute("aria-pressed")) === "true" && (await savedSettings(s.page)).guesserLevel === "hard" && (await hint()) === "Every note in first position");
+  const labels = () => s.page.locator(".listen .staff text[font-family^=Barlow]").allTextContents();
   check("with the toggles off, the note to play has no labels", (await labels()).length === 0);
-  for (const toggle of ["Fingers", "Note names", "Letter names"]) await s.page.click(`.listen button[aria-label^="${toggle}"]`);
+  for (const toggle of ["Fingers", "Do Ré Mi", "A B C"]) await s.page.click(`.dock button:text-is("${toggle}")`);
   const shown = await labels();
   check("the toggles put its finger, name and letter on it", shown.length === 2 && /^[0-4]$/.test(shown[0]) && / [A-G]/.test(shown[1]), shown.join(" | "));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-// Technique: a third mode, with its own row of chips, hidden in the other two. The staff shows the string's notes.
+// Technique: a third mode, with its own settings in the settings panel, hidden in the other two. The staff shows the
+// string's notes.
 {
   const s = await open(OUT + "a440.wav");
   await seed(s.page, { settings: { toggles: { fingers: true, noteNames: false, letterNames: false } } });
-  const modes = await s.page.locator(".listen-modes button").evaluateAll((buttons) => buttons.map((button) => button.ariaLabel));
-  check("Listen has three modes, as icons", modes.join(",") === "Free play,Note guesser,Technique", modes.join(","));
-  check("the mode picked is named under the needle", (await s.page.locator(".listen-mode-title").innerText()) === "Free play");
-  const row = s.page.locator(".technique");
-  check("the technique row is hidden in free play", await row.isHidden());
-  await s.page.click('.listen-modes button[aria-label="Technique"]');
-  check("Technique shows its row, and hides the guesser's", (await row.isVisible()) && (await s.page.locator(".guesser").isHidden()));
+  const modes = await s.page.locator(".nav-sub .sub-name").allInnerTexts();
+  check("Listen has three modes, named in the sidebar", modes.join(",") === "Free play,Note guesser,Technique", modes.join(","));
+  check("the mode picked is the screen's title", (await s.page.locator(".listen h1").innerText()) === "Free play");
+  const row = s.page.locator(".dock");
+  const perBow = row.locator('[aria-label="Notes per bow"]');
+  check("Technique's settings are hidden in free play", await perBow.isHidden());
+  await pickMode(s.page, "Technique");
+  check("Technique shows its settings, and hides the guesser's", (await perBow.isVisible()) && (await row.locator('[aria-label="Level"]').isHidden()));
   const pressed = (label) => row.locator(`[aria-label="${label}"] [aria-pressed="true"]`).innerText();
-  check("it starts on a long bow on the A string, 4 beats a note", (await pressed("Notes per bow")) === "1" && (await pressed("String")) === "A" && (await pressed("Beats per note")) === "4");
-  const fingers = async () => (await s.page.locator(".listen .staff text[font-family^=system-ui]").allTextContents()).filter((text) => /^\d$/.test(text)).join(" ");
+  check("it starts on a long bow on the A string, 4 beats a note", (await pressed("Notes per bow")) === "1" && (await pressed("String")) === "A" && (await pressed("Beats a note")) === "4");
+  const fingers = async () => (await s.page.locator(".listen .staff text[font-family^=Barlow]").allTextContents()).filter((text) => /^\d$/.test(text)).join(" ");
   check("the staff shows the open string and fingers 1, 2 and 3", (await fingers()) === "0 1 2 3", await fingers());
   await row.locator('[aria-label="String"] button:text-is("D")').click();
-  await row.locator('[aria-label="Beats per note"] button:text-is("8")').click();
+  await row.locator('[aria-label="Beats a note"] button:text-is("8")').click();
   await row.locator('[aria-label="Notes per bow"] button:text-is("3")').click();
   const kept = await savedSettings(s.page);
   check("each choice is kept", kept.bowString === "D" && kept.bowBeats === 8 && kept.bowNotes === 3 && kept.listenMode === "technique", JSON.stringify(kept));
   check("8 beats a note draws as whole notes", (await s.page.locator(".listen .staff .vf-stavenote").count()) >= 4);
   // A pause before each note: only for a long bow, a rest after each note, and no beats to pick.
-  const pause = s.page.locator('.stage-pause button[title^="Pause before each note"]');
+  const pause = row.locator('button:text-is("Before each note")');
   check("the pause switch is hidden with three notes to a bow", await pause.isHidden());
   await row.locator('[aria-label="Notes per bow"] button:text-is("1")').click();
   await pause.click();
   const drawn = await s.page.locator(".listen .staff .vf-stavenote").count();
-  check("with it on, a rest comes between each of its six notes, and the beats are hidden", drawn === 11 && (await row.locator('[aria-label="Beats per note"]').isHidden()), `${drawn} drawn`);
+  check("with it on, a rest comes between each of its six notes, and the beats are hidden", drawn === 11 && (await row.locator('[aria-label="Beats a note"]').isHidden()), `${drawn} drawn`);
   const wide = (await s.page.locator(".listen .staff").boundingBox()).width;
-  await s.page.click('.listen-modes button[aria-label="Note guesser"]');
-  check("Technique's staff is wider than the guesser's, for its eight notes' names", wide > (await s.page.locator(".listen .staff").boundingBox()).width);
-  await s.page.click('.listen-modes button[aria-label="Technique"]');
+  await pickMode(s.page, "Note guesser");
+  check("Technique's staff is as wide as the guesser's, filling its panel", wide === (await s.page.locator(".listen .staff").boundingBox()).width);
+  await pickMode(s.page, "Technique");
   await s.page.reload();
-  await s.page.waitForSelector(".technique");
-  check("and Listen opens on Technique again", (await row.isVisible()) && (await pressed("String")) === "D");
-  await s.page.click('.listen-modes button[aria-label="Free play"]');
-  check("free play hides the row again", await row.isHidden());
+  await s.page.waitForSelector('.listen[data-mode="technique"]');
+  check("and Listen opens on Technique again", (await perBow.isVisible()) && (await pressed("String")) === "D");
+  await pickMode(s.page, "Free play");
+  check("free play hides its settings again", await perBow.isHidden());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
@@ -367,10 +375,7 @@ const techniqueRound = { listenMode: "technique", bpm: 120, countInBeats: 2, bow
   const bows = (await s.page.locator(".listen .staff text[font-family=Bravura]").allTextContents()).map((mark) => ({ "\uE610": "down", "\uE612": "up" })[mark]);
   check("bows alternate down and up, each marked over its note", bows.join(" ") === "down up down up", bows.join(" "));
   check("the volume curve shows in Technique", await s.page.locator(".volume-curve").isVisible());
-  check("its pause switch sits in the staff's top right corner, and the label toggles in its top left", await s.page.evaluate(() => {
-    const [staff, pause, labels] = [".listen .staff", ".stage-pause", ".stage-labels"].map((selector) => document.querySelector(selector).getBoundingClientRect());
-    return Math.abs(pause.right - staff.right) < 12 && Math.abs(labels.left - staff.left) < 12 && pause.top - staff.top < 12 && labels.top - staff.top < 12;
-  }));
+  check("its pause switch and the label toggles are in the settings panel, with their words", (await s.page.locator('.dock button:text-is("Before each note")').isVisible()) && (await s.page.locator('.dock button:text-is("Fingers")').isVisible()));
   await start(s.page);
   const statusIs = (text) => s.page.waitForFunction((text) => document.querySelector(".technique-status").textContent.startsWith(text), text, { timeout: 4000 });
   await statusIs("Starts in");
@@ -378,14 +383,14 @@ const techniqueRound = { listenMode: "technique", bpm: 120, countInBeats: 2, bow
   await statusIs("Note 2 of 4 · Up bow");
   check("a count-in, then each note in turn, down bow and up", true);
   check("the pitch line runs through the notes", (await s.page.locator(".listen .pitch-trace polyline").count()) > 0);
-  await s.page.waitForSelector(".technique .info-chip", { timeout: 6000 });
-  const chips = await s.page.locator(".technique .info-chip").allInnerTexts();
+  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 6000 });
+  const chips = await s.page.locator(".stage-staff .info-chip").allInnerTexts();
   check("a steady tone scores steady, and held throughout", /^Pitch ±[01] cents?$/.test(chips[0]) && /^Volume steady (9\d|100)%$/.test(chips[1]) && chips[2] === "Held 8/8 beats", chips.join(" | "));
   check("a tone that never moves to the next note has no note changes to time", chips[3] === "Note changes not heard", chips.join(" | "));
   await s.page.waitForSelector('button:text-is("Start")', { timeout: 3000 });
-  check("the round ends the run, and the results stay", (await s.page.locator(".technique .info-chip").count()) === 4);
+  check("the round ends the run, and the results stay", (await s.page.locator(".stage-staff .info-chip").count()) === 4);
   await s.page.screenshot({ path: OUT + "listen-technique.png" });
-  await s.page.click('.listen-modes button[aria-label="Free play"]');
+  await pickMode(s.page, "Free play");
   check("free play hides the volume curve, and the pitch line goes", (await s.page.locator(".volume-curve").isHidden()) && (await s.page.locator(".listen .pitch-trace polyline").count()) === 0);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -394,8 +399,8 @@ const techniqueRound = { listenMode: "technique", bpm: 120, countInBeats: 2, bow
   const s = await open(OUT + "silence.wav");
   await seed(s.page, { settings: techniqueRound });
   await start(s.page);
-  await s.page.waitForSelector(".technique .info-chip", { timeout: 9000 });
-  const chips = await s.page.locator(".technique .info-chip").allInnerTexts();
+  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 9000 });
+  const chips = await s.page.locator(".stage-staff .info-chip").allInnerTexts();
   check("a silent round says nothing was heard", chips.join() === "Nothing heard", chips.join(" | "));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -413,14 +418,14 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
     check("with a slur over each bow's notes", (await s.page.locator(".listen .staff .vf-slur").count()) === 2);
   }
   await start(s.page);
-  await s.page.waitForSelector(".technique .info-chip", { timeout: 9000 });
-  const chips = await s.page.locator(".technique .info-chip").allInnerTexts();
+  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 9000 });
+  const chips = await s.page.locator(".stage-staff .info-chip").allInnerTexts();
   check(`slurs from ${file}: ${expected.filter(Boolean).join(", ")}`, expected.every((chip, index) => chip === null || chips[index] === chip), chips.join(" | "));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-// Free play's note to copy: a tap on the staff picks the natural note there and sounds it on the violin, its speaker
+// Free play's note to copy: a tap on the staff picks the natural note there and sounds it on the violin, its Sound
 // switch silences it but keeps it, and a second tap takes it away. Only free play has the switch.
 {
   const s = await open(OUT + "a440.wav");
@@ -433,31 +438,31 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
     return { x: box.left + box.width * 0.6, y: lines[2].top + lines[2].height / 2 };
   });
   const drawn = () => s.page.locator(".listen .staff .vf-stavenote").count();
-  const speaker = s.page.locator('.stage-speaker button[aria-label="Sound the note picked"]');
+  const speaker = s.page.locator('.dock button:text-is("Play the note I pick")');
   await s.page.mouse.click(middle.x, middle.y); await sleep(500);
   let played = (await recordings(s.page)).at(-1);
   check("a tap on the middle line picks B4, drawn, and sounds it on the violin", (await drawn()) === 1 && played?.midi === 71 && !played.stopped, JSON.stringify(played));
   await speaker.click(); await sleep(200);
-  check("the speaker switch silences it, keeping the note, and is saved", (await drawn()) === 1 && (await recordings(s.page)).at(-1).stopped && (await savedSettings(s.page)).listenReferenceOn === false);
+  check("the Sound switch silences it, keeping the note, and is saved", (await drawn()) === 1 && (await recordings(s.page)).at(-1).stopped && (await savedSettings(s.page)).listenReferenceOn === false);
   await speaker.click(); await sleep(300);
   await s.page.mouse.click(middle.x, middle.y); await sleep(200);
   // Away from the staff, so the note a tap would pick doesn't show faintly in its place.
   await s.page.mouse.move(5, 5); await sleep(100);
   check("a second tap takes the note away, and the sound", (await drawn()) === 0 && (await recordings(s.page)).at(-1).stopped);
-  await s.page.click('.listen-modes button[aria-label="Note guesser"]');
-  check("only free play has the speaker switch", await speaker.isHidden());
+  await pickMode(s.page, "Note guesser");
+  check("only free play has the Sound switch", await speaker.isHidden());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-// The fingerboard in every mode, from the button by Start: in free play it shows the note picked, and in Technique the
-// note to play. A view saved for the guesser alone before carries over.
+// The fingerboard in every mode: in free play it shows the note picked, and in Technique the note to play. A view saved
+// for the guesser alone, before Listen had panels, carries over as the staff big and the fingerboard small.
 {
   const s = await open(OUT + "a440.wav");
   await seed(s.page, { settings: { listenMode: "free", guesserView: "both" } });
   const board = s.page.locator(".fingerboard");
   const target = () => s.page.evaluate(() => { const circle = document.querySelector(".fingerboard-target"); return circle.style.display === "none" ? null : circle.getAttribute("cx") + "," + circle.getAttribute("cy"); });
-  check("the guesser's saved view carries over to all of Listen, the fingerboard beside the staff in free play", (await board.isVisible()) && (await savedSettings(s.page)).listenView === "both");
+  check("the guesser's saved view carries over to all of Listen, the fingerboard small under the staff in free play", (await board.isVisible()) && JSON.stringify((await savedSettings(s.page)).listenPanels) === JSON.stringify({ staff: "big", board: "small", tuner: true }));
   const middle = await s.page.evaluate(() => {
     const lines = [...document.querySelectorAll(".listen .staff svg path")].map((path) => path.getBoundingClientRect()).filter((r) => r.width > 100 && r.height < 3).sort((a, b) => a.top - b.top);
     const box = document.querySelector(".listen .staff svg").getBoundingClientRect();
@@ -467,12 +472,12 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
   const head = await s.page.locator(".listen .staff .vf-notehead").first().boundingBox();
   check("a note picked sits in the middle of the staff", Math.abs(head.x + head.width / 2 - middle.centre) < 20, JSON.stringify({ head, centre: middle.centre }));
   check("and the fingerboard shows where it's played", (await target()) !== null);
-  await s.page.click('.listen-modes button[aria-label="Technique"]'); await sleep(200);
+  await pickMode(s.page, "Technique"); await sleep(200);
   check("Technique keeps the fingerboard, showing its first note", (await board.isVisible()) && (await target()) !== null);
-  check("the view button sits between Start and Fullscreen", await s.page.evaluate(() => {
+  check("the title row has Progress, then Full screen, then Start", await s.page.evaluate(() => {
     const buttons = [...document.querySelector(".listen-start").parentElement.children];
-    const [start, view, full] = [".listen-start", ".listen-view", 'button[aria-label="Fullscreen"]'].map((selector) => buttons.indexOf(document.querySelector(selector)));
-    return start < view && view < full;
+    const [progress, full, start] = [".listen-progress", 'button[aria-label="Fullscreen"]', ".listen-start"].map((selector) => buttons.indexOf(document.querySelector(selector)));
+    return progress < full && full < start;
   }));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -503,7 +508,7 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
   check("Start sounds it on the violin", (await recordings(s.page)).length === 1);
   await s.page.locator(".listen .staff").click(); await sleep(300);
   check("and a tap on the staff sounds it again", (await recordings(s.page)).length === 2);
-  await s.page.click('.guess-by button[aria-label^="By eye"]'); await sleep(200);
+  await s.page.click('.dock [aria-label="Guess by"] button:text-is("Eye")'); await sleep(200);
   check("by eye shows the note, and is saved", (await shown()) === 1 && (await savedSettings(s.page)).guesserBy === "eye");
   await stop(s.page);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// A fresh copy of the settings module, on a screen and with saved settings of our choosing.
-async function settingsWith(stored: object | null, screen = { width: 1440, height: 900 }, language = "en-US") {
+// A fresh copy of the settings module, with saved settings and a browser language of our choosing.
+async function settingsWith(stored: object | null, language = "en-US") {
   vi.resetModules();
   const values = new Map<string, string>(stored ? [["settings", JSON.stringify(stored)]] : []);
   vi.stubGlobal("localStorage", {
@@ -10,8 +10,6 @@ async function settingsWith(stored: object | null, screen = { width: 1440, heigh
     removeItem: (key: string) => values.delete(key),
   });
   vi.stubGlobal("navigator", { language });
-  vi.stubGlobal("innerWidth", screen.width);
-  vi.stubGlobal("innerHeight", screen.height);
   const { getSettings, saveSettings, backupJson, restoreBackup } = await import("../src/storage");
   return { getSettings, saveSettings, backupJson, restoreBackup, values };
 }
@@ -42,6 +40,32 @@ describe("Listen's mode", () => {
     expect((await settingsWith(null)).getSettings().listenMode).toBe("free");
     expect((await settingsWith({ guesserOn: true })).getSettings().listenMode).toBe("guesser");
     expect((await settingsWith({ guesserOn: true, listenMode: "technique" })).getSettings().listenMode).toBe("technique");
+  });
+});
+
+describe("Listen's panels", () => {
+  it("open with the staff big, the fingerboard small and the tuner on", async () => {
+    expect((await settingsWith(null)).getSettings().listenPanels).toEqual({ staff: "big", board: "small", tuner: true });
+  });
+
+  it("carry over the view Listen's one button showed before, and the guesser's before that, with the tuner on", async () => {
+    expect((await settingsWith({ listenView: "staff" })).getSettings().listenPanels).toEqual({ staff: "big", board: "off", tuner: true });
+    expect((await settingsWith({ listenView: "both" })).getSettings().listenPanels).toEqual({ staff: "big", board: "small", tuner: true });
+    expect((await settingsWith({ listenView: "board" })).getSettings().listenPanels).toEqual({ staff: "off", board: "big", tuner: true });
+    expect((await settingsWith({ guesserView: "board" })).getSettings().listenPanels).toEqual({ staff: "off", board: "big", tuner: true });
+  });
+
+  it("let go of the views they replaced once carried over", async () => {
+    const { getSettings, saveSettings, values } = await settingsWith({ listenView: "both", staffBig: true, staffOnly: false, todayPlanOpen: false });
+    saveSettings();
+    const saved = JSON.parse(values.get("settings")!);
+    expect(["listenView", "staffBig", "staffOnly", "todayPlanOpen"].some((key) => key in saved)).toBe(false);
+    expect(getSettings().practicePanels.staff).toBe("big");
+  });
+
+  it("keep panels already saved", async () => {
+    const panels = { staff: "small", board: "small", tuner: false };
+    expect((await settingsWith({ listenView: "board", listenPanels: panels })).getSettings().listenPanels).toEqual(panels);
   });
 });
 
@@ -91,7 +115,7 @@ describe("saved pieces", () => {
 describe("settings", () => {
   it("starts with sensible defaults", async () => {
     const { getSettings } = await settingsWith(null);
-    expect(getSettings()).toMatchObject({ toleranceCents: 40, holdMs: 200, tempoOn: false, metronomeOn: false, bpm: 60, pattern: 0, staffOpen: false });
+    expect(getSettings()).toMatchObject({ toleranceCents: 40, holdMs: 200, tempoOn: false, metronomeOn: false, bpm: 60, pattern: 0, staffOpen: false, sidebarIcons: false });
     expect(getSettings().countInOn).toBe(true);
     expect(getSettings().toggles).toMatchObject({ fingers: true, noteNames: true, letterNames: true });
   });
@@ -103,9 +127,9 @@ describe("settings", () => {
   });
 
   it("picks the language from the browser until one is saved", async () => {
-    expect((await settingsWith(null, undefined, "pt-BR")).getSettings().language).toBe("pt");
-    expect((await settingsWith(null, undefined, "fr-FR")).getSettings().language).toBe("en");
-    expect((await settingsWith({ language: "en" }, undefined, "pt-BR")).getSettings().language).toBe("en");
+    expect((await settingsWith(null, "pt-BR")).getSettings().language).toBe("pt");
+    expect((await settingsWith(null, "fr-FR")).getSettings().language).toBe("en");
+    expect((await settingsWith({ language: "en" }, "pt-BR")).getSettings().language).toBe("en");
   });
 
   it("saves what changed", async () => {
@@ -116,24 +140,15 @@ describe("settings", () => {
   });
 });
 
-describe("timeline scale", () => {
-  async function scaleOn(width: number, height: number) {
-    await settingsWith(null, { width, height });
-    return (await import("../src/ui/layout")).timelineScale();
-  }
-
-  it("bigger staff gives the staff most of the room and shrinks the lanes", async () => {
-    await settingsWith({ staffBig: true });
-    const { staffScale, timelineScale } = await import("../src/ui/layout");
-    expect(staffScale()).toBeGreaterThan(1);
-    expect(timelineScale()).toBeLessThan(1);
+describe("Practice's panels", () => {
+  it("open with the lanes big and the staff small, the fingerboard and tuner off", async () => {
+    expect((await settingsWith(null)).getSettings().practicePanels).toEqual({ lanes: "big", staff: "small", board: "off", tuner: false });
   });
 
-  it("keeps full size from tablets up, and shrinks on phones and short screens", async () => {
-    expect(await scaleOn(1440, 900)).toBe(1);
-    expect(await scaleOn(768, 1024)).toBe(1);
-    expect(await scaleOn(390, 844)).toBe(0.75);
-    expect(await scaleOn(844, 390)).toBe(0.6);
+  it("carry over a bigger staff, and the staff alone, from before Practice had panels", async () => {
+    expect((await settingsWith({ staffBig: true })).getSettings().practicePanels).toEqual({ lanes: "small", staff: "big", board: "off", tuner: false });
+    expect((await settingsWith({ staffBig: true, staffOnly: true })).getSettings().practicePanels).toEqual({ lanes: "off", staff: "big", board: "off", tuner: false });
+    expect((await settingsWith({ staffBig: false, staffOnly: false })).getSettings().practicePanels).toEqual({ lanes: "big", staff: "small", board: "off", tuner: false });
   });
 });
 

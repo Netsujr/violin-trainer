@@ -1,9 +1,9 @@
-// Pieces you make yourself: writing one on the staff or typing it, editing it, saving it as a PDF, and the questions
-// asked before anything is lost. Also the size of the buttons on a Library row, and the bars and labels on the sheet.
+// Pieces you make yourself: writing one on Add piece's staff, editing it, saving it as a PDF, and the questions asked
+// before anything is lost. Also the size of the buttons on a Library card, and the bars and labels on the sheet.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { wav, rest } from "./wav.mjs";
-import { answer, auditCheck, canvasHasColor, check, nav, open, openDrawers, OUT, pickPiece, progress, seed, sleep } from "./lib.mjs";
+import { answer, auditCheck, canvasHasColor, cardOf, check, nav, open, showGroup, OUT, pickPiece, progress, seed, sleep, setLanguage } from "./lib.mjs";
 
 const WAV = OUT + "pieces-silent.wav";
 wav(WAV, [rest(3)]);
@@ -16,16 +16,22 @@ const G4_Y = 90;
 const D5_Y = 60;
 const STEP_PX = 7.5;
 
-// The Library, with these saved pieces and this on the staff.
+// The Library's My songs, with these saved pieces and this on Add piece's staff.
 async function library(page, { pieces = [], draft = { title: "", notes: [] }, settings } = {}) {
   await page.evaluate((draft) => localStorage.setItem("pieceDraft", JSON.stringify(draft)), draft);
   await seed(page, { settings, pieces });
   await nav(page, "Library");
+  await showGroup(page, "My songs");
   await sleep(200);
-  await openDrawers(page);
+}
+// Add piece, opened from Library's +, with these saved pieces and this on its staff.
+async function editor(page, options) {
+  await library(page, options);
+  await page.click('.library button[aria-label="Add piece"]');
+  await sleep(200);
 }
 
-function tools(page, press = (locator) => locator.click()) {
+function tools(page, press = (locator, options) => locator.click(options)) {
   const row = (text) => page.locator(".piece", { hasText: text });
   const say = async (label) => { await press(page.locator("dialog[open]").getByRole("button", { name: label, exact: true })); await sleep(100); };
   return {
@@ -33,19 +39,25 @@ function tools(page, press = (locator) => locator.click()) {
     row,
     say,
     modal: page.locator("dialog[open]"),
-    title: page.locator('input[placeholder="Title"]'),
-    save: page.locator("section > .row").last().getByRole("button", { name: "Save piece", exact: true }),
-    clear: (label = "Clear") => page.locator("section > .row").last().getByRole("button", { name: label, exact: true }),
-    pencil: (text) => row(text).getByRole("button", { name: "Edit piece", exact: true }),
+    title: page.locator('input[aria-label="Title"]'),
+    save: page.locator('.title-tools button:text-is("Save piece")'),
+    clear: (label = "Clear") => page.locator(`.title-tools button:text-is("${label}")`),
+    back: () => press(page.locator(".add-piece .title-row .icon-only")),
+    pencil: (text) => row(text).getByRole("button", { name: "Edit", exact: true }),
     trash: (text) => row(text).getByRole("button", { name: "Delete", exact: true }),
-    download: (text) => row(text).getByRole("button", { name: "Download PDF", exact: true }),
+    // A card's PDF button, from whichever group holds it.
+    download: async (text) => (await cardOf(page, text)).getByRole("button", { name: "PDF", exact: true }),
     blank: () => page.locator(".editor-column.blank .editor-sheet").first(),
     sheetOf: (index) => page.locator(`.editor-column[data-index="${index}"] .editor-sheet`),
-    nameOf: (index) => page.locator(`.editor-column[data-index="${index}"] button.editor-name`),
-    beatsOf: (index) => page.locator(`.editor-column[data-index="${index}"] select`),
-    heading: () => page.locator("section > h2").last().textContent(),
-    names: () => page.$$eval(".editor-column button.editor-name", (names) => names.map((name) => name.textContent).join()),
-    beats: () => page.$$eval(".beat-picker select", (selects) => selects.map((select) => select.value).join()),
+    // Picks a note out for the note tools, with a press low on its sheet, well away from the note, so it doesn't move.
+    pick: async (index) => { await press(page.locator(`.editor-column[data-index="${index}"] .editor-sheet`), { position: { x: 4, y: 185 } }); await sleep(60); },
+    tool: (text) => page.locator(`.note-tools button:text-is("${text}")`),
+    // A note's length, in the note tools, by its label: ½, 1, 1½, 2, 3 or 4.
+    beatsButton: (label) => page.locator(`.note-tools [aria-label="Beats"] button:text-is("${label}")`),
+    heading: () => page.locator(".add-piece h1").textContent(),
+    // The notes' names, as each shows on hover, and their lengths, as the staff keeps them.
+    names: () => page.$$eval(".editor-column[title]", (columns) => columns.map((column) => column.title).join()),
+    beats: async () => (await page.evaluate(() => JSON.parse(localStorage.getItem("pieceDraft")).notes.map((note) => note.beats).join())),
     widths: () => page.$$eval(".editor-column", (columns) => columns.map((column) => column.getBoundingClientRect().width)),
     stored: () => page.evaluate(() => JSON.parse(localStorage.getItem("pieces") ?? "[]")),
     draft: () => page.evaluate(() => JSON.parse(localStorage.getItem("pieceDraft"))),
@@ -61,19 +73,19 @@ flow("Writing on the staff");
   const s = await open(WAV);
   const { page } = s;
   const t = tools(page);
-  await library(page);
+  await editor(page);
   check("Save starts off", await t.save.isDisabled());
   check("so does Clear, with nothing to clear", await t.clear().isDisabled());
 
   const beatNumbers = await page.$$eval(".editor-row:first-child .editor-column text", (numbers) => numbers.map((number) => number.textContent).join());
   check("a blank staff already shows its bars, counted in beats", beatNumbers.startsWith("1,2,3,4,1,2,3,4"), beatNumbers);
-  check("with bar lines", (await page.locator('.editor-row:first-child line[stroke="#000"]').count()) >= 2);
+  check("with bar lines", (await page.locator('.editor-row:first-child line[stroke="#6f7a8d"]').count()) >= 2);
 
   await t.blank().scrollIntoViewIfNeeded();
   const box = await t.blank().boundingBox();
   await page.mouse.move(box.x + 20, box.y + G4_Y);
   await sleep(50);
-  check("hovering shows where a note would go, and its name", (await page.locator(".editor-column.blank svg ellipse").count()) === 1 && (await page.locator(".editor-column.blank .editor-name").first().textContent()) === "Sol");
+  check("hovering shows where a note would go", (await page.locator(".editor-column.blank svg ellipse").count()) === 1);
   await page.mouse.move(box.x + 20, box.y - 200);
   await sleep(50);
   check("and it goes away with the mouse", (await page.locator(".editor-column.blank svg ellipse").count()) === 0);
@@ -96,27 +108,29 @@ flow("Writing on the staff");
   check("a press well away from a note doesn't move it", (await t.names()) === "Ré", await t.names());
   await drag(0, D5_Y, G4_Y);
 
+  check("the note placed is picked out, and the note tools name it", (await page.locator(".editor-column.selected").count()) === 1 && (await page.locator(".selected-note").innerText()) === "Sol (G), bar 1");
   const accidentals = [];
-  for (let i = 0; i < 3; i++) { await t.nameOf(0).click(); await sleep(60); accidentals.push(await t.names()); }
-  check("clicking the name goes through sharp, flat and natural", accidentals.join() === "Sol♯,Sol♭,Sol", accidentals.join());
+  for (const label of ["♯ Sharp", "♭ Flat", "Natural"]) { await t.tool(label).click(); await sleep(60); accidentals.push(await t.names()); }
+  check("the note tools set sharp, flat and natural", accidentals.join() === "Sol♯,Sol♭,Sol", accidentals.join());
 
-  await t.beatsOf(0).selectOption("2");
+  await t.beatsButton("2").click();
   await t.blank().click({ position: { x: 20, y: D5_Y } });
   await sleep(100);
   check("the next click lands after it", (await t.names()) === "Sol,Ré" && (await t.beats()) === "2,1");
-  const inBar = await t.beatsOf(1).evaluate((select) => [...select.options].filter((option) => option.disabled).map((option) => option.value).join());
+  const inBar = await page.$$eval('.note-tools [aria-label="Beats"] button:disabled', (buttons) => buttons.map((button) => button.textContent).join());
   check("lengths that don't fit the bar can't be picked", inBar === "3,4", inBar);
 
-  const offsets = await page.$$eval(".editor-delete", (buttons) => buttons.map((button) => button.getBoundingClientRect().left - button.closest(".editor-sheet").getBoundingClientRect().left));
-  check("each note's trash sits in the same place inside the staff", new Set(offsets).size === 1, offsets.join());
-  await page.locator(".editor-delete").first().click();
+  await t.pick(0);
+  check("a press on a note picks it out", (await page.locator(".selected-note").innerText()) === "Sol (G), bar 1");
+  await page.locator('.note-tools button[aria-label="Delete note"]').click();
   await sleep(100);
-  check("and removes just that note", (await t.names()) === "Ré");
+  check("and its bin removes just that note, leaving nothing picked", (await t.names()) === "Ré" && (await t.tool("Hear this line").isHidden()));
 
   await t.title.fill("On the staff");
   await page.reload();
   await page.waitForSelector("nav button");
   await nav(page, "Library");
+  await page.click('.library button[aria-label="Add piece"]');
   await sleep(200);
   check("a reload keeps what's on the staff", (await t.names()) === "Ré" && (await t.title.inputValue()) === "On the staff");
 
@@ -124,8 +138,8 @@ flow("Writing on the staff");
   await sleep(150);
   const saved = (await t.stored()).at(-1);
   check("Save keeps the note, with a fingering", saved.title === "On the staff" && saved.notes[0].pitch === "D5" && saved.notes[0].finger !== undefined, JSON.stringify(saved.notes));
-  check("then the staff and title are blank", (await t.names()) === "" && (await t.title.inputValue()) === "");
-  await t.row("On the staff").getByRole("button", { name: "Practice", exact: true }).click();
+  check("then goes back to My songs, the staff and title blank", (await page.locator(".library h1").innerText()) === "My songs" && (await t.draft()).notes.length === 0 && (await t.draft()).title === "");
+  await t.row("On the staff").getByRole("button", { name: "Practise", exact: true }).click();
   await sleep(300);
   check("it opens in Practice", (await progress(page)) === "Note 1 of 1", await progress(page));
   notProblems(s);
@@ -137,37 +151,39 @@ flow("The space notes take, and the bar lines");
   const s = await open(WAV);
   const { page } = s;
   const t = tools(page);
-  await library(page, { draft: { title: "", notes: lengths(2, 0.5, 0.5, 1) } });
+  await editor(page, { draft: { title: "", notes: lengths(2, 0.5, 0.5, 1) } });
   check("a quick note gets a whole beat's room, a long one more", (await t.widths()).slice(0, 4).join() === "144,72,72,72", (await t.widths()).join());
 
-  await library(page, { draft: { title: "", notes: lengths(1, 1, 1, 1) } });
+  await editor(page, { draft: { title: "", notes: lengths(1, 1, 1, 1) } });
   const place = () => page.$$eval(".editor-column[data-index]", (columns) => columns.map((column) => column.getBoundingClientRect().left));
   const before = await place();
-  await t.beatsOf(0).selectOption("4");
+  await t.pick(0);
+  await t.beatsButton("4").click();
   await sleep(100);
   const after = await place();
   check("a note made longer pushes the next ones along", after[1] - before[1] === 216 && (await t.widths())[0] === 288, `${after[1] - before[1]}`);
 
-  await library(page, { draft: { title: "", notes: lengths(2, 1, 0.5) } });
+  await editor(page, { draft: { title: "", notes: lengths(2, 1, 0.5) } });
   await t.blank().click({ position: { x: 20, y: G4_Y } });
   await sleep(100);
   check("a note with half a beat left starts at ½", (await t.draft()).notes.at(-1).beats === 0.5, JSON.stringify((await t.draft()).notes.at(-1)));
   check("and a full bar leaves a fresh one to write in", (await t.blank().count()) === 1);
 
   const eighths = Array.from({ length: 32 }, () => 0.5);
-  await library(page, { draft: { title: "", notes: lengths(...eighths) } });
+  await editor(page, { draft: { title: "", notes: lengths(...eighths) } });
   const rows = await page.$$eval(".editor-row", (list) => list.map((row) => row.getBoundingClientRect().right));
   const room = await page.locator(".editor-rows").evaluate((rows) => rows.getBoundingClientRect().right);
   check("wide bars wrap into rows, inside the page", rows.length > 1 && rows.every((right) => right <= room + 1), `${rows.length} rows`);
   await auditCheck(page, "A long staff", ".piece-editor");
 
-  await library(page, { draft: { title: "Over", notes: lengths(1, 1, 0.5, 0.5, 1) } });
+  await editor(page, { draft: { title: "Over", notes: lengths(1, 1, 0.5, 0.5, 1) } });
   check("a bar that fits has no warning", (await page.locator(".piece-editor .warning").textContent()) === "" && (await t.save.isEnabled()));
-  await t.beatsOf(0).selectOption("1.5");
+  await t.pick(0);
+  await t.beatsButton("1½").click();
   await sleep(100);
   check("a push over the bar line turns the note red, and shows the overflow", (await page.locator(".editor-column.crosses-bar").count()) === 1 && (await page.locator(".editor-column.spill").count()) === 1);
   check("it explains, and Save waits", (await page.locator(".piece-editor .warning").textContent()).includes("Each bar holds 4 beats") && (await t.save.isDisabled()));
-  await t.beatsOf(0).selectOption("1");
+  await t.beatsButton("1").click();
   await sleep(100);
   check("fixing it clears all that", (await page.locator(".editor-column.crosses-bar").count()) === 0 && (await t.save.isEnabled()));
   notProblems(s);
@@ -178,23 +194,22 @@ flow("Hearing a line of the staff");
 {
   const s = await open(WAV);
   const { page } = s;
-  await library(page);
-  check("an empty staff has no play button", (await page.locator(".editor-play").count()) === 0);
-
-  await library(page, { draft: { title: "", notes: lengths(...Array.from({ length: 32 }, () => 0.5)) } });
-  const lines = await page.$$eval(".editor-row", (rows) => rows.map((row) => `${row.querySelectorAll(".editor-column[data-index]").length > 0}:${row.querySelectorAll(".editor-clef .editor-play").length}`));
-  check("each line with notes has a play button under its clef", lines.filter((line) => line === "true:1").length > 1 && lines.every((line) => line === "true:1" || line === "false:0"), lines.join());
+  const t = tools(page);
+  await editor(page);
+  const play = page.locator(".note-tools .editor-play");
+  check("with no note picked, there's no line to hear", await play.isHidden());
 
   // Two beats at 120 BPM: a second.
-  await library(page, { draft: { title: "", notes: lengths(1, 1) }, settings: { bpm: 120 } });
-  const play = page.locator(".editor-play");
+  await editor(page, { draft: { title: "", notes: lengths(1, 1) }, settings: { bpm: 120 } });
+  await t.pick(0);
+  check("a note picked can hear its line", (await play.innerText()) === "Hear this line");
   await play.click();
-  check("pressing it plays the line, and it becomes Stop", (await play.getAttribute("title")) === "Stop");
+  check("pressing it plays the line, and it becomes Stop", (await play.innerText()) === "Stop");
   await sleep(1500);
-  check("it goes back once the line has played", (await play.getAttribute("title")) === "Hear this line");
+  check("it goes back once the line has played", (await play.innerText()) === "Hear this line");
   await play.click();
   await play.click();
-  check("pressing Stop stops it", (await play.getAttribute("title")) === "Hear this line");
+  check("pressing Stop stops it", (await play.innerText()) === "Hear this line");
   notProblems(s);
   await s.close();
 }
@@ -204,18 +219,19 @@ flow("Rests");
   const s = await open(WAV);
   const { page } = s;
   const t = tools(page);
-  await library(page, { draft: { title: "Breath", notes: [] } });
-  const addRest = page.locator(".editor-rest");
-  check("the next note's place has a button for a rest", (await addRest.count()) === 1 && (await addRest.getAttribute("title")) === "Add a rest");
+  await editor(page, { draft: { title: "Breath", notes: [] } });
+  const addRest = t.tool("Add a rest");
+  check("the note tools always have Add a rest", await addRest.isVisible());
   await addRest.click();
   await sleep(100);
   const rest = page.locator(".editor-column.rest");
-  check("it adds a rest of one beat, named as one, with its length to pick", (await rest.count()) === 1 && (await rest.locator(".editor-name").textContent()) === "Rest" && (await t.beats()) === "1", await t.beats());
+  check("it adds a rest of one beat, picked out and named as one, with its length to pick", (await rest.count()) === 1 && (await page.locator(".selected-note").innerText()) === "Rest, bar 1" && (await t.beats()) === "1", await t.beats());
+  check("a rest has no sharp or flat", await t.tool("♯ Sharp").isHidden());
   check("drawn with the rest sign", (await rest.locator(".vf-stavenote").textContent()).includes("\uE4E5"));
-  check("rests alone can't be saved, and their line has nothing to hear", (await t.save.isDisabled()) && (await page.locator(".editor-play").count()) === 0);
+  check("rests alone can't be saved", await t.save.isDisabled());
   await t.blank().click({ position: { x: 20, y: G4_Y } });
   await sleep(100);
-  check("after a note they can, and the line plays", !(await t.save.isDisabled()) && (await page.locator(".editor-play").count()) === 1);
+  check("after a note they can", !(await t.save.isDisabled()));
   await t.save.click();
   await sleep(200);
   const saved = (await t.stored()).find((piece) => piece.title === "Breath");
@@ -279,11 +295,10 @@ flow("The question before anything is lost");
   await t.trash("My tune").click(); await t.modal.waitFor();
   await answer(page, "Delete");
   check("Delete removes only that song", (await t.stored()).map((piece) => piece.id).join() === "other,long" && (await t.row("My tune").count()) === 0);
-  await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
-  await openDrawers(page);
+  await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await showGroup(page, "My songs"); await sleep(200);
   check("for good", (await t.row("My tune").count()) === 0);
 
-  await library(page, { pieces, draft: { title: "", notes: [note("D4", 1)] } });
+  await editor(page, { pieces, draft: { title: "", notes: [note("D4", 1)] } });
   await t.clear().click(); await t.modal.waitFor();
   check("Clear asks too", (await t.modal.innerText()).includes("Remove all the notes"));
   await answer(page, "Cancel");
@@ -308,16 +323,13 @@ flow("The question before anything is lost");
   await answer(page, "Delete"); await sleep(150);
   check("confirming removes it", (await page.locator("dialog[open]").count()) === 0 && (await page.locator("audio, .recording-note").count()) === 0 && !(await hasTake()));
 
-  await nav(page, "Library"); await sleep(200);
-  await openDrawers(page);
-  await page.click("header summary"); await page.getByRole("button", { name: "PT", exact: true }).click(); await sleep(200);
-  await openDrawers(page); // Changing language builds the Library again, with its drawers closed.
+  await nav(page, "Library"); await showGroup(page, "My songs"); await sleep(200);
+  await setLanguage(page, "PT");
   await t.row("Other tune").getByRole("button", { name: "Excluir", exact: true }).click(); await t.modal.waitFor();
   const question = await t.modal.innerText();
   check("the question comes in Portuguese too", question.includes('Excluir "Other tune"?') && question.includes("Cancelar"), question.replaceAll("\n", " | "));
   await answer(page, "Cancelar");
-  await page.click("header summary"); await page.getByRole("button", { name: "EN", exact: true }).click(); await sleep(200);
-  await openDrawers(page);
+  await setLanguage(page, "EN");
   check("the browser's own popups aren't used anywhere", popups === 0, `${popups}`);
   notProblems(s);
   await s.close();
@@ -334,41 +346,41 @@ flow("Editing a saved song");
   const settings = { highlighted: ["mine"] };
   const savedMine = async () => (await t.stored()).find((piece) => piece.id === "mine");
   await library(page, { pieces, settings });
-  const buttonsOn = (text) => t.row(text).first().evaluate((row) => [...row.querySelectorAll("button.icon-button")].map((button) => button.getAttribute("aria-label")).join());
-  check("custom songs get the pencil, beside the trash", (await buttonsOn("My tune")) === "Practice,Download PDF,Edit piece,Delete,Add a backing track", await buttonsOn("My tune"));
+  const buttonsOn = (text) => t.row(text).first().evaluate((row) => [...row.querySelectorAll(".card-button")].map((button) => button.textContent).join());
+  check("your own songs get Edit and Delete", (await buttonsOn("My tune")) === "Practise,PDF,Add track,Edit,Delete", await buttonsOn("My tune"));
+  await showGroup(page, "Classic tunes");
   check("built-in songs don't", !(await buttonsOn("Ode to Joy")).includes("Edit") && !(await buttonsOn("Ode to Joy")).includes("Delete"));
+  await showGroup(page, "My songs");
 
   await t.pencil("My tune").click(); await sleep(150);
-  check("the heading says Edit piece", (await t.heading()) === "Edit piece", await t.heading());
+  check("Edit opens Add piece, saying Edit piece", (await t.heading()) === "Edit piece", await t.heading());
   check("the title, notes and lengths come along", (await t.title.inputValue()) === "My tune" && (await t.names()) === "Ré,Lá,Si" && (await t.beats()) === "2,1,1", `${await t.names()} ${await t.beats()}`);
-  check("it scrolls to the editor", await page.locator("section > h2").last().evaluate((heading) => { const { top } = heading.getBoundingClientRect(); return top >= -1 && top < innerHeight; }));
   await page.screenshot({ path: OUT + "pieces-editing.png" });
 
   await t.clear("Cancel").click(); await sleep(100);
   check("Cancel with no changes doesn't ask", !(await t.open()));
   check("and leaves a blank staff", (await t.heading()) === "Add piece" && (await t.names()) === "" && (await t.title.inputValue()) === "");
+  await t.back(); await sleep(150);
 
   await t.pencil("My tune").click(); await sleep(150);
   await t.title.fill("My better tune");
-  await t.beatsOf(0).selectOption("1");
-  await t.nameOf(2).click(); await sleep(100);
+  await t.pick(0); await t.beatsButton("1").click();
+  await t.pick(2); await t.tool("♯ Sharp").click(); await sleep(100);
   await t.save.click(); await sleep(150);
   const changed = await savedMine();
   check("Save updates the song in place", (await t.stored()).length === 2 && changed.title === "My better tune" && changed.notes[0].beats === 1, JSON.stringify((await t.stored()).map((piece) => piece.title)));
   check("a note left alone keeps a hand-set finger", changed.notes[1].finger === "4" && changed.notes[1].string === "D", JSON.stringify(changed.notes[1]));
   check("a note given a new pitch gets a fresh fingering", changed.notes[2].pitch === "B#4" && changed.notes[2].finger !== "1" && changed.notes[2].finger !== undefined, JSON.stringify(changed.notes[2]));
-  check("the editor goes back to adding", (await t.heading()) === "Add piece" && (await t.names()) === "");
+  check("the staff goes back to adding", (await t.draft()).editingId === undefined && (await t.draft()).notes.length === 0);
   check("the highlight stays with the song", await t.row("My better tune").evaluate((card) => card.classList.contains("highlighted")));
 
-  await t.row("My better tune").getByRole("button", { name: "Practice", exact: true }).click(); await sleep(300);
-  check("Practice gets the changes", (await progress(page)) === "Note 1 of 3" && (await page.locator(".piece-select").innerText()) === "My better tune", await progress(page));
+  await t.row("My better tune").getByRole("button", { name: "Practise", exact: true }).click(); await sleep(300);
+  check("Practice gets the changes", (await progress(page)) === "Note 1 of 3" && (await page.locator(".practice-title h1").innerText()) === "My better tune", await progress(page));
   await nav(page, "Library"); await sleep(200);
-  await openDrawers(page);
 
   await t.pencil("My better tune").click(); await sleep(150);
   await t.title.fill("After a reload");
-  await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
-  await openDrawers(page);
+  await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await page.click('.library button[aria-label="Add piece"]'); await sleep(200);
   check("a reload stays in the edit", (await t.heading()) === "Edit piece" && (await t.title.inputValue()) === "After a reload");
   await t.save.click(); await sleep(150);
   check("so saving doesn't make a copy", (await t.stored()).length === 2 && (await savedMine()).title === "After a reload", JSON.stringify((await t.stored()).map((piece) => piece.title)));
@@ -384,22 +396,24 @@ flow("Editing a saved song");
   check("Discard leaves the saved song alone", (await savedMine()).title === "After a reload" && (await t.heading()) === "Add piece" && (await t.title.inputValue()) === "");
 
   await t.title.fill("My draft");
+  await t.back(); await sleep(150);
   await t.pencil("After a reload").click(); await t.modal.waitFor();
-  check("the pencil asks before replacing a draft", (await t.modal.innerText()).includes("Replace what's on the staff"));
+  check("Edit asks before replacing a draft", (await t.modal.innerText()).includes("Replace what's on the staff"));
   await answer(page, "Cancel");
-  check("Cancel keeps the draft", (await t.title.inputValue()) === "My draft" && (await t.heading()) === "Add piece");
+  check("Cancel keeps the draft", (await t.draft()).title === "My draft" && (await page.locator(".library").count()) === 1);
   await t.pencil("After a reload").click(); await t.modal.waitFor();
-  await answer(page, "Replace");
+  await answer(page, "Replace"); await sleep(150);
   check("Replace loads the song", (await t.heading()) === "Edit piece" && (await t.title.inputValue()) === "After a reload");
 
+  await t.back(); await sleep(150);
   await t.pencil("Other tune").click(); await sleep(150);
   check("an unchanged edit moves to another song without asking", !(await t.open()) && (await t.title.inputValue()) === "Other tune");
   check("a note with no written length opens as 1 beat", (await t.beats()) === "1");
+  await t.back(); await sleep(150);
   await t.trash("Other tune").click(); await t.modal.waitFor();
   await answer(page, "Delete");
-  check("deleting the song being edited clears the editor", (await t.heading()) === "Add piece" && (await t.names()) === "" && (await t.stored()).length === 1);
-  await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await sleep(200);
-  await openDrawers(page);
+  check("deleting the song being edited clears the staff", (await t.draft()).editingId === undefined && (await t.draft()).notes.length === 0 && (await t.stored()).length === 1);
+  await page.reload(); await page.waitForSelector("nav button"); await nav(page, "Library"); await page.click('.library button[aria-label="Add piece"]'); await sleep(200);
   check("and a reload doesn't bring the edit back", (await t.heading()) === "Add piece");
   notProblems(s);
   await s.close();
@@ -413,7 +427,8 @@ flow("Saving as a PDF");
   const bar = (start) => [2, 0.5, 0.5, 1].map((beats, index) => note(["D4", "E4", "F#4", "G4", "A4", "B4", "C#5", "D5"][(start + index) % 8], beats, { finger: String((start + index) % 4) }));
   const pieces = [custom("mine", "Mine: a tune", bar(0)), custom("long", "Long one", Array.from({ length: 40 }, (_, index) => bar(index)).flat())];
   const fetchPdf = async (text, file) => {
-    const [download] = await Promise.all([page.waitForEvent("download"), t.download(text).click()]);
+    const button = await t.download(text);
+    const [download] = await Promise.all([page.waitForEvent("download"), button.click()]);
     await download.saveAs(OUT + file);
     const bytes = readFileSync(OUT + file);
     const raw = bytes.toString("latin1");
@@ -440,7 +455,7 @@ flow("Saving as a PDF");
     return { width: bitmap.width, height: bitmap.height, corner: data[0], dark, brown };
   }, image);
   await library(page, { pieces });
-  const icons = async (text) => t.row(text).first().getByRole("button", { name: "Download PDF", exact: true }).count();
+  const icons = async (text) => (await t.download(text)).count();
   check("every song gets a download, and scales don't", (await icons("Hot Cross Buns")) === 1 && (await icons("Mine: a tune")) === 1 && (await icons("D (Ré) major")) === 0);
 
   const ode = await fetchPdf("Ode to Joy", "pieces-ode.pdf");
@@ -477,7 +492,7 @@ flow("The sheet in Practice: bars, and labels that stay with their line");
   // Three between the four bars of D major, and one at each end of the staff.
   const barLines = await page.locator(".staff .vf-stavebarline").count();
   check("a scale is written in bars, on the staff", barLines === 5, `${barLines}`);
-  check("and with heavier lines on the lanes", await canvasHasColor(page, 0x5a, 0x4e, 0x42));
+  check("and with heavier lines on the lanes", await canvasHasColor(page, 0x3a, 0x44, 0x56));
 
   // Reads the open sheet in its own units. Noteheads are font text, whose boxes are far taller than what shows, so they're sized by hand.
   const collisions = () => page.evaluate(() => {
@@ -520,29 +535,25 @@ flow("The sheet in Practice: bars, and labels that stay with their line");
   await s.close();
 }
 
-flow("The buttons on a row");
-const rowSizes = async (page, t, label, drawn, tap) => {
+flow("The buttons on a card");
+const cardSizes = async (page, t, label) => {
   const pieces = [custom("mine", "My tune", [note("D4", 1, { finger: "0" })])];
   await library(page, { pieces, settings: { highlighted: ["mine"] } });
-  const sizes = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".icon-button")].map((control) => {
-    const box = control.getBoundingClientRect(), shown = control.querySelector("svg").getBoundingClientRect();
-    return { shown: `${shown.width}x${shown.height}`, tall: box.height, wide: box.width };
-  }));
-  check(`${label}: five controls`, sizes.length === 5);
-  check(`${label}: drawn at ${drawn} px`, sizes.every(({ shown }) => shown === `${drawn}x${drawn}`), sizes.map(({ shown }) => shown).join());
-  check(`${label}: tapped at ${tap} px`, sizes.every(({ tall, wide }) => tall === tap && wide >= tap), sizes.map(({ wide, tall }) => `${wide}x${tall}`).join());
-  const answers = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".icon-button")].every((control) => {
+  const buttons = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".card-button")].map((control) => ({ text: control.textContent, tall: control.getBoundingClientRect().height })));
+  check(`${label}: five buttons, each with its word`, buttons.map(({ text }) => text).join() === "Practise,PDF,Add track,Edit,Delete", buttons.map(({ text }) => text).join());
+  check(`${label}: each tall enough to tap`, buttons.every(({ tall }) => tall >= 38), buttons.map(({ tall }) => tall).join());
+  const answers = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".card-button")].every((control) => {
     control.scrollIntoView({ block: "center" });
     const box = control.getBoundingClientRect();
     return [[box.left + 4, box.top + 4], [box.right - 4, box.top + 4], [box.left + 4, box.bottom - 4], [box.right - 4, box.bottom - 4]].every(([x, y]) => control.contains(document.elementFromPoint(x, y)));
   }));
   check(`${label}: the whole tap area answers`, answers);
-  await auditCheck(page, `${label}: Library rows`, ".library");
+  await auditCheck(page, `${label}: Library cards`, ".library");
 };
 {
   const s = await open(WAV);
-  await rowSizes(s.page, tools(s.page), "Mouse", 20, 28);
-  await s.page.locator(".library > div").nth(1).screenshot({ path: OUT + "pieces-rows-mouse.png" });
+  await cardSizes(s.page, tools(s.page), "Mouse");
+  await s.page.locator(".piece-grid").screenshot({ path: OUT + "pieces-cards-mouse.png" });
   notProblems(s);
   await s.close();
 }
@@ -552,10 +563,10 @@ for (const [label, width, height] of [["iPhone size", 393, 852], ["Small phone",
   const s = await open(WAV, undefined, { viewport: { width, height }, hasTouch: true, isMobile: true });
   const { page } = s;
   const t = tools(page, (locator) => locator.tap());
-  await rowSizes(page, t, label, 18, 32);
-  await page.locator(".library > div").nth(1).screenshot({ path: `${OUT}pieces-rows-${width}.png` });
+  await cardSizes(page, t, label);
+  await page.locator(".piece-grid").screenshot({ path: `${OUT}pieces-cards-${width}.png` });
 
-  await library(page, { pieces: [custom("mine", "My tune", [note("D4", 1, { finger: "0" })])] });
+  await editor(page, { pieces: [custom("mine", "My tune", [note("D4", 1, { finger: "0" })])] });
   await t.title.fill("By touch");
   await t.blank().scrollIntoViewIfNeeded();
   await t.blank().tap({ position: { x: 20, y: G4_Y } });
@@ -570,21 +581,20 @@ for (const [label, width, height] of [["iPhone size", 393, 852], ["Small phone",
   await touchAt("touchEnd");
   await sleep(100);
   check(`${label}: a finger drags it, right through the redraws`, (await t.names()) === "Ré", await t.names());
-  await t.nameOf(0).tap(); await sleep(100);
-  check(`${label}: a tap on the name sharpens it`, (await t.names()) === "Ré♯", await t.names());
-  await t.beatsOf(0).selectOption("4"); await sleep(100);
-  for (const beats of [0.5, 0.5, 0.5, 0.5, 2]) {
+  await t.tool("♯ Sharp").tap(); await sleep(100);
+  check(`${label}: a tap on Sharp sharpens it`, (await t.names()) === "Ré♯", await t.names());
+  await t.beatsButton("4").tap(); await sleep(100);
+  // Each note placed is picked out, so its length is set straight away.
+  for (const beats of ["½", "½", "½", "½", "2"]) {
     await t.blank().scrollIntoViewIfNeeded();
     await t.blank().tap({ position: { x: 20, y: G4_Y } }); await sleep(100);
-    const last = (await page.locator(".editor-column[data-index]").count()) - 1;
-    await t.beatsOf(last).selectOption(String(beats)); await sleep(100);
+    await t.beatsButton(beats).tap(); await sleep(100);
   }
   await auditCheck(page, `${label}: a staff of quick notes`, ".piece-editor");
 
   await t.save.scrollIntoViewIfNeeded();
   await t.save.tap(); await sleep(150);
-  await openDrawers(page); // A fourth song of your own goes in a new drawer.
-  check(`${label}: it saves`, (await t.stored()).length === 2);
+  check(`${label}: it saves, back on My songs`, (await t.stored()).length === 2 && (await t.row("By touch").count()) === 1);
   await t.trash("By touch").tap(); await t.modal.waitFor();
   await auditCheck(page, `${label}: the question`, "dialog[open]");
   await page.screenshot({ path: `${OUT}pieces-question-${width}.png` });
@@ -594,7 +604,7 @@ for (const [label, width, height] of [["iPhone size", 393, 852], ["Small phone",
   await t.say("Delete");
   check(`${label}: and Delete removes it`, (await t.stored()).length === 1);
   await t.pencil("My tune").tap(); await sleep(250);
-  check(`${label}: the pencil opens the editor`, (await t.heading()) === "Edit piece");
+  check(`${label}: Edit opens Add piece`, (await t.heading()) === "Edit piece");
   await auditCheck(page, `${label}: editing`);
   notProblems(s);
   await s.close();

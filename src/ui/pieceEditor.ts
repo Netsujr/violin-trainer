@@ -1,15 +1,11 @@
 import { Note } from "tonal";
 import { BarlineType, Formatter, Renderer, Stave, Voice } from "vexflow/bravura";
 import { t } from "../i18n";
-import { HIGHEST_MIDI, LOWEST_MIDI } from "../music/fingering";
-import { BAR_BEATS, barMarks, BEAT_LABELS, BEAT_LENGTHS, midiOf, noteLabels, type PieceNote } from "../music/notes";
+import { BAR_BEATS, barMarks, noteLabels, type PieceNote } from "../music/notes";
 import { h } from "./dom";
 import { contentWidth } from "./layout";
-import { createLinePlayer } from "./linePlayer";
+import { createNoteTools } from "./noteTools";
 import { toStaveNote } from "./staff";
-import { TRASH_ICON } from "./toggles";
-
-const ACCIDENTALS = ["", "#", "b"];
 
 // The sheet is drawn larger than the Practice staff, so a note's position is easy to hit. Sizes are in staff units,
 // except a beat's width, which is whole pixels so the pieces of a staff line meet exactly.
@@ -18,16 +14,16 @@ const MAX_BEAT_PX = 72;
 const CLEF_WIDTH = 40;
 const NOTEHEAD_LEFT = 10;
 const NOTEHEAD_CENTER = NOTEHEAD_LEFT + 6;
-const SHEET_HEIGHT = 128; // The bottom strip, below the lowest note, holds each note's delete button.
+const SHEET_HEIGHT = 128;
 const TOP_LINE_Y = 30;
 const BOTTOM_LINE_Y = 70;
 const STAVE_Y = TOP_LINE_Y - 40; // VexFlow leaves four lines of space above the top line.
 const STEP_HEIGHT = 5;
 const BEAT_NUMBER_Y = 12;
-const BEAT_LINE_COLOR = "#cdbfa8";
-const BEAT_NUMBER_COLOR = "#9a8b72";
-const GHOST_COLOR = "#6b3a1e";
-const QUARTER_REST = "\uE4E5"; // In the music font.
+const BEAT_LINE_COLOR = "#2c3442";
+const BEAT_NUMBER_COLOR = "#8590a2";
+const BAR_LINE_COLOR = "#6f7a8d";
+const GHOST_COLOR = "#e6ae48";
 // Staff positions counted from the bottom line, E4. The violin's first position runs from G3 to B5.
 const LETTERS = "CDEFGAB";
 const BOTTOM_LINE_POSITION = 4 * 7 + LETTERS.indexOf("E");
@@ -45,7 +41,7 @@ const pitchAt = (step: number) => {
   return `${LETTERS[position % 7]}${Math.floor(position / 7)}`;
 };
 // A new pitch drops the note's string and finger, which were for the old one. Saving works them out again.
-const withPitch = ({ beats }: PieceNote, pitch: string): PieceNote => ({ pitch, beats });
+export const withPitch = ({ beats }: PieceNote, pitch: string): PieceNote => ({ pitch, beats });
 
 // A stretch of the staff, starting on a beat counted from the start of the piece. It holds a note, the part of a
 // too-long note that spills into the next bar, or nothing yet. None of them cross a bar line, so the bars stay put.
@@ -94,7 +90,7 @@ function drawSheet(container: HTMLDivElement, width: number, options: { clef?: b
     number.setAttribute("font-family", "system-ui, sans-serif");
     svg.append(number);
   }
-  if (beats && (start + beats) % BAR_BEATS === 0) addLine(width - 0.5, "#000");
+  if (beats && (start + beats) % BAR_BEATS === 0) addLine(width - 0.5, BAR_LINE_COLOR);
 
   if (options.note) {
     const note = toStaveNote(options.note, true);
@@ -107,22 +103,20 @@ function drawSheet(container: HTMLDivElement, width: number, options: { clef?: b
   }
 }
 
+// The staff for writing a piece: a sheet of joined-up columns, one per note. A tap places the next note, which can be
+// dragged up or down, and picks a note out for the note tools, docked under the staff.
 export function createPieceEditor(startingNotes: PieceNote[], onChange: () => void) {
   let notes = startingNotes;
   let fitted = "";
   let beatPx = MAX_BEAT_PX;
   let segmentOf: Segment[] = [];
   let dragging = false;
+  // The note picked out for the note tools, by its place in notes.
+  let selected: number | null = null;
+  // Each note's line on the sheet, for hearing the line it's on.
+  let lineOf: number[][] = [];
   const rows = h("div", { className: "editor-rows" });
   const warning = h("p", { className: "warning" });
-  const player = createLinePlayer();
-  const restButton = h("button", {
-    className: "editor-rest",
-    textContent: QUARTER_REST,
-    title: t.addRest,
-    ariaLabel: t.addRest,
-    onclick: () => change(() => notes.push({ beats: newBeats() })),
-  });
   const ghost = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
   ghost.setAttribute("rx", "7");
   ghost.setAttribute("ry", "5");
@@ -155,34 +149,6 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     onChange();
   }
 
-  // Only lengths that fit what's left of the bar, plus the current one if earlier changes have pushed it over.
-  // The select is clear and sits over the label, so tapping it opens the native list.
-  function beatPicker(index: number, start: number) {
-    const current = notes[index].beats!;
-    const room = BAR_BEATS - (start % BAR_BEATS);
-    const select = h(
-      "select",
-      {
-        title: t.noteBeats,
-        ariaLabel: t.noteBeats,
-        onchange: () => change(() => (notes[index] = { ...notes[index], beats: Number(select.value) })),
-      },
-      ...BEAT_LENGTHS.map((beats) =>
-        h("option", { value: String(beats), selected: beats === current, disabled: beats > room && beats !== current, textContent: BEAT_LABELS[beats] }),
-      ),
-    );
-    return h("div", { className: "beat-picker" }, `${BEAT_LABELS[current]} ▾`, select);
-  }
-
-  // Steps through natural, sharp and flat, past any that would leave the violin's range.
-  function nextAccidental(index: number) {
-    const { letter, acc, oct } = Note.get(notes[index].pitch!);
-    const from = ACCIDENTALS.indexOf(acc);
-    const options = [1, 2].map((offset) => `${letter}${ACCIDENTALS[(from + offset) % ACCIDENTALS.length]}${oct}`);
-    const pitch = options.find((option) => midiOf(option) >= LOWEST_MIDI && midiOf(option) <= HIGHEST_MIDI);
-    if (pitch) change(() => (notes[index] = withPitch(notes[index], pitch)));
-  }
-
   function emptySheet(segment: Segment) {
     const sheet = h("div", { className: "editor-sheet" });
     drawSheet(sheet, widthOf(segment) * beatWidth(), { start: segment.start, beats: segment.beats, beatWidth: beatWidth() });
@@ -194,37 +160,20 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     return element;
   }
 
+  // A rest can't be dragged up or down. The selected note is marked, for the note tools.
   function noteColumn(segment: Segment) {
     const index = segment.noteIndex!;
     const note = notes[index];
-    const solfege = note.pitch && noteLabels(note.pitch).solfege;
     const sheet = h("div", { className: "editor-sheet" });
     drawSheet(sheet, widthOf(segment) * beatWidth(), { note, start: segment.start, beats: segment.beats, beatWidth: beatWidth() });
-    sheet.append(
-      h("button", {
-        className: "editor-delete",
-        title: t.deleteNote,
-        ariaLabel: t.deleteNote,
-        innerHTML: TRASH_ICON,
-        onclick: () => change(() => notes.splice(index, 1)),
-      }),
-    );
-    // A rest has no sharp or flat, and can't be dragged up or down.
-    const column = h(
-      "div",
-      { className: `editor-column${segment.crossesBar ? " crosses-bar" : ""}${solfege ? "" : " rest"}` },
-      sheet,
-      solfege
-        ? h("button", { className: "editor-name", textContent: solfege, title: t.sharpOrFlat, ariaLabel: `${solfege}: ${t.sharpOrFlat}`, onclick: () => nextAccidental(index) })
-        : h("div", { className: "editor-name", textContent: t.rest }),
-      beatPicker(index, segment.start),
-    );
+    const column = h("div", { className: `editor-column${segment.crossesBar ? " crosses-bar" : ""}${note.pitch ? "" : " rest"}${index === selected ? " selected" : ""}` }, sheet);
     column.dataset.index = String(index);
+    // Its name shows on hover.
+    if (note.pitch) column.title = noteLabels(note.pitch).solfege;
     return sized(column, segment);
   }
 
-  const blankColumn = (segment: Segment) =>
-    sized(h("div", { className: "editor-column blank" }, emptySheet(segment), h("div", { className: "editor-name" })), segment);
+  const blankColumn = (segment: Segment) => sized(h("div", { className: "editor-column blank" }, emptySheet(segment)), segment);
 
   const spillColumn = (segment: Segment) => sized(h("div", { className: "editor-column spill" }, emptySheet(segment)), segment);
 
@@ -270,9 +219,9 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     return rowList;
   }
 
-  // A line playing stops, because its button is drawn again.
+  // A line playing stops, as its notes may have changed.
   function render() {
-    player.stop();
+    tools.stopPlaying();
     const measured = measure();
     beatPx = measured.beatPx;
     fitted = `${measured.beatPx}:${measured.beatsPerRow}`;
@@ -280,20 +229,19 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     segmentOf = [];
     for (const segment of list) if (segment.noteIndex !== undefined) segmentOf[segment.noteIndex] = segment;
 
+    lineOf = [];
     rows.replaceChildren(
       ...toRows(list, measured.beatsPerRow).map((row) => {
         const clef = h("div", { className: "editor-sheet editor-clef" });
         drawSheet(clef, CLEF_WIDTH, { clef: true });
-        // A line with a note to hear has a play button, under its clef.
         const lineNotes = row.flatMap(({ noteIndex }) => (noteIndex === undefined ? [] : [noteIndex]));
-        if (lineNotes.some((index) => notes[index].pitch)) clef.append(player.button(() => lineNotes.map((index) => notes[index])));
+        lineNotes.forEach((index) => (lineOf[index] = lineNotes));
         const columns = row.map((segment) => (segment.noteIndex !== undefined ? noteColumn(segment) : segment.spill ? spillColumn(segment) : blankColumn(segment)));
         return h("div", { className: "editor-row" }, clef, ...columns);
       }),
     );
-    // The next note's place also has a button for a rest.
-    rows.querySelector(".editor-column.blank .editor-sheet")!.append(restButton);
     warning.textContent = crossesBar() ? t.crossesBar : "";
+    tools.show();
   }
 
   // Follows the pointer until it's released, redrawing only the note being moved.
@@ -306,6 +254,7 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
 
       notes[index] = withPitch(notes[index], pitchAt(step));
       column.replaceWith(noteColumn(segmentOf[index]));
+      tools.show();
     };
     const end = () => {
       dragging = false;
@@ -319,11 +268,7 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     addEventListener("pointercancel", end);
   }
 
-  function hideGhost() {
-    ghost.remove();
-    const name = rows.querySelector(".editor-column.blank .editor-name");
-    if (name) name.textContent = "";
-  }
+  const hideGhost = () => ghost.remove();
 
   rows.addEventListener("pointerdown", (event) => {
     const target = event.target as Element;
@@ -338,12 +283,17 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     if (column.classList.contains("blank")) {
       hideGhost();
       notes.push({ pitch: pitchAt(step), beats: newBeats() });
+      selected = notes.length - 1;
       render();
       onChange();
       dragNote(notes.length - 1);
     } else {
       const index = Number(column.dataset.index);
       const { pitch } = notes[index];
+      if (selected !== index) {
+        selected = index;
+        render();
+      }
       if (pitch && Math.abs(step - stepOf(pitch)) <= GRAB_STEPS) dragNote(index);
     }
   });
@@ -360,7 +310,6 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     ghost.setAttribute("cx", String(NOTEHEAD_CENTER));
     ghost.setAttribute("cy", String(BOTTOM_LINE_Y - step * STEP_HEIGHT));
     next.querySelector("svg")!.append(ghost);
-    next.querySelector(".editor-name")!.textContent = noteLabels(pitchAt(step)).solfege;
   });
   rows.addEventListener("pointerleave", hideGhost);
 
@@ -370,13 +319,33 @@ export function createPieceEditor(startingNotes: PieceNote[], onChange: () => vo
     if (rows.clientWidth && `${px}:${beatsPerRow}` !== fitted) render();
   }).observe(rows);
 
+  const tools = createNoteTools({
+    notes: () => notes,
+    selected: () => selected,
+    startOf: (index) => segmentOf[index].start,
+    line: (index) => lineOf[index].map((at) => notes[at]),
+    change,
+    // A note deleted takes the selection with it; a rest added is selected.
+    remove: (index) => change(() => {
+      notes.splice(index, 1);
+      selected = null;
+    }),
+    addRest: () => change(() => {
+      notes.push({ beats: newBeats() });
+      selected = notes.length - 1;
+    }),
+  });
   render();
 
   return {
-    element: h("div", { className: "piece-editor" }, h("p", { className: "editor-hint" }, t.editorHint), rows, warning),
+    element: h("div", { className: "piece-editor" }, rows, h("p", { className: "editor-hint" }, t.editorHint), warning),
+    tools: tools.element,
     notes: () => notes,
     crossesBar,
-    setNotes: (newNotes: PieceNote[]) => change(() => (notes = newNotes)),
-    stopPlaying: player.stop,
+    setNotes: (newNotes: PieceNote[]) => change(() => {
+      notes = newNotes;
+      selected = null;
+    }),
+    stopPlaying: tools.stopPlaying,
   };
 }

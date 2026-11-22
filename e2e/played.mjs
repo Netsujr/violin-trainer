@@ -1,6 +1,6 @@
 // The ghost note on the staff: where it sits against the current note, which way its arrow points, and when it shows.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT, setCountIn, setBpm } from "./lib.mjs";
+import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT, setCountIn, setBpm, openSettings } from "./lib.mjs";
 
 wav(OUT + "played-silent.wav", [rest(3)]);
 const s = await open(OUT + "played-silent.wav");
@@ -19,7 +19,8 @@ const ghost = () => page.evaluate(() => {
     across: Math.round(head.left + head.width / 2 - (target.left + target.width / 2)),
   };
 });
-const GREEN = "#14914a", BLUE = "#1f6fd1";
+// The ghost note: blue in tune, a soft red when off.
+const IN_TUNE = "#6cc4ff", OFF = "#f08a8d";
 // Plays one fixed pitch whatever the note is, and starts.
 const playing = async (midi, bpm) => {
   await freshPractice(page, bpm);
@@ -34,7 +35,7 @@ check("nothing shows before a run", (await ghost()) === null);
 // Target is D4, in the wait mode
 await playing(64);
 let seen = await ghost();
-check("a note too high shows above the target, in blue", seen.above > 3 && seen.color === BLUE, JSON.stringify(seen));
+check("a note too high shows above the target, in red", seen.above > 3 && seen.color === OFF, JSON.stringify(seen));
 check("with an arrow saying to go down", seen.arrow === "↓", seen.arrow);
 check("at the target's position across the staff", Math.abs(seen.across) <= 3, JSON.stringify(seen));
 check("and the note doesn't clear", (await progress(page)) === "Note 1 of 15", await progress(page));
@@ -44,7 +45,7 @@ check("Stop removes it", (await ghost()) === null);
 
 await playing(60);
 seen = await ghost();
-check("a note too low shows below, with an arrow saying to go up", seen.above < -3 && seen.arrow === "↑" && seen.color === BLUE, JSON.stringify(seen));
+check("a note too low shows below, with an arrow saying to go up", seen.above < -3 && seen.arrow === "↑" && seen.color === OFF, JSON.stringify(seen));
 check("as far below as a tone up was above, one position each way", Math.abs(seen.above + twoUp) <= 1.5, `${twoUp} / ${seen.above}`);
 await stop(page); await sleep(200);
 
@@ -55,27 +56,25 @@ await stop(page); await sleep(200);
 
 await playing(62.8);
 seen = await ghost();
-check("a bit out, past the tolerance, still points the way", seen.arrow === "↓" && seen.color === BLUE, JSON.stringify(seen));
+check("a bit out, past the tolerance, still points the way", seen.arrow === "↓" && seen.color === OFF, JSON.stringify(seen));
 await stop(page); await sleep(200);
 
 // Right on it, caught in the moment before the note clears
+await openSettings(page);
+await page.locator('.setting:has-text("Hold time") input').fill("500");
 await freshPractice(page);
-await page.click("header summary"); await sleep(150);
-await page.locator('label.setting:has-text("Hold time") input').fill("500");
-await page.keyboard.press("Escape"); await sleep(150);
 await followNotes(page, { midis: Array(16).fill(62.2) });
 await begin(page);
 for (let tries = 0; tries < 40; tries++) {
   seen = await ghost();
-  if (seen?.color === GREEN) break;
+  if (seen?.color === IN_TUNE) break;
   await sleep(20);
 }
 check("in tune it lands right on the note", seen && Math.abs(seen.above) < 2, JSON.stringify(seen));
-check("green, with no arrow", seen?.color === GREEN && seen.arrow === "", JSON.stringify(seen));
+check("blue, with no arrow", seen?.color === IN_TUNE && seen.arrow === "", JSON.stringify(seen));
 await stop(page); await sleep(200);
-await page.click("header summary"); await sleep(150);
-await page.locator('label.setting:has-text("Hold time") input').fill("200");
-await page.keyboard.press("Escape"); await sleep(150);
+await openSettings(page);
+await page.locator('.setting:has-text("Hold time") input').fill("200");
 
 // An octave off is accepted, so it reads as right
 await playing(74);
@@ -88,7 +87,7 @@ await freshPractice(page);
 await setBpm(page, 120);
 await followNotes(page, { midis: D, delays: { 5: 60000 } });
 await page.click('button:text-is("Start")');
-await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 5 of 15", null, { timeout: 15000 });
+await page.waitForFunction(() => document.querySelector(".practice-progress").textContent === "Note 5 of 15", null, { timeout: 15000 });
 await sleep(200);
 check("silence shows nothing", (await ghost()) === null);
 await stop(page); await sleep(200);
@@ -97,7 +96,7 @@ await freshPractice(page);
 await page.locator(".staff-toggle").click(); await sleep(300);
 await followNotes(page, { midis: D.map((midi, index) => (index === 6 ? midi - 2 : midi)) });
 await page.click('button:text-is("Start")');
-await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 7 of 15", null, { timeout: 15000 });
+await page.waitForFunction(() => document.querySelector(".practice-progress").textContent === "Note 7 of 15", null, { timeout: 15000 });
 await sleep(300);
 seen = await ghost();
 check("on the full sheet it sits at the current note, even on a sharp", seen && Math.abs(seen.across) <= 3 && seen.arrow === "↑", JSON.stringify(seen));
@@ -113,9 +112,9 @@ await page.screenshot({ path: OUT + "played-fullscreen.png" });
 await page.click('button[aria-label="Exit fullscreen"]'); await sleep(300);
 
 // While the reference sounds the mic doesn't count
-await page.click('button[aria-label="Play reference"]'); await sleep(200);
+await page.click(".reference"); await sleep(200);
 check("the reference hides it", (await ghost()) === null);
-await page.click('button[aria-label="Stop reference"]'); await sleep(300);
+await page.click(".reference"); await sleep(300);
 await stop(page); await sleep(200);
 
 // At the end
@@ -128,12 +127,12 @@ await sleep(150);
 check("finishing removes it, even with the note still sounding", await page.evaluate(() => !document.querySelector(".played-note")));
 await stop(page); await sleep(200);
 
-// The count-in, and Don't wait
+// The count-in, and Keep moving
 await freshPractice(page);
 await setCountIn(page, 4);
 await followNotes(page, { midis: Array(16).fill(62) });
 await begin(page);
-await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("Starts in"), null, { timeout: 3000 });
+await page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("Starts in"), null, { timeout: 3000 });
 await sleep(200);
 check("the count-in shows none", (await ghost()) === null);
 await stop(page); await sleep(200);
@@ -145,11 +144,11 @@ await setBpm(page, 120);
 // The first note in tune starts the lanes. The rest are sharp.
 await followNotes(page, { midis: D.map((midi, index) => (index === 0 ? midi : midi + 2)) });
 await page.click('button:text-is("Start")');
-await page.waitForFunction(() => document.querySelector("section > p").textContent === "Note 3 of 15", null, { timeout: 15000 });
+await page.waitForFunction(() => document.querySelector(".practice-progress").textContent === "Note 3 of 15", null, { timeout: 15000 });
 await sleep(150);
 seen = await ghost();
-// Don't wait draws the pitch line, with the ghost at its tip, where the sound was played, just before the hit line.
-check("Don't wait shows it too, at the tip of its pitch line", seen && seen.arrow === "↓" && seen.color === BLUE && (await page.locator(".pitch-trace polyline").count()) > 0, JSON.stringify(seen));
+// Keep moving draws the pitch line, with the ghost at its tip, where the sound was played, just before the hit line.
+check("Keep moving shows it too, at the tip of its pitch line", seen && seen.arrow === "↓" && seen.color === OFF && (await page.locator(".pitch-trace polyline").count()) > 0, JSON.stringify(seen));
 await stop(page); await sleep(200);
 await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
 

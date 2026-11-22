@@ -1,0 +1,223 @@
+/* Library: one group's pieces as cards, filling the width. */
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 1.375rem;
+}
+
+.title-caption {
+  margin: 0.125rem 0 0;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+.piece-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18.75rem), 1fr));
+  gap: 0.875rem;
+}
+
+.piece {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.125rem;
+  background: var(--panel);
+  border: 1px solid var(--panel);
+  border-radius: 1rem;
+}
+
+/* Marked for practice: a brass edge. */
+.piece.highlighted {
+  border-color: var(--brass);
+}
+
+/* The card's title is the button that marks it, drawn as plain text. */
+.piece-name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  text-align: start;
+  overflow-wrap: anywhere;
+  background: none;
+  border: none;
+}
+
+.piece-name strong {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.piece-name span {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.piece-name .piece-last {
+  color: var(--blue-light);
+  font-size: 0.875rem;
+}
+
+.card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.card-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.375rem;
+  margin: 0;
+  padding: 0 0.75rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 1.1875rem;
+}
+
+.card-button:hover {
+  background: var(--raised);
+}
+
+.card-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.card-button.main {
+  color: var(--brass-light);
+  border-color: var(--brass);
+}
+
+/* Icon-only buttons: +, back and the bin, each a circle. */
+.icon-only {
+  width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+  justify-content: center;
+}
+
+.start-button.icon-only {
+  width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.icon-only svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Add piece: the title, then the staff filling the room, with the selected note's tools docked under it. */
+.piece-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  max-width: 37.5rem;
+  margin: 0;
+}
+
+.piece-title input {
+  margin: 0;
+}
+
+.editor-panel {
+  flex: 1;
+  overflow: auto;
+}
+
+.editor-hint {
+  margin: 0.5rem 0 0;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+.selected-note {
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+  margin: 0;
+  font-family: var(--title-font);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* The staff for writing a piece: a sheet of joined-up columns, one per note. The ground is on the row rather than
+   each stretch of staff, so a note's flag or sharp can reach over the next one. */
+.editor-row {
+  display: flex;
+  align-items: flex-start;
+  width: fit-content;
+  margin-bottom: 0.75rem;
+}
+
+.editor-sheet {
+  position: relative;
+  touch-action: none; /* A finger on the sheet moves notes rather than the page. */
+  user-select: none;
+  cursor: ns-resize;
+}
+
+.editor-sheet svg {
+  display: block;
+  overflow: visible;
+  fill: var(--text);
+  stroke: var(--text);
+}
+
+.editor-sheet .vf-stave path {
+  stroke: #6f7a8d;
+}
+
+.editor-clef {
+  flex: none;
+  cursor: default;
+}
+
+.editor-column {
+  flex: none;
+  border-radius: 0.5rem;
+}
+
+.editor-column.selected {
+  background: rgb(230 174 72 / 0.14);
+}
+
+.editor-column.selected .vf-stavenote :is(text, rect) {
+  fill: var(--brass);
+}
+
+.editor-column.selected .vf-stavenote path {
+  stroke: var(--brass);
+}
+
+.editor-column.blank .editor-sheet {
+  cursor: pointer;
+}
+
+.editor-column.spill .editor-sheet,
+.editor-column.rest .editor-sheet {
+  cursor: default;
+}
+
+.editor-column.crosses-bar .editor-sheet,
+.editor-column.spill .editor-sheet {
+  background: rgb(229 72 77 / 0.25);
+}
+
+.editor-play svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.library > .track-status:empty {
+  display: none;
+}

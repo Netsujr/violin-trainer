@@ -1,0 +1,412 @@
+/* Calendar: the month and the day picked side by side, the day panel 280px wide. */
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Only the first letter is raised, as dates in Portuguese keep "de" small. */
+.calendar-month::first-letter,
+.day-title::first-letter {
+  text-transform: uppercase;
+}
+
+.calendar-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17.5rem;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.calendar-weekday {
+  padding-left: 0.625rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* A day: its date at the top, today's in a white circle, and at the bottom its minutes in a small blue pill, then its
+   plan's blocks. Busier days fill a stronger brass, with dark text once bright. */
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+  min-height: 6.5rem;
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  color: var(--text);
+  text-align: left;
+  background: var(--panel);
+  border: 2px solid transparent;
+  border-radius: 0.75rem;
+}
+
+.calendar-day.practised {
+  background: color-mix(in srgb, var(--brass) var(--level), var(--panel));
+}
+
+.calendar-day.busy {
+  color: var(--on-brass);
+}
+
+.calendar-day.other-month {
+  color: #5b6576;
+}
+
+.calendar-day.selected {
+  border-color: var(--text);
+}
+
+.calendar-date {
+  display: inline-grid;
+  place-items: center;
+  align-self: flex-start;
+  min-width: 1.625rem;
+  height: 1.625rem;
+  padding: 0 0.25rem;
+  font-weight: 600;
+}
+
+.calendar-day.today .calendar-date {
+  color: var(--ground);
+  background: var(--text);
+  border-radius: 0.8125rem;
+}
+
+.calendar-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-top: auto;
+}
+
+.calendar-minutes {
+  padding: 0.125rem 0.4375rem;
+  color: var(--blue-light);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgb(11 14 19 / 0.55);
+  border-radius: 0.375rem;
+}
+
+/* The plan: a block for each piece on a dark backing, so it reads on any shade of brass. A block is full once its
+   piece is done and half full partway, and they're all blue once the plan's done. */
+.calendar-plan {
+  line-height: 0;
+}
+
+.plan-blocks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 100%;
+  padding: 4px;
+  background: rgb(11 14 19 / 0.55);
+  border-radius: 0.375rem;
+}
+
+.plan-blocks i {
+  width: 12px;
+  height: 12px;
+  background: rgb(255 255 255 / 0.18);
+  border-radius: 3px;
+}
+
+.plan-blocks i.full {
+  background: var(--text);
+}
+
+.plan-blocks i.half {
+  background: linear-gradient(to right, var(--text) 50%, rgb(255 255 255 / 0.18) 50%);
+}
+
+.calendar-plan.done .plan-blocks i {
+  background: var(--blue);
+}
+
+/* Picking days to paste into: each from today on shows a +, and a ✓ once pasted into. A day with a plan has a red
+   trash in its corner, on top of it, clearing it. */
+.calendar-cell {
+  position: relative;
+  display: grid;
+}
+
+.calendar-day.pickable,
+.calendar-day.pasted {
+  position: relative;
+}
+
+.calendar-day.pickable::after,
+.calendar-day.pasted::after {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.5rem;
+  color: var(--brass);
+  font-weight: 800;
+  content: "+";
+}
+
+.calendar-day.pasted::after {
+  color: var(--blue);
+  content: "✓";
+}
+
+.day-clear {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0;
+  padding: 0;
+  color: var(--red);
+  background: none;
+  border: 0;
+}
+
+.day-clear svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* The day picked: its date, its plan with the plan's tools, then what was practised. */
+.day-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1rem;
+  font-size: 0.875rem;
+  background: var(--panel);
+  border-radius: 1rem;
+}
+
+.day-title {
+  margin: 0;
+  font-family: var(--title-font);
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.day-summary {
+  margin: 0;
+  color: var(--faint);
+}
+
+.panel-heading {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.plan-total {
+  margin-left: 0.25rem;
+  color: var(--faint);
+  font-weight: 400;
+}
+
+.plan-empty {
+  margin: 0;
+  padding: 0.75rem 0;
+  color: var(--faint);
+  border-top: 1px solid var(--line);
+}
+
+.plan {
+  margin: 0;
+  padding: 0;
+}
+
+/* A planned piece: its name and minutes, tapping it sets how long to practise it, and a thin bar, brass until it's
+   done and then blue. */
+.plan-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.25rem;
+  align-items: center;
+  margin: 0;
+  padding: 0.5rem 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.plan-piece {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  text-align: start;
+  overflow-wrap: anywhere;
+  background: none;
+  border: none;
+}
+
+.plan-piece:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.plan-piece:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+.plan-name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.plan-target {
+  color: var(--brass-light);
+  white-space: nowrap;
+}
+
+.plan-item.done .plan-target {
+  color: var(--blue);
+}
+
+.plan-item .plan-bar {
+  grid-column: 1 / -1;
+  height: 8px;
+  overflow: hidden;
+  background: #283141;
+  border-radius: 4px;
+}
+
+.plan-item .plan-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+}
+
+.plan-item.done .plan-bar > span {
+  background: var(--blue);
+}
+
+.plan-minus,
+.plan-remove {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1;
+  background: none;
+  border-radius: 0.375rem;
+}
+
+.plan-minus {
+  color: var(--brass);
+  border: 1px solid var(--brass);
+}
+
+.plan-remove {
+  color: var(--muted);
+  border: none;
+}
+
+.plan-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+
+.plan-add .piece-select {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0;
+  padding: 0;
+  color: var(--on-brass);
+  font-size: 1.375rem;
+  font-weight: 600;
+  background: var(--brass);
+  border: none;
+  border-radius: 1.25rem;
+}
+
+.plan-add .ghost-button[aria-pressed="true"] {
+  color: var(--brass-light);
+  border-color: var(--brass);
+}
+
+.day-total {
+  margin-bottom: 0.25rem;
+}
+
+.day-piece {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.day-piece-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.day-piece ul {
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+.day-piece li {
+  margin: 0.25rem 0;
+  color: var(--muted);
+  list-style: none;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+/* Tablets in portrait and phones: the day under the month, and smaller tiles, so a whole week fits across. */
+@media (max-width: 900px) {
+  .calendar-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-grid {
+    gap: 0.25rem;
+  }
+
+  .calendar-day {
+    min-height: 4rem;
+    padding: 0.25rem;
+  }
+
+  .calendar-minutes {
+    display: none;
+  }
+
+  .plan-blocks {
+    gap: 1px;
+    padding: 2px;
+  }
+
+  .plan-blocks i {
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+  }
+}

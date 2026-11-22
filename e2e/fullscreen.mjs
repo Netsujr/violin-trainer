@@ -1,6 +1,6 @@
 // Fullscreen on a computer: what shows, playing in it, and getting back out. Sizes are in screens.mjs.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, sleep, check, followNotes, progress, begin, waitForText, savedSettings, D_MAJOR as D, OUT } from "./lib.mjs";
+import { open, nav, sleep, check, followNotes, progress, begin, waitForText, savedSettings, D_MAJOR as D, OUT, setLanguage } from "./lib.mjs";
 
 wav(OUT + "fullscreen-silent.wav", [rest(3)]);
 const s = await open(OUT + "fullscreen-silent.wav", undefined, { viewport: { width: 1440, height: 900 } });
@@ -15,17 +15,16 @@ await page.click(".staff-toggle"); await sleep(200);
 const before = await canvasWidth();
 await enter();
 check("uses the browser's own fullscreen", await page.evaluate(() => !!document.fullscreenElement));
-for (const hidden of ["header", ".patterns", ".section-bar", ".staff-toggle", ".reference"]) check(`hides ${hidden}`, await page.locator(hidden).first().isHidden());
-for (const shown of ['button:text-is("Start")', '.actions .count-in', '.actions .box-toggle[aria-label="Fingers"]', "section > p", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
-check("the lanes grow past the normal width", before === 960 && (await canvasWidth()) === 1408, `${before} > ${await canvasWidth()}`);
-check("the staff is one moving line, and the saved choice stays open", (await page.locator(".staff.collapsed").count()) === 1 && (await savedSettings(page)).staffOpen === true);
-const lines = await page.evaluate(() => { const hit = 130 * Number(getComputedStyle(document.querySelector(".staff-panel")).getPropertyValue("--timeline-scale")), canvas = document.querySelector("canvas").getBoundingClientRect(); return { hit: Math.round(hit), scale: canvas.height / 336 }; });
-check("the staff's playhead follows the larger scale", Math.abs(lines.hit - 130 * lines.scale) < 2, JSON.stringify(lines));
+// The panels as set, with Start or Stop, Hear the note and Exit.
+for (const hidden of ["header", ".dock", ".piece-select", ".practice-title h1"]) check(`hides ${hidden}`, await page.locator(hidden).first().isHidden());
+for (const shown of ['button:text-is("Start")', ".reference", 'button[aria-label="Exit fullscreen"]', ".practice-progress", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
+check("the lanes grow into the sidebar's room", (await canvasWidth()) > before, `${before} > ${await canvasWidth()}`);
+check("the staff keeps the whole sheet, as chosen", (await page.locator(".staff.collapsed").count()) === 0 && (await savedSettings(page)).staffOpen === true);
 
 // Playing, with a switch out and back in the middle
 await followNotes(page, { midis: D, delayMs: 300 });
 await begin(page);
-await page.waitForFunction(() => /^Note [3-9] of/.test(document.querySelector("section > p").textContent), null, { timeout: 15000 });
+await page.waitForFunction(() => /^Note [3-9] of/.test(document.querySelector(".practice-progress").textContent), null, { timeout: 15000 });
 await exit();
 const during = await progress(page);
 check("leaving mid-run keeps the run going", (await page.locator('button:text-is("Stop")').count()) === 1, during);
@@ -46,12 +45,12 @@ await page.click('button:text-is("Stop")'); await sleep(200);
 // Getting out
 await page.keyboard.press("Escape"); await sleep(300);
 check("Esc leaves fullscreen", !(await isFullscreen()) && !(await page.evaluate(() => document.fullscreenElement)));
-check("the header and page width are back", (await page.locator("header").isVisible()) && (await canvasWidth()) === 960);
-check("the count-in is back on the lanes' bar", (await page.locator(".section-bar .count-in").count()) === 1 && (await page.locator(".actions .count-in").count()) === 0);
+check("the sidebar and the lanes' width are back", (await page.locator("header").isVisible()) && (await canvasWidth()) === before);
+check("the settings panel is back", await page.locator(".dock").isVisible());
 check("the full sheet is back", (await page.locator(".staff.collapsed").count()) === 0);
 await enter();
 await page.evaluate(() => document.exitFullscreen()); await sleep(300);
-check("leaving through the browser ends it too", !(await isFullscreen()) && (await canvasWidth()) === 960);
+check("leaving through the browser ends it too", !(await isFullscreen()) && (await canvasWidth()) === before);
 
 // Phones that don't offer it: the same layout, in the page
 await page.evaluate(() => { Element.prototype.requestFullscreen = undefined; });
@@ -62,8 +61,8 @@ check("and Esc still leaves it", !(await isFullscreen()) && (await page.locator(
 
 await page.reload(); await page.waitForSelector("nav button");
 await nav(page, "Practice"); await sleep(250);
-check("a reload starts in the normal layout", !(await isFullscreen()) && (await canvasWidth()) === 960);
-await page.click("header summary"); await page.click('.language button:text-is("PT")'); await sleep(250);
+check("a reload starts in the normal layout", !(await isFullscreen()) && (await canvasWidth()) === before);
+await setLanguage(page, "PT");
 check("pt: the button is translated", (await page.locator('button[aria-label="Tela cheia"]').count()) === 1);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

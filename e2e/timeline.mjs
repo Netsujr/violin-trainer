@@ -1,15 +1,17 @@
 import { wav, note } from "./wav.mjs";
-import { laneScore, begin, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, pickPiece } from "./lib.mjs";
+import { laneScore, begin, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, pickPiece, laneScale } from "./lib.mjs";
 
 const LANES = ["E", "A", "D", "G"];
 const HIT_X = 130, SPACING = 120, LANE_HEIGHT = 84;
 const scrollLeft = (page) => page.locator(".highway-scroll").evaluate((e) => e.scrollLeft);
 
-// Clicks a spot on the canvas, given the note slot and string lane, at the current scroll position.
+// Clicks a spot on the canvas, given the note slot and string lane, at the current scroll position. The lanes draw as
+// large as their panel allows.
 async function clickTile(page, noteIndex, string) {
   const box = await page.locator("canvas").boundingBox();
-  const x = HIT_X + noteIndex * SPACING - (await scrollLeft(page));
-  await page.mouse.click(box.x + x, box.y + (LANES.indexOf(string) + 0.5) * LANE_HEIGHT);
+  const scale = box.height / (LANES.length * LANE_HEIGHT);
+  const x = (HIT_X + noteIndex * SPACING) * scale - (await scrollLeft(page));
+  await page.mouse.click(box.x + x, box.y + (LANES.indexOf(string) + 0.5) * LANE_HEIGHT * scale);
 }
 const currentOnStaff = (page) =>
   page.locator(".staff .vf-stavenote").evaluateAll((notes) => notes.findIndex((n) => n.classList.contains("current")));
@@ -43,7 +45,7 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   check("clicking a tile moves the start point", (await progress(page)) === "Note 6 of 15", await progress(page));
   check("the staff marks the same note", (await currentOnStaff(page)) === 5, String(await currentOnStaff(page)));
   await sleep(1000);
-  check("the view moves that note to the hit line", Math.abs((await scrollLeft(page)) - 5 * SPACING) <= 1, String(await scrollLeft(page)));
+  check("the view moves that note to the hit line", Math.abs((await scrollLeft(page)) - 5 * SPACING * (await laneScale(page))) <= 1, String(await scrollLeft(page)));
   await s.close();
 }
 
@@ -59,12 +61,12 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await sleep(1500);
   const finishing = await open(OUT + "silent.wav");
   await nav(finishing.page, "Practice");
-  await finishing.page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 14 * 120));
+  await finishing.page.locator(".highway-scroll").evaluate((e, left) => (e.scrollLeft = left), 14 * 120 * (await laneScale(finishing.page)));
   await sleep(200);
   await clickTile(finishing.page, 14, "D");
   await followNotes(finishing.page, { midis: D_MAJOR });
   await start(finishing.page);
-  await finishing.page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 8000 });
+  await finishing.page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 8000 });
   await finishing.page.waitForSelector('button:text-is("Start"):not([disabled])');
   await finishing.page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 0));
   await sleep(150);
@@ -73,7 +75,7 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await finishing.close();
   check("Start plays from the picked note, and it can be hit", (await progress(page)) === "Note 7 of 15", await progress(page));
 
-  await page.locator(".highway-scroll").evaluate((e) => (e.scrollLeft = 14 * 120));
+  await page.locator(".highway-scroll").evaluate((e, left) => (e.scrollLeft = left), 14 * 120 * (await laneScale(page)));
   await sleep(200);
   await clickTile(page, 14, "D");
   check("clicking while running jumps there", (await progress(page)) === "Note 15 of 15", await progress(page));
@@ -81,7 +83,7 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   await sleep(200);
   await followNotes(page, { midis: D_MAJOR });
   await start(page);
-  await page.waitForFunction(() => document.querySelector("section > p").textContent.startsWith("All"), null, { timeout: 8000 });
+  await page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 8000 });
   check("a partial run finishes", (await progress(page)) === "All 15 notes done", await progress(page));
   const stats = await laneScore(page);
   check("the lanes' bar calls it a partial run", stats.includes("Note 15 to the end done in") && stats.includes("1 hit"), stats);
@@ -103,7 +105,7 @@ wav(OUT + "b4.wav", [note(71, 3)]);
   const s = await open(OUT + "silent.wav");
   const page = s.page;
   await nav(page, "Practice");
-  await page.locator(".highway-scroll").evaluate((e) => { e.scrollLeft = 2 * 120; e.focus(); });
+  await page.locator(".highway-scroll").evaluate((e, left) => { e.scrollLeft = left; e.focus(); }, 2 * 120 * (await laneScale(page)));
   await sleep(100);
   await page.keyboard.press("Enter");
   check("Enter picks the note at the hit line", (await progress(page)) === "Note 3 of 15", await progress(page));

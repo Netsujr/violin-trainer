@@ -1,6 +1,6 @@
 // Portuguese across the app, including what only appears with data in it.
 import { wav, note } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, seed, heard, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, seed, heard, OUT, setLanguage } from "./lib.mjs";
 
 wav(OUT + "l-a4.wav", [note(69, 4)]);
 const today = new Date().toISOString();
@@ -11,36 +11,35 @@ const everyText = (page) => page.evaluate(() => [document.body.innerText, ...[..
 const s = await open(OUT + "l-a4.wav");
 const page = s.page;
 await seed(page, { log, settings: { targetDays: { "d-major-1oct": 0 }, staffOpen: true } });
-await page.click("header summary"); await page.click('.language button:text-is("PT")');
+await setLanguage(page, "PT");
 await sleep(250);
 
 check("pt: the page says so", (await page.evaluate(() => document.documentElement.lang)) === "pt-BR");
 check("pt: the title is translated", (await page.title()) === "Treinador de Notas para Violino");
 check("pt: the choice is saved", await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).language === "pt"));
-await page.click("summary");
-for (const [index, name] of ["Ouvir", "Praticar", "Biblioteca", "Registro"].entries()) {
-  await page.locator("nav button").nth(index).click();
+// Each screen in the menu, then Settings at the bottom of the sidebar.
+for (const [index, name] of ["Ouvir", "Praticar", "Biblioteca", "Calendário", "Configurações"].entries()) {
+  await (index < 4 ? page.locator("header > nav > button").nth(index) : page.locator("header .set-row nav button")).click();
   await sleep(250);
   const text = await everyText(page);
   const found = text.match(ENGLISH);
   check(`pt: ${name} has no English left`, !found, found ? `"${found[0]}" in ${text.slice(Math.max(0, found.index - 40), found.index + 40).replaceAll("\n", " ")}` : "");
 }
-await page.click("summary");
 
-await page.locator("nav button").nth(3).click();
+await page.locator("header > nav > button").nth(3).click();
 await sleep(200);
 const logText = await page.locator("section").innerText();
 check("pt: log titles and numbers are translated", logText.includes("Ré maior") && logText.includes("Prática livre") && logText.includes("3,2 min") && logText.includes("2 passadas"), logText.slice(0, 80).replaceAll("\n", " "));
 check("pt: saved logs keep the English title", await page.evaluate(() => JSON.parse(localStorage.getItem("log"))[0].pieceTitle === "D major"));
 
-await page.locator("nav button").nth(1).click();
+await page.locator("header > nav > button").nth(1).click();
 await sleep(250);
 const staffLabels = await page.locator(".staff > svg > text").evaluateAll((texts) => texts.map((text) => text.textContent).join(" "));
 check("pt: the staff labels use Portuguese names", staffLabels.includes("Fá♯") && staffLabels.includes("Dó♯"), staffLabels.slice(0, 50));
-await page.locator(".patterns button").nth(1).click();
+await page.locator('.dock [aria-label="Pattern"] button').nth(1).click();
 await sleep(100);
 
-await page.locator("nav button").nth(0).click();
+await page.locator("header > nav > button").nth(0).click();
 await sleep(150);
 await page.locator('.listen button:text-is("Iniciar")').click();
 await page.waitForSelector('button:text-is("Parar")');
@@ -49,7 +48,7 @@ const shown = await heard(page);
 check("pt: Listen names the note on the staff", shown === "0 Lá A", shown);
 const hertz = await page.locator("section").innerText();
 check("pt: a decimal comma", /\d+,\d Hz/.test(hertz));
-await page.click("header summary"); await page.click('.language button:text-is("EN")');
+await setLanguage(page, "EN");
 await sleep(500);
 check("switching language ends a running session", (await page.locator('.listen button:text-is("Start")').count()) === 1);
 check("en: back to English", (await page.locator("nav button").first().innerText()) === "Listen");

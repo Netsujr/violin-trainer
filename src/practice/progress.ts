@@ -10,7 +10,7 @@ export const OFF_CENTS = 8;
 
 export type DayProgress = { day: string; score: number | null; bpm: number | null };
 
-// A piece over time: how much, how often, and when it was last practised, and each day's "Don't wait" score, from
+// A piece over time: how much, how often, and when it was last practised, and each day's Keep moving score, from
 // all that day's notes, with the fastest tempo it was played at. Only days with a score are charted, the last 30.
 export function progressOf(entries: LogEntry[], pieceId: string) {
   const mine = entries.filter((entry) => entry.pieceId === pieceId);

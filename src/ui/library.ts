@@ -1,195 +1,148 @@
 import { localTitle, t } from "../i18n";
-import { fillFingering } from "../music/fingering";
-import { allPieces, deletePiece, getSettings, isHighlighted, isScale, loadDraft, pieceGroups, saveDraft, savePiece, toggleHighlighted, updatePiece } from "../storage";
 import { countNotes, meterOf, type Piece } from "../music/notes";
+import { dayKey } from "../practice/calendar";
+import { allPieces, deletePiece, getSettings, isHighlighted, isScale, loadDraft, loadLog, pieceGroups, saveDraft, toggleHighlighted } from "../storage";
+import { draftOf, hasUnsavedWork } from "./addPiece";
 import { confirmAction } from "./confirm";
 import { h, type Screen } from "./dom";
 import { createCardTracks } from "./libraryTracks";
-import { createPieceEditor } from "./pieceEditor";
+import { shortDay, type GroupKey } from "./progress";
 import { downloadSheet } from "./sheetPdf";
-import type { GroupKey } from "./progress";
 import { CHART_ICON, DOWNLOAD_ICON, PENCIL_ICON, PLAY_ICON, TRASH_ICON } from "./toggles";
 
-const SHOWN_PIECES = 3;
+const PLUS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 
-const editableNote = (note: Piece["notes"][number]) => ({ ...note, beats: note.beats ?? 1 });
+// The group shown last, to come back to.
+let shownGroup: GroupKey = "scales";
 
-export function libraryScreen(goPractice: (pieceId: string) => void, goAlign: (pieceId: string) => void, goProgress: (group: GroupKey) => void): Screen {
+// Library's groups, for the sidebar under Library: each with its count, the one shown marked. pick shows a group.
+export function libraryGroups(current: () => GroupKey, pick: (key: GroupKey) => void) {
+  const groups = pieceGroups(allPieces()).filter(([, pieces]) => pieces.length > 0);
+  const buttons = groups.map(([key, pieces]) =>
+    h("button", { type: "button", className: "sub-item", onclick: () => pick(key) }, h("span", { className: "sub-name" }, t[key]), h("span", { className: "sub-hint" }, t.pieceCount(pieces.length))),
+  );
+  const show = () => buttons.forEach((button, index) => (button.ariaPressed = String(groups[index][0] === current())));
+  show();
+  return { element: h("div", { role: "group", ariaLabel: t.screens.Library }, ...buttons), show };
+}
+
+type Actions = {
+  practise: (pieceId: string) => void;
+  align: (pieceId: string) => void;
+  progress: (group: GroupKey) => void;
+  // Add piece, with what's on its staff, a new piece or one to edit.
+  addPiece: () => void;
+};
+
+// Library: one group of pieces at a time, the groups in the sidebar under Library with their counts. Each piece is a
+// card: its title, which marks it for practice, its subtitle and when it was last practised, and its buttons.
+// group, when given, is the group to show.
+export function libraryScreen(actions: Actions, group?: GroupKey): Screen {
   const settings = getSettings();
-  const list = h("div", { className: "library" });
-  const draft = loadDraft();
-  // The saved piece on the staff, if any. Its id is in the draft, so a reload doesn't turn the edit into a copy.
-  let editing = allPieces().find((piece) => piece.id === draft.editingId);
-  const title = h("input", { placeholder: t.pieceTitle, value: draft.title, oninput: () => refreshForms() });
-  const editor = createPieceEditor(draft.notes, () => refreshForms());
-  const saveButton = h("button", { textContent: t.savePiece, onclick: saveFromStaff });
-  const clearButton = h("button", {
-    textContent: t.clearStaff,
-    className: "secondary outline",
-    async onclick() {
-      if (editing) {
-        if (!hasUnsavedWork() || (await confirmAction(t.discardConfirm, t.discard))) stopEditing();
-      } else if (await confirmAction(t.clearConfirm, t.clearStaff)) editor.setNotes([]);
-    },
-  });
-  const heading = h("h2");
-
-  const tracks = createCardTracks(goAlign, () => renderList());
+  if (group) shownGroup = group;
+  const heading = h("h1");
+  const count = h("p", { className: "title-caption" });
+  const cards = h("div", { className: "piece-grid" });
+  const tracks = createCardTracks(actions.align, () => render());
   const subtitle = (piece: Piece) => t.pieces[piece.id]?.subtitle ?? piece.subtitle ?? t.noteCount(countNotes(piece.notes));
+  // The day each piece was last practised.
+  const lastDays = new Map(loadLog().map((entry) => [entry.pieceId, dayKey(new Date(entry.startedAt))]));
+  const button = (icon: string, text: string, onclick: () => void, className = "") =>
+    h("button", { type: "button", className: `card-button ${className}`, innerHTML: icon, onclick }, text);
 
-  // Clicking a card, anywhere but its buttons, marks it for practice or clears the mark.
-  const pieceRow = (piece: Piece) =>
-    h(
+  const card = (piece: Piece) => {
+    const name = localTitle(piece.id, piece.title);
+    const track = tracks.name(piece.id);
+    const last = lastDays.get(piece.id);
+    return h(
       "div",
-      {
-        className: `row piece${isHighlighted(piece) ? " highlighted" : ""}`,
-        title: t.markForPractice,
-        onclick(event) {
-          if ((event.target as Element).closest(".icon-button")) return;
-          toggleHighlighted(piece);
-          renderList();
-        },
-      },
+      { className: `piece${isHighlighted(piece) ? " highlighted" : ""}` },
       h(
         "button",
-        { type: "button", className: "piece-name", ariaPressed: String(isHighlighted(piece)) },
-        h("strong", {}, localTitle(piece.id, piece.title)),
-        h("span", {}, tracks.name(piece.id) ? `${subtitle(piece)} · ♪ ${tracks.name(piece.id)}` : subtitle(piece)),
+        {
+          type: "button",
+          className: "piece-name",
+          title: t.markForPractice,
+          ariaPressed: String(isHighlighted(piece)),
+          onclick() {
+            toggleHighlighted(piece);
+            render();
+          },
+        },
+        h("strong", {}, name),
+        h("span", {}, track ? `${subtitle(piece)} · ♪ ${track}` : subtitle(piece)),
+        ...(last ? [h("span", { className: "piece-last" }, t.lastPractisedOn(shortDay(last)))] : []),
       ),
-      h("button", {
-        className: "outline icon-button",
-        innerHTML: PLAY_ICON,
-        title: t.screens.Practice,
-        ariaLabel: t.screens.Practice,
-        onclick: () => goPractice(piece.id),
-      }),
-      ...(isScale(piece)
-        ? []
-        : [
-            h("button", {
-              className: "secondary outline icon-button",
-              innerHTML: DOWNLOAD_ICON,
-              title: t.downloadPdf,
-              ariaLabel: t.downloadPdf,
-              onclick: () =>
-                downloadSheet(localTitle(piece.id, piece.title), piece.notes, { names: settings.toggles.noteNames, fingers: settings.toggles.fingers }, meterOf(piece)),
-            }),
-          ]),
-      ...(piece.source === "imported"
-        ? [
-            h("button", {
-              className: "secondary outline icon-button",
-              innerHTML: PENCIL_ICON,
-              title: t.editPiece,
-              ariaLabel: t.editPiece,
-              onclick: () => edit(piece),
-            }),
-            h("button", {
-              className: "secondary outline icon-button",
-              innerHTML: TRASH_ICON,
-              title: t.delete,
-              ariaLabel: t.delete,
-              onclick: () => remove(piece),
-            }),
-          ]
-        : []),
-      ...tracks.buttons(piece),
+      h(
+        "div",
+        { className: "card-buttons" },
+        button(PLAY_ICON, t.practise, () => actions.practise(piece.id), "main"),
+        ...(isScale(piece) ? [] : [button(DOWNLOAD_ICON, t.pdf, () => downloadSheet(name, piece.notes, { names: settings.toggles.noteNames, fingers: settings.toggles.fingers }, meterOf(piece)))]),
+        ...tracks.buttons(piece),
+        ...(piece.source === "imported" ? [button(PENCIL_ICON, t.edit, () => edit(piece)), button(TRASH_ICON, t.delete, () => remove(piece))] : []),
+      ),
     );
+  };
 
-  // Each group shows its first few, with the rest in a drawer that stays open across changes.
-  const openDrawers = new Set<string>();
-  function renderList() {
-    list.replaceChildren(
-      ...pieceGroups(allPieces())
-        .filter(([, group]) => group.length > 0)
-        .map(([key, group]) => {
-          const rest = group.slice(SHOWN_PIECES);
-          const selected = group.filter(isHighlighted).length;
-          const drawer = h(
-            "details",
-            {
-              className: "more-pieces",
-              open: openDrawers.has(key),
-              ontoggle: () => (drawer.open ? openDrawers.add(key) : openDrawers.delete(key)),
-            },
-            h("summary", {}, t.showMore(rest.length)),
-            ...rest.map(pieceRow),
-          );
-          const heading = selected ? `${t[key]} (${t.selectedCount(selected)})` : t[key];
-          const label = t.progressOf(t[key]);
-          const chart = h("button", { type: "button", className: "secondary outline icon-button", innerHTML: CHART_ICON, title: label, ariaLabel: label, onclick: () => goProgress(key) });
-          return h("div", {}, h("div", { className: "group-head" }, h("h3", {}, heading), chart), ...group.slice(0, SHOWN_PIECES).map(pieceRow), ...(rest.length ? [drawer] : []));
-        }),
-    );
+  function render() {
+    const groups = pieceGroups(allPieces()).filter(([, pieces]) => pieces.length > 0);
+    const [key, pieces] = groups.find(([key]) => key === shownGroup) ?? groups[0];
+    shownGroup = key;
+    sidebar.show();
+    const selected = pieces.filter(isHighlighted).length;
+    heading.textContent = t[key];
+    count.textContent = selected ? `${t.pieceCount(pieces.length)} · ${t.selectedCount(selected)}` : t.pieceCount(pieces.length);
+    cards.replaceChildren(...pieces.map(card));
   }
 
   async function remove(piece: Piece) {
-    if (await confirmAction(t.deleteConfirm(localTitle(piece.id, piece.title)), t.delete)) {
-      deletePiece(piece.id);
-      if (editing?.id === piece.id) stopEditing();
-      renderList();
-    }
+    if (!(await confirmAction(t.deleteConfirm(localTitle(piece.id, piece.title)), t.delete))) return;
+    deletePiece(piece.id);
+    // A piece deleted while it's on the staff isn't being edited any more.
+    const draft = loadDraft();
+    if (draft.editingId === piece.id) saveDraft({ title: "", notes: [] });
+    render();
   }
 
-  function hasUnsavedWork() {
-    if (!editing) return title.value.trim() !== "" || editor.notes().length > 0;
-    return title.value.trim() !== editing.title || JSON.stringify(editor.notes()) !== JSON.stringify(editing.notes.map(editableNote));
-  }
-
+  // Edit puts the piece on Add piece's staff, asking first if that would replace work there.
   async function edit(piece: Piece) {
-    if (editing?.id !== piece.id) {
-      if (hasUnsavedWork() && !(await confirmAction(t.replaceConfirm, t.replace))) return;
-
-      editing = piece;
-      title.value = piece.title;
-      editor.setNotes(piece.notes.map(editableNote));
+    const draft = loadDraft();
+    if (draft.editingId !== piece.id) {
+      if (hasUnsavedWork(draft) && !(await confirmAction(t.replaceConfirm, t.replace))) return;
+      saveDraft(draftOf(piece));
     }
-    heading.scrollIntoView();
+    actions.addPiece();
   }
 
-  function stopEditing() {
-    editing = undefined;
-    title.value = "";
-    editor.setNotes([]);
-  }
+  const sidebar = libraryGroups(
+    () => shownGroup,
+    (key) => {
+      shownGroup = key;
+      render();
+    },
+  );
 
-  function refreshForms() {
-    const hasTitle = title.value.trim() !== "";
-    saveDraft({ title: title.value, notes: editor.notes(), editingId: editing?.id });
-    // A piece needs a note to play, not just rests.
-    saveButton.disabled = !hasTitle || countNotes(editor.notes()) === 0 || editor.crossesBar();
-    clearButton.disabled = !editing && editor.notes().length === 0;
-    clearButton.textContent = editing ? t.cancel : t.clearStaff;
-    heading.textContent = editing ? t.editPiece : t.addPiece;
-  }
-
-  function saveFromStaff() {
-    const name = title.value.trim();
-    const notes = editor.notes().map(fillFingering);
-    if (editing) updatePiece({ ...editing, title: name, notes });
-    else savePiece({ id: crypto.randomUUID(), title: name, source: "imported", notes });
-    editing = undefined;
-    title.value = "";
-    editor.setNotes([]);
-    renderList();
-  }
-
-  renderList();
-  refreshForms();
-
+  render();
   return {
     element: h(
       "section",
-      {},
-      h("h2", {}, t.screens.Library),
+      { className: "library" },
+      h(
+        "div",
+        { className: "title-row" },
+        h("div", {}, heading, count),
+        h(
+          "div",
+          { className: "title-tools" },
+          h("button", { type: "button", className: "ghost-button", innerHTML: CHART_ICON, onclick: () => actions.progress(shownGroup) }, t.progress),
+          h("button", { type: "button", className: "start-button icon-only", innerHTML: PLUS_ICON, ariaLabel: t.addPiece, title: t.addPiece, onclick: actions.addPiece }),
+        ),
+      ),
       tracks.message,
-      list,
+      cards,
       tracks.file,
-      heading,
-      h("div", { className: "add-piece" }, title),
-      editor.element,
-      h("div", { className: "row" }, saveButton, clearButton),
     ),
-    leave: editor.stopPlaying,
+    sidebar: sidebar.element,
+    leave() {},
   };
 }

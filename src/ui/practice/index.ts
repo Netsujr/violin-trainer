@@ -1,6 +1,6 @@
 import { sharedMetronome as metronome } from "../../audio/metronome";
 import { sharedAudioContext } from "../../audio/reference";
-import { t } from "../../i18n";
+import { localTitle, t } from "../../i18n";
 import { countNotes, meterOf, midiOf } from "../../music/notes";
 import { withPattern, withRepeatedTop } from "../../music/patterns";
 import { createJudge } from "../../practice/judge";
@@ -8,8 +8,11 @@ import type { Session } from "../../practice/session";
 import { aroundSpot } from "../../practice/trouble";
 import { allPieces, getSettings, isScale, passCents, rememberPiece } from "../../storage";
 import { h, type Screen } from "../dom";
+import { createFingerboard } from "../fingerboard";
 import type { Section } from "../highway";
+import { arrangePanels } from "../panels";
 import { createRunControls } from "../runControls";
+import { createTuner } from "../tuner";
 import { createBackingTrack } from "./backingTrack";
 import { createCountIn } from "./countIn";
 import { createFollowing } from "./following";
@@ -26,6 +29,10 @@ import { createWaitingRun } from "./waitingRun";
 const LOOP_GAP_MS = 2000;
 // How often the metronome schedules its clicks, well inside how far ahead it schedules them.
 const METRONOME_TICK_MS = 25;
+// How much of the height the lanes, the staff and the fingerboard each take when big.
+const LANES_WEIGHT = 3;
+const STAFF_WEIGHT = 1.6;
+const BOARD_WEIGHT = 2;
 
 // aligning, when given, opens the piece to line its backing track up, and is the way back to Library.
 export function practiceScreen(pieceId?: string, aligning?: () => void): Screen {
@@ -48,7 +55,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   // When a loop starts its next time round, after a short gap, and the note the last one ended on.
   let loopAt: { at: number; previousMidi?: number } | null = null;
 
-  const selection = createSelection((picked) => { highway.showSection(picked); toolbar.showModes(); });
+  const selection = createSelection((picked) => { highway.showSection(picked); toolbar.showModes(); renderNotes(); });
   const currentIndex = () => controls.session?.index ?? startIndex;
   const endIndex = () => ((spotRun ?? selection.section)?.last ?? piece.notes.length - 1) + 1;
   // A finished section stays on its last note, rather than moving on to the one after it.
@@ -57,14 +64,25 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const withLoopNumber = (text: string) => (loopCount > 1 ? `${text} · ${t.loopNumber(loopCount, lastScore)}` : text);
 
   const judge = createJudge({ get toleranceCents() { return passCents(); }, get holdMs() { return holdMs(); } });
-  const progress = h("p");
+  // The title row: the piece, its subtitle and how far the run's got, a section's notes when there is one, and the
+  // score after a run.
+  const title = h("h1");
+  const subtitle = h("span");
+  const progress = h("span", { className: "practice-progress" });
+  const sectionNotes = h("span", { className: "practice-section" });
   const board = createStaffSection(pickNote, renderNotes, (beat) => track.showBeat(beat));
+  const fingerboard = createFingerboard();
+  const tuner = createTuner();
+  const boardPanel = h("div", { className: "stage-panel stage-board" }, fingerboard.element);
+  const panels = h("div", { className: "stage-panels" }, board.lanesPanel, board.staffPanel, boardPanel);
   const results = createResults(board, playAgain, { onSpot: (spot) => { selection.spot(spot); renderNotes(); }, onPractise: practiseSpot });
   const { staff, highway } = board;
   const countIn = createCountIn(metronome, (text) => (progress.textContent = withLoopNumber(text)));
   const glide = createTempoGlide(metronome, judge, highway);
   const tone = createReferenceTone(() => (controls.session?.finished ? undefined : piece.notes[currentIndex()]));
-  const track = createBackingTrack({ aligning: aligning ?? null, stopRun: () => controls.stop(), onChange: () => toolbar.showModes(), addToBar: board.addToggle });
+  const track = createBackingTrack({ aligning: aligning ?? null, stopRun: () => controls.stop(), onChange: () => toolbar.showModes(), lanes: highway });
+  // Lining the track up, its waveform runs under the lanes, on the same timeline.
+  if (track.strip) board.lanesPanel.append(track.strip);
   const following = createFollowing({ metronome, highway, staff, isMuted: tone.isMuted, endIndex, track, moveOn });
   const waiting = createWaitingRun({ judge, glide, staff, isMuted: tone.isMuted, endIndex, holdMs, showProgress: (value) => (holdProgress = value), moveOn });
 
@@ -76,6 +94,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   // From its first note, with no section.
   function loadPiece() {
     piece = buildPiece();
+    title.textContent = localTitle(basePiece.id, basePiece.title);
+    subtitle.textContent = t.pieces[basePiece.id]?.subtitle ?? basePiece.subtitle ?? "";
     board.setMeter((metronome.meter = meterOf(piece)));
     rememberPiece(basePiece.id);
     track.load(basePiece.id);
@@ -107,6 +127,10 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     const done = countNotes(section ? piece.notes.slice(section.first, section.last + 1) : piece.notes);
     const noteText = note ? t.noteOf(countNotes(piece.notes.slice(0, index)) + 1, countNotes(piece.notes)) : t.allDone(done);
     progress.textContent = withLoopNumber(countIn.active ? t.startsIn(countIn.beats) : noteText);
+    sectionNotes.textContent = section ? t.sectionNotes(countNotes(piece.notes.slice(0, section.first)) + 1, countNotes(piece.notes.slice(0, section.last + 1))) : "";
+    // The fingerboard shows the note to play now, and the one after as a dashed ring.
+    const next = finished ? undefined : piece.notes.slice(index + 1).find((later) => later.pitch);
+    fingerboard.show(note?.pitch ? note : null, false, next ?? null);
     if (!countIn.active) countIn.hideOverlay();
     if (note?.pitch) tone.setNote(midiOf(note.pitch));
     else tone.stop();
@@ -138,7 +162,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     if (controls.session) countInFor(controls.session);
   }
 
-  // A spot's rounds count in with 2 beats, even with "Don't wait", where the lanes start once it's counted.
+  // A spot's rounds count in with 2 beats, even with Keep moving, where the lanes start once it's counted.
   function countInFor(session: Session) {
     if (spotRun) countIn.start(2);
     else if (!session.following && settings.countInOn) countIn.start();
@@ -184,7 +208,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     renderNotes();
   }
 
-  // Each reading from the mic: "Don't wait" moves the lanes on, a count-in counts down, and otherwise the note waits to be played.
+  // Each reading from the mic: Keep moving moves the lanes on, a count-in counts down, and otherwise the note waits to be played.
   function onReading(frequency: number | null, now: number) {
     // A run that has just ended by itself can still get the mic's last reading.
     const session = controls.session;
@@ -203,6 +227,10 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     } else if (!session.finished) {
       waiting.read(session, frequency, now);
     }
+    // The tuner and the fingerboard measure what's heard against the note to play.
+    const target = piece.notes[currentIndex()]?.pitch;
+    tuner.hear(frequency, target ? midiOf(target) : undefined);
+    fingerboard.hear(frequency, passCents());
     highway.draw(piece.notes, shownIndex(), holdProgress);
   }
 
@@ -212,7 +240,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     listen: () => track.listening,
     aligning: Boolean(aligning),
     onStart() {
-      // A backing track keeps moving like the music it is, so it always runs as "Don't wait".
+      // A backing track keeps moving like the music it is, so it always runs as Keep moving.
       controls.session!.following = settings.followOn || track.active;
       highway.jumpTo(startIndex);
       beginRun(startIndex);
@@ -224,19 +252,35 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       if (glide.cancel()) highway.jumpTo(currentIndex());
       [spotRun, loopCount, lastScore, holdProgress, loopAt] = [null, 1, null, 0, null];
       staff.hidePlayed();
+      tuner.hear(null);
       renderNotes();
       toolbar.showModes(); // Today's plan, with the run just logged.
     },
   });
   const toolbar = createPracticeControls({
-    run: controls, pieces, board, track, referenceButton: tone.button, loadPiece, render: renderNotes,
-    piece: () => basePiece, section: () => selection.section,
+    run: controls, pieces, board, track, referenceButton: tone.button, loadPiece, render: renderNotes, arrange,
+    piece: () => basePiece,
     clearStats: () => results.clear(),
-    async onPick(picked) { await controls.stop(); basePiece = picked; loadPiece(); },
+    async onPick(picked) { await controls.stop(); basePiece = picked; loadPiece(); toolbar.showModes(); },
   });
 
+  // The panels as the settings panel sets them. With the lanes off they keep running out of sight, because the staff
+  // follows them.
+  function arrange() {
+    const { lanes, staff: staffSize, board: boardSize, tuner: tunerOn } = settings.practicePanels;
+    arrangePanels(panels, [
+      { element: board.lanesPanel, size: lanes, weight: LANES_WEIGHT },
+      { element: board.staffPanel, size: staffSize, weight: STAFF_WEIGHT },
+      { element: boardPanel, size: boardSize, weight: BOARD_WEIGHT },
+    ]);
+    board.lanesPanel.hidden = false;
+    board.lanesPanel.classList.toggle("offstage", lanes === "off");
+    tuner.element.hidden = !tunerOn;
+  }
+  arrange();
+
   // The metronome ticks for as long as it's switched on, whether a run is going or not. A backing track stands in for
-  // it, and "Don't wait" brings it in with the first note.
+  // it, and Keep moving brings it in with the first note.
   const metronomeTimer = setInterval(() => {
     if (settings.metronomeOn && !following.waiting && !track.active && sharedAudioContext().state === "running") metronome.tick(performance.now(), settings.bpm);
   }, METRONOME_TICK_MS);
@@ -246,18 +290,17 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   return {
     element: h(
       "section",
-      { className: "practice" },
-      ...(track.panel ? [] : [toolbar.todayPlan]),
-      progress,
-      toolbar.actions,
-      toolbar.modeNote,
-      // Aligning, everything for lining the track up sits in one box: its controls, the lanes, and the waveform under them.
-      track.panel ? h("div", { className: "track-align" }, track.panel, board.timeline, track.strip!) : board.timeline,
+      { className: "practice fills-window" },
+      h("div", { className: "title-row" }, h("div", { className: "practice-title" }, title, h("p", {}, subtitle, progress, sectionNotes, board.score)), toolbar.tools),
+      controls.message,
+      // Aligning, the controls for lining the track up sit above the panels, and its waveform under the lanes.
+      ...(track.panel ? [track.panel] : []),
+      h("div", { className: "stage" }, panels, tuner.element),
+      ...(track.panel ? [] : [toolbar.dock]),
       results.element,
-      board.sheet,
-      toolbar.patternRow,
       countIn.overlay,
     ),
+    sidebar: track.panel ? undefined : toolbar.todayPlan,
     // The metronome switched or the BPM changed: the beat starts again from here.
     tempoChanged: () => glide.resetBeat(),
     ownsMetronome: () => true,

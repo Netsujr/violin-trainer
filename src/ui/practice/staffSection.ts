@@ -3,26 +3,29 @@ import type { Meter } from "../../music/notes";
 import { getSettings, saveSettings } from "../../storage";
 import { h } from "../dom";
 import { createHighway } from "../highway";
-import { contentWidth, staffScale, timelineScale } from "../layout";
+import { scaleToFit } from "../layout";
 import { createStaff } from "../staff";
-import { createIconToggle } from "../toggles";
 
-const STAFF_SIDE_PADDING = 16;
+// The moving line's height, in the staff's units, which its panel's height sets the scale of.
+const LINE_UNITS = 160;
 
-// The lanes with their display toggles, and the staff under them with its open/close button, sized to the screen.
-// pickNote is a click on a note. render draws the notes again after a change of size or display. onMove is the lanes
-// moving, with the beat at the hit line.
+// The lanes and the staff, each in its panel and drawn as large as the panel allows, the staff with its button to show
+// one moving line or the whole sheet. pickNote is a click on a note. render draws the notes again after a change of
+// size or display. onMove is the lanes moving, with the beat at the hit line.
 export function createStaffSection(pickNote: (index: number, extend: boolean) => void, render: () => void, onMove: (beat: number) => void) {
   const settings = getSettings();
   let viewChanged = () => {};
-  const staffWidth = () => (contentWidth() - STAFF_SIDE_PADDING) / staffScale();
+  // The whole sheet is drawn at its usual size, as wide as the panel; the moving line as tall as the panel allows.
+  const staffScale = () => (settings.staffOpen ? 1 : scaleToFit(staff.element, LINE_UNITS));
+  const staffWidth = () => (staff.element.clientWidth || 600) / staffScale();
   // Scrolling the staff by hand moves the lanes, which bring the staff along, as when the lanes are scrolled.
-  const staff = createStaff(staffWidth(), !settings.staffOpen && !settings.staffOnly, staffScale(), pickNote, (beat) => highway.moveToBeat(beat));
+  const staff = createStaff(600, !settings.staffOpen, 1, pickNote, (beat) => highway.moveToBeat(beat));
   const highway = createHighway(pickNote, (beat) => {
     staff.follow(beat);
     onMove(beat);
   });
   const toggle = h("button", {
+    type: "button",
     className: "staff-toggle",
     textContent: "▾",
     onclick() {
@@ -30,22 +33,14 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
       saveSettings();
       staff.setCollapsed(!settings.staffOpen);
       labelToggle();
-      render();
+      refit();
       viewChanged();
     },
   });
-  const panel = h("div", { className: "staff-panel" }, staff.element, toggle);
-  // The run's score, on the left of the bar above the lanes.
+  const staffPanel = h("div", { className: "stage-panel staff-panel" }, staff.element, toggle);
+  const lanesPanel = h("div", { className: "stage-panel lanes-panel" }, highway.element);
+  // The run's score, for the title row.
   const score = h("span", { className: "lane-score" });
-  // The label switches, kept together so fullscreen can take them to its buttons.
-  const labels = h(
-    "div",
-    { className: "row toggles label-toggles" },
-    createIconToggle("fingers", render),
-    createIconToggle("noteNames", render),
-    createIconToggle("letterNames", render),
-  );
-  const toolbar = h("div", { className: "section-bar" }, score, labels);
 
   function labelToggle() {
     const label = settings.staffOpen ? t.collapseSheet : t.showFullSheet;
@@ -55,27 +50,30 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
   }
   labelToggle();
 
-  const showScale = () => panel.style.setProperty("--timeline-scale", String(staffScale()));
-  showScale();
-
-  // Only a real change of layout, not a phone's address bar sliding away.
-  let fitted = `${contentWidth()}:${timelineScale()}:${staffScale()}`;
-  function fit() {
-    const size = `${contentWidth()}:${timelineScale()}:${staffScale()}`;
-    if (size === fitted) return;
-
-    fitted = size;
-    showScale();
+  function refit() {
+    staffPanel.style.setProperty("--timeline-scale", String(staffScale()));
     highway.resize();
     staff.resize(staffWidth(), staffScale());
     render();
   }
-  addEventListener("resize", fit);
+
+  // Only a real change of size, not one a redraw makes, so this doesn't go round in circles.
+  let fitted = "";
+  const sizes = () => [lanesPanel, staffPanel].map((panel) => `${panel.clientWidth}x${panel.clientHeight}`).join();
+  const observer = new ResizeObserver(() => {
+    if (sizes() === fitted) return;
+    fitted = sizes();
+    refit();
+  });
+  observer.observe(lanesPanel);
+  observer.observe(staffPanel);
 
   return {
     staff,
     highway,
-    fit,
+    score,
+    lanesPanel,
+    staffPanel,
     // The piece's bars, for the staff and the lanes' bar lines.
     setMeter(meter: Meter) {
       staff.setMeter(meter);
@@ -85,22 +83,9 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
     whenViewChanges(callback: () => void) {
       viewChanged = callback;
     },
-    // Something for the start of the bar, before the score.
-    addFirst(...nodes: Node[]) {
-      toolbar.prepend(...nodes);
-    },
-    // Another switch on the bar, after the score.
-    addToggle(node: Node) {
-      toolbar.insertBefore(node, score.nextSibling);
-    },
-    labels,
-    // The label switches back at the end of the bar, after fullscreen.
-    returnLabels: () => toolbar.append(labels),
     showScore(text: string) {
       score.textContent = text;
     },
-    timeline: h("div", { className: "timeline-section" }, toolbar, highway.element),
-    sheet: h("div", { className: "staff-section" }, panel),
-    leave: () => removeEventListener("resize", fit),
+    leave: () => observer.disconnect(),
   };
 }

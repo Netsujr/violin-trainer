@@ -2,18 +2,32 @@ import { t } from "../i18n";
 import type { Piece } from "../music/notes";
 import { startRun, type Run } from "../practice/run";
 import { h } from "./dom";
-import { boxToggle, RECORD_ICON } from "./toggles";
+import { PLAY_ICON, RECORD_ICON, STOP_ICON } from "./toggles";
 
 // A finished run ends this long after its last note counts, so a recording keeps the end of that note.
 const FINISH_TAIL_MS = 1000;
 
-// Record, in the header for every screen: when it's on, the next run records. It can't be switched mid-run.
+// Record, in the sidebar for every screen: when it's on, the next run records. It can't be switched mid-run.
 let recordOn = false;
 let recordToggle: HTMLButtonElement | null = null;
 export function createRecordToggle() {
-  recordToggle = boxToggle(h("span", { className: "icon", innerHTML: RECORD_ICON }), t.record, recordOn, (on) => (recordOn = on));
-  recordToggle.classList.add("record-toggle");
-  return recordToggle;
+  const button = h(
+    "button",
+    {
+      type: "button",
+      className: "nav-item record-toggle",
+      ariaLabel: t.record,
+      ariaPressed: String(recordOn),
+      onclick() {
+        recordOn = !recordOn;
+        button.ariaPressed = String(recordOn);
+      },
+    },
+    h("span", { className: "icon", innerHTML: RECORD_ICON }),
+    h("span", { className: "nav-word" }, t.record),
+  );
+  recordToggle = button;
+  return button;
 }
 
 export function createRunControls(options: {
@@ -27,17 +41,18 @@ export function createRunControls(options: {
   onStart?: () => void;
   onStop?: () => void;
 }) {
-  const button = h("button", { textContent: t.start, onclick: () => (run ? stop() : start()) });
+  const button = h("button", { className: "start-button", onclick: () => (run ? stop() : start()) });
   const message = h("span", { className: "warning" });
   let run: Run | null = null;
   let saving: Promise<void> = Promise.resolve();
   let left = false;
 
   const showRunning = () => {
-    button.textContent = run ? t.stop : t.start;
-    button.classList.toggle("secondary", run !== null);
+    button.innerHTML = run ? STOP_ICON : PLAY_ICON;
+    button.append(run ? t.stop : t.start);
     if (recordToggle) recordToggle.disabled = run !== null;
   };
+  showRunning();
 
   async function start() {
     button.disabled = true;

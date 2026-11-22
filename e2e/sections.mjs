@@ -1,7 +1,7 @@
-// The Options panel, the section bars, the staff's labels and its two modes, and the needle's zones.
+// Practice's settings panel, the staff's labels and its two modes, Settings, and the dial's zones.
 import { readFileSync, writeFileSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, sleep, check, seed, progress, OUT, pickPiece, heard } from "./lib.mjs";
+import { open, nav, start, sleep, check, seed, progress, OUT, pickPiece, heard, openSettings, setLanguage, clickLanes } from "./lib.mjs";
 
 wav(OUT + "s-silent.wav", [rest(3)]);
 const detuned = (cents) => 440 * 2 ** (cents / 1200);
@@ -9,7 +9,6 @@ wav(OUT + "s-green.wav", [{ hz: detuned(8), seconds: 4, wave: "sine" }]);
 wav(OUT + "s-yellow.wav", [{ hz: detuned(30), seconds: 4, wave: "sine" }]);
 wav(OUT + "s-out.wav", [{ hz: detuned(46), seconds: 4, wave: "sine" }]);
 
-const titles = (page, section) => page.locator(`${section} .section-bar .box-toggle:not([hidden])`).evaluateAll((buttons) => buttons.map((button) => button.title));
 const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toDataURL());
 
 {
@@ -18,67 +17,54 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await nav(page, "Practice");
   await sleep(250);
 
-  // The run's switches, on the lanes' bar, with no box of their own
-  check("options: no box above the lanes", (await page.locator(".options").count()) === 0);
-  const bar = page.locator(".section-bar");
-  const text = (await bar.innerText()) + " " + (await bar.locator("[aria-label], [title]").evaluateAll((elements) => elements.map((element) => element.ariaLabel ?? element.title).join(" ")));
-  check("the lanes' bar holds Tempo and the count-in, with record and the metronome in the header", text.includes("Tempo") && text.includes("count-in") && !["Record", "Metronome"].some((word) => text.includes(word)), text.replaceAll("\n", " ").slice(0, 120));
-  const rowOf = (selector) => page.locator(selector).evaluate((element) => Math.round(element.getBoundingClientRect().top + element.getBoundingClientRect().height / 2));
+  // The run's choices, in the settings panel docked under the panels, each in words
+  const dock = page.locator(".dock");
+  const text = await dock.innerText();
+  check("the settings panel holds the run's choices, with record and the metronome in the sidebar", ["On the notes", "On screen", "Pace", "Repeat", "Top note", "Pattern", "Count-in", "Glide"].every((word) => text.includes(word)) && !["Record", "Metronome"].some((word) => text.includes(word)), text.replaceAll("\n", " ").slice(0, 160));
   const record = await page.locator('header button[aria-label="Record"]').boundingBox(), metronome = await page.locator("header .metronome-button").boundingBox();
-  check("the header has record just left of the metronome, on one line", record.x + record.width <= metronome.x && Math.abs((await rowOf('header button[aria-label="Record"]')) - (await rowOf("header .metronome-button"))) < 4);
-  check("with its BPM in its corner", /^\d+$/.test(await page.locator("header .metronome-button .bpm-badge").innerText()));
-  check("run buttons are off the lanes' bar", (await page.locator('.section-bar button:text-is("Start")').count()) === 0);
-  const label = page.locator('.section-bar label:has-text("Tempo")');
-  const color = () => label.evaluate((element) => getComputedStyle(element).color);
-  const off = await color();
-  check("options: an off switch is grey", off === "rgb(163, 154, 139)", off);
-  await label.locator("input").check();
-  check("options: an on switch lights up", (await color()) !== off, await color());
-  await label.locator("input").uncheck();
-  check("options: off stays clickable", await label.locator("input").isEnabled());
+  check("the sidebar has record just above the metronome", record.y + record.height <= metronome.y + 1 && Math.abs(record.x - metronome.x) < 2);
+  check("named with its BPM", /^Metronome \d+$/.test(await page.locator("header .metronome-button").innerText()));
+  check("Start is in the title row, the lanes have no bar of their own", (await page.locator('.title-row button:text-is("Start")').count()) === 1 && (await page.locator(".section-bar").count()) === 0);
+  const glide = dock.locator('button:text-is("Glide")');
+  check("options: Glide starts off", (await glide.getAttribute("aria-pressed")) === "false");
+  await glide.click();
+  check("options: and switches on, saved", (await glide.getAttribute("aria-pressed")) === "true" && (await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).tempoOn)) === true);
+  await glide.click();
 
-  // Bars
-  const order = await titles(page, ".timeline-section");
-  check("bars: timeline order, the count-in first", order[0].startsWith("Beat count-in") && order.slice(1).join() === "Fingers,Note names (Do Ré Mi),Letter names (A G D)", order.join());
-  check("bars: the piece picker on the left, and no grid switch, the grid always drawn", (await page.locator(".section-bar > *").first().getAttribute("class")) === "piece-select" && (await page.locator('.box-toggle[title="Grid"]').count()) === 0);
-  check("bars: only the lanes have a header", (await page.locator(".section-bar").count()) === 1 && (await page.locator(".staff-section label").count()) === 0);
-  const toggleText = await page.locator(".section-bar .box-toggle:not([hidden])").evaluateAll((buttons) => buttons.map((button) => button.textContent).join(""));
-  check("bars: icons in boxes instead of names, Tempo's switch the only checkbox, under its icon", toggleText === "DoA" && (await page.locator(".section-bar label:not(.icon-switch) input[type=checkbox]").count()) === 0, toggleText);
-  const below = (selector) => page.evaluate((selector) => { const section = document.querySelector(selector); return section.querySelector(".section-bar").getBoundingClientRect().bottom <= section.querySelector("canvas, .staff").getBoundingClientRect().top + 0.5; }, selector);
-  check("bars: nothing sits on the lanes", await below(".timeline-section"));
+  // The panels
   const arrow = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), button = document.querySelector(".staff-toggle").getBoundingClientRect(); return { left: Math.round(button.left - panel.left), bottom: Math.round(panel.bottom - button.bottom) }; });
   check("staff: the arrow sits at its bottom left", arrow.left >= 0 && arrow.left < 16 && arrow.bottom >= 0 && arrow.bottom < 16, JSON.stringify(arrow));
-  for (const key of ["Fingers", "Note names (Do Ré Mi)", "Letter names (A G D)"]) {
-    const toggle = page.locator(`.timeline-section .box-toggle[title="${key}"]`);
+  const label = (name) => dock.locator(`[aria-label="On the notes"] button:text-is("${name}")`);
+  for (const key of ["Fingers", "Do Ré Mi", "A B C"]) {
     const before = await picture(page);
-    await toggle.click();
+    await label(key).click();
     await sleep(60);
-    check(`bars: ${key} changes the timeline, and lights off`, (await picture(page)) !== before && (await toggle.getAttribute("aria-pressed")) === "false");
-    await toggle.click();
+    check(`labels: ${key} changes the lanes, and switches off`, (await picture(page)) !== before && (await label(key).getAttribute("aria-pressed")) === "false");
+    await label(key).click();
     await sleep(60);
-    check(`bars: ${key} comes back`, (await picture(page)) === before);
+    check(`labels: ${key} comes back`, (await picture(page)) === before);
   }
 
   // Staff labels
   const labels = () => page.locator(".staff > svg > text").evaluateAll((texts) => texts.map((text) => text.textContent).join(" "));
   check("staff: fingers and names show by default", (await labels()).startsWith("0 Ré 1 Mi 2 Fa♯ 3 Sol"), await labels());
   // Each starts on, so every press here turns it off or back on.
-  const lane = (name) => ({ uncheck: () => page.locator(`.timeline-section .box-toggle[title="${name}"]`).click(), check: () => page.locator(`.timeline-section .box-toggle[title="${name}"]`).click() });
-  await lane("Note names (Do Ré Mi)").uncheck();
+  const lane = (name) => ({ uncheck: () => label(name).click(), check: () => label(name).click() });
+  await lane("Do Ré Mi").uncheck();
   check("staff: the lanes' names switch hides its names too", (await labels()) === "0 1 2 3 0 1 2 3 2 1 0 3 2 1 0", await labels());
   await lane("Fingers").uncheck();
   check("staff: the lanes' fingers switch hides its fingers too", (await labels()) === "");
   await lane("Fingers").check();
-  await lane("Note names (Do Ré Mi)").check();
+  await lane("Do Ré Mi").check();
   check("staff: both come back", (await labels()).startsWith("0 Ré 1 Mi"), await labels());
   const sheet = () => page.locator(".staff svg").evaluate((svg) => svg.outerHTML);
   const before = await sheet();
-  await lane("Letter names (A G D)").uncheck();
+  await lane("A B C").uncheck();
   check("staff: letter names are only for the lanes", (await sheet()) === before);
-  await lane("Letter names (A G D)").check();
+  await lane("A B C").check();
   await pickPiece(page, "c-major-1oct");
   await sleep(150);
-  const low = await page.locator(".staff > svg > text").evaluateAll((texts) => texts.filter((text) => text.getAttribute("fill") === "#b03020").map((text) => text.textContent).join());
+  const low = await page.locator(".staff > svg > text").evaluateAll((texts) => texts.filter((text) => text.getAttribute("fill") === "#f08a8d").map((text) => text.textContent).join());
   check("staff: low fingers are red, with a plain number", low.length > 0 && !low.includes("L"), low);
   const inside = await page.locator(".staff").evaluate((staff) => { const box = staff.getBoundingClientRect(); return [...staff.querySelectorAll("svg > text")].every((text) => { const rect = text.getBoundingClientRect(); return rect.top >= box.top && rect.bottom <= box.bottom; }); });
   check("staff: labels stay inside the sheet", inside);
@@ -86,19 +72,21 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   // Staff modes, with the current note on the playhead
   await pickPiece(page, "d-major-1oct");
   await sleep(150);
+  // How far the current notehead is from the playhead, which sits 130 units in, at the staff's scale.
   const headOffset = () => page.evaluate(() => {
-    const panel = document.querySelector(".staff-panel").getBoundingClientRect();
+    const staff = document.querySelector(".staff").getBoundingClientRect();
+    const scale = parseFloat(getComputedStyle(document.querySelector(".staff-panel")).getPropertyValue("--timeline-scale"));
     const glyphs = [...document.querySelectorAll(".staff .vf-stavenote.current .vf-notehead text")];
-    return Math.round(Math.max(...glyphs.map((glyph) => glyph.getBoundingClientRect().left)) - panel.left);
+    return Math.round(Math.max(...glyphs.map((glyph) => glyph.getBoundingClientRect().left)) - staff.left - 130 * scale);
   });
   check("staff: closed by default, one line", (await page.locator(".staff.collapsed").count()) === 1 && (await page.locator(".staff .vf-stave").count()) === 1);
-  check("staff: the first note starts on the playhead", (await headOffset()) === 130, String(await headOffset()));
+  check("staff: the first note starts on the playhead", Math.abs(await headOffset()) <= 1, String(await headOffset()));
   const clef = await page.evaluate(() => { const panel = document.querySelector(".staff").getBoundingClientRect(), clef = document.querySelector(".staff .vf-clef").getBoundingClientRect(); return { left: Math.round(clef.left - panel.left), scrolled: document.querySelector(".staff").scrollLeft }; });
   check("staff: the clef isn't cut off at the start", clef.left >= 8 && clef.scrolled === 0, JSON.stringify(clef));
   const box = await page.locator("canvas").boundingBox();
-  await page.mouse.click(box.x + 130 + 6 * 120, box.y + 126);
+  await clickLanes(page, 130 + 6 * 120, 126);
   await sleep(900);
-  check("staff: follows the timeline to a clicked sharp note", (await progress(page)) === "Note 7 of 15" && (await headOffset()) === 130, `${await progress(page)} ${await headOffset()}`);
+  check("staff: follows the timeline to a clicked sharp note", (await progress(page)) === "Note 7 of 15" && Math.abs(await headOffset()) <= 1, `${await progress(page)} ${await headOffset()}`);
   check("staff: marks the same note", (await page.locator(".staff .vf-stavenote").evaluateAll((notes) => notes.findIndex((n) => n.classList.contains("current")))) === 6);
   await page.mouse.move(box.x + 500, box.y + 60);
   await page.mouse.wheel(240, 0);
@@ -134,30 +122,24 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await s.close();
 }
 
-// The Settings panel
+// The Settings screen, with the dial as it will look
 {
   const s = await open(OUT + "s-silent.wav");
-  const panel = s.page.locator("header details");
-  const isOpen = () => panel.evaluate((details) => details.open);
+  const current = () => s.page.locator('nav button[aria-current="page"]').innerText();
   await nav(s.page, "Practice");
-  await s.page.click("header summary");
-  check("settings: opens", await isOpen());
+  await openSettings(s.page);
+  check("settings: a screen of its own, marked in the sidebar", (await current()) === "Settings", await current());
+  const arc = () => s.page.locator(".settings .dial-yellow").getAttribute("d");
+  const before = await arc();
   await s.page.locator('input[aria-label="Close enough"]').fill("30");
-  check("settings: using a control keeps it open", await isOpen());
   const saved = await s.page.evaluate(() => JSON.parse(localStorage.getItem("settings")).toleranceCents);
   check("settings: saved as you slide", saved === 30, String(saved));
-  await s.page.mouse.click(300, 600);
-  check("settings: clicking elsewhere closes it", !(await isOpen()));
-  await s.page.click("header summary");
-  await s.page.keyboard.press("Escape");
-  check("settings: Esc closes it", !(await isOpen()));
-  await s.page.click("header summary");
-  await s.page.click("header summary");
-  check("settings: its own header still toggles it", !(await isOpen()));
-  await s.page.click("header summary");
-  await s.page.click('.language button:text-is("PT")');
-  await sleep(200);
-  check("settings: closed when the language changes", !(await isOpen()));
+  check("settings: the dial's close-enough arc moves as you slide", (await arc()) !== before);
+  await s.page.click('.settings [aria-label="Close enough"] button:text-is("Off")');
+  check("settings: Close enough off hides its slider and its arc", (await s.page.locator('input[aria-label="Close enough"]').isHidden()) && (await s.page.locator(".settings .dial-yellow").evaluate((path) => path.style.visibility)) === "hidden");
+  await s.page.click('.settings [aria-label="Close enough"] button:text-is("On")');
+  await setLanguage(s.page, "PT");
+  check("settings: switching language stays on Settings", (await current()) === "Configurações", await current());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
@@ -188,19 +170,21 @@ for (const [file, cents, zone] of [["s-green.wav", 8, "green"], ["s-yellow.wav",
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1200);
-  const seen = await s.page.locator(".needle").evaluate((needle) => ({ zone: needle.dataset.zone, left: parseFloat(needle.querySelector("i").style.left) }));
-  check(`needle: ${cents} cents reads ${zone}`, seen.zone === zone && Math.abs(seen.left - (50 + cents)) < 3, JSON.stringify(seen));
+  // The needle turns 1.8 degrees a cent, 90 at 50 cents sharp.
+  const seen = await s.page.locator(".needle").evaluate((needle) => ({ zone: needle.dataset.zone, cents: parseFloat(needle.querySelector(".dial-needle").style.transform.match(/-?[\d.]+/)[0]) / 1.8 }));
+  check(`needle: ${cents} cents reads ${zone}`, seen.zone === zone && Math.abs(seen.cents - cents) < 3, JSON.stringify(seen));
   await s.close();
 }
 {
   const s = await open(OUT + "s-yellow.wav");
-  await s.page.click("summary");
+  await openSettings(s.page);
   await s.page.locator('input[aria-label="Close enough"]').fill("50");
-  await s.page.click("summary");
+  await nav(s.page, "Listen");
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1200);
-  const seen = await s.page.evaluate(() => ({ zone: document.querySelector(".needle").dataset.zone, tolerance: document.documentElement.style.getPropertyValue("--tolerance") }));
-  check("needle: Tolerance moves the zones", seen.zone === "yellow" && seen.tolerance === "50%", JSON.stringify(seen));
+  // Close enough at 50 cents reaches the dial's ends, the first at (30, 160).
+  const seen = await s.page.evaluate(() => ({ zone: document.querySelector(".needle").dataset.zone, arc: document.querySelector(".needle .dial-yellow").getAttribute("d") }));
+  check("needle: Close enough moves the zones", seen.zone === "yellow" && seen.arc.startsWith("M30.0 160.0"), JSON.stringify(seen));
   await s.close();
 }

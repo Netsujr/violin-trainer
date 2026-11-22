@@ -17,11 +17,8 @@ type WriteLabel = (text: string, x: number, y: number, fill: string, fontSize: n
 const TOP = 30;
 export const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
-const BAR_NOTE_WIDTH = 40;
 // An open sheet always has four bars to a line, however wide the page.
 const BARS_PER_LINE = 4;
-// A sheet fitted to the screen is never drawn smaller than this.
-const MIN_FITTED_SCALE = 1;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 3: "hd", 4: "w" };
 // How far a line's rows of fingers and names sit outside the staff and its notes, measured to the text's baseline.
 const FINGER_GAP = 5;
@@ -43,20 +40,21 @@ const NOTEHEAD_RADIUS = 5;
 // With labels on, their rows use the space that high notes otherwise get above the staff.
 const LABELLED_TOP = 6;
 const LABELLED_BOTTOM = 8;
-const LOW_FINGER_COLOR = "#b03020";
-const FINGER_COLOR = "#111";
-const NAME_COLOR = "#6b3a1e";
+// The labels' colours: dark on a printed sheet, light on the screen's dark panels.
+type Ink = { finger: string; lowFinger: string; name: string };
+const PRINT_INK: Ink = { finger: "#111", lowFinger: "#b03020", name: "#6b3a1e" };
+const SCREEN_INK: Ink = { finger: "#e8ecf2", lowFinger: "#f08a8d", name: "#98a2b3" };
 // Matches the timeline's hit line, in the same units, so the current note lines up with its tile.
 const HIT_LINE_X = 130;
 // Collapsed, the first notehead lands under the hit line, with room for the clef.
 const COLLAPSED_NOTE_START = 118;
 const COLLAPSED_MARGIN = 16;
 const COLLAPSED_BEAT_WIDTH = 72;
-const SECTION_COLOR = "rgba(255, 149, 0, 0.28)";
+const SECTION_COLOR = "rgba(230, 174, 72, 0.22)";
 const STAFF_STEP_HEIGHT = 5;
-const PLAYED_COLOR = "#1f6fd1";
+const PLAYED_COLOR = "#f08a8d";
 const GHOST_EDGE = 8;
-const PLAYED_IN_TUNE_COLOR = "#14914a";
+const PLAYED_IN_TUNE_COLOR = "#6cc4ff";
 // How far a note's clickable slot and the section's band start before its notehead, and how far the last one runs after it.
 const NOTE_LEAD = 20;
 const NOTE_TAIL = 40;
@@ -122,7 +120,7 @@ export function openLines(notes: StaffNote[], width: number, meter = COMMON_TIME
 }
 
 // Draws a line of bars on the page's SVG or a PDF's canvas, and returns its notes.
-export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[][], formatWidth: number, labels: StaffLabels, writeLabel: WriteLabel) {
+export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[][], formatWidth: number, labels: StaffLabels, writeLabel: WriteLabel, ink = PRINT_INK) {
   stave.setContext(context).draw();
   const lineNotes = line.flat();
   if (lineNotes.length === 0) return [];
@@ -157,18 +155,18 @@ export function drawLine(context: RenderContext, stave: Stave, line: StaffNote[]
   const slurred = lineNotes.some((note) => note.slur);
   const bowRow = slurred ? slurRow - SLUR_ROOM : slurRow;
   const xs = drawn.map((note) => note.getAbsoluteX() + NOTEHEAD_CENTER);
-  if (slurred) drawSlurs(context.setFillStyle(FINGER_COLOR), lineNotes.map((note) => Boolean(note.slur)), xs, slurRow);
+  if (slurred) drawSlurs(context.setFillStyle(ink.finger), lineNotes.map((note) => Boolean(note.slur)), xs, slurRow);
   lineNotes.forEach((note, index) => {
     const x = xs[index];
     if (labels.fingers && note.finger) {
-      const color = note.finger.startsWith("L") ? LOW_FINGER_COLOR : FINGER_COLOR;
+      const color = note.finger.startsWith("L") ? ink.lowFinger : ink.finger;
       writeLabel(note.finger.replace("L", ""), x, fingerRow, color, 13);
     }
-    if (note.bow) writeLabel(BOW_MARKS[note.bow], x, bowRow, FINGER_COLOR, BOW_MARK_SIZE, MUSIC_FONT);
+    if (note.bow) writeLabel(BOW_MARKS[note.bow], x, bowRow, ink.finger, BOW_MARK_SIZE, MUSIC_FONT);
     if (!note.pitch) return;
     const { solfege, letter } = noteLabels(note.pitch);
     const name = [labels.names && solfege, labels.letters && letter].filter(Boolean).join(" ");
-    if (name) writeLabel(name, x, nameRow, NAME_COLOR, 11);
+    if (name) writeLabel(name, x, nameRow, ink.name, 11);
   });
   return drawn;
 }
@@ -182,7 +180,7 @@ function svgText(svg: SVGSVGElement, text: string, x: number, y: number, fill: s
   element.setAttribute("stroke", "none");
   element.setAttribute("font-size", String(fontSize));
   element.setAttribute("font-weight", font ? "400" : "700");
-  element.setAttribute("font-family", font ?? "system-ui, sans-serif");
+  element.setAttribute("font-family", font ?? "Barlow, system-ui, sans-serif");
   element.setAttribute("text-anchor", "middle");
   svg.append(element);
 }
@@ -247,19 +245,6 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   let nudge = 0;
   let section: Section | null = null;
   let followedBeat = 0;
-  // When set, an open sheet is drawn as large as fits this many pixels of height.
-  let fitHeight: number | null = null;
-
-  // The width to draw an open sheet at, in its own units: the fewer, the larger it shows. It's sized to fill fitHeight,
-  // but never cramps its notes, nor shrinks below a readable size, so a long piece scrolls instead.
-  function fittedWidth(notes: StaffNote[], top: number, bottom: number) {
-    const lines = layOut(notes, meter);
-    const shownWidth = width * scale;
-    const needed = CLEF_SPACE + 20 + Math.max(...lines.map((line) => line.flat().length)) * BAR_NOTE_WIDTH;
-    const toFill = ((top + lines.length * LINE_HEIGHT + bottom) * shownWidth) / fitHeight!;
-    return Math.max(needed, Math.min(shownWidth / MIN_FITTED_SCALE, toFill));
-  }
-
   function noteAt(event: MouseEvent) {
     const box = element.querySelector("svg")!.getBoundingClientRect();
     const x = ((event.clientX - box.left) * sheet.width) / box.width;
@@ -300,7 +285,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const labelled = labels.names || labels.fingers || labels.letters;
     const top = labelled ? LABELLED_TOP + (notes.some((note) => note.bow) ? BOW_ROOM : 0) + (notes.some((note) => note.slur) ? SLUR_ROOM : 0) : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
-    const sheetWidth = !collapsed && fitHeight ? fittedWidth(notes, top, bottom) : width;
+    const sheetWidth = width;
     const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
     const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : sheetWidth;
@@ -329,7 +314,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       }
       if (centred && notes.length === 1) stave.setNoteStartX(stave.getX() + stave.getWidth() / 2 + nudge);
       if (collapsed) stave.setNoteStartX(COLLAPSED_NOTE_START);
-      const drawn = drawLine(context, stave, line, formatWidth, labels, (...label) => svgText(svg, ...label));
+      const drawn = drawLine(context, stave, line, formatWidth, labels, (...label) => svgText(svg, ...label), SCREEN_INK);
       allNotes.push(...drawn);
       for (const _ of drawn) noteLines.push(lineIndex);
     });
@@ -450,7 +435,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       const y = Math.max(GHOST_EDGE, Math.min(sheet.height - GHOST_EDGE, noteYs[index] - offset));
       placeGhost(x, y, cents, inTune);
     },
-    // "Don't wait": what's heard at a beat, as the pitch line, with the ghost notehead at its tip. cents and inTune are
+    // Keep moving: what's heard at a beat, as the pitch line, with the ghost notehead at its tip. cents and inTune are
     // against the note being judged, for the ghost's colour and arrow. Silence, with frequency null, hides the ghost.
     tracePlayed(beat: number, frequency: number | null, cents: number | null, inTune: boolean) {
       const point = trace.add(beat, frequency);
@@ -471,11 +456,6 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     },
     setCollapsed(value: boolean) {
       collapsed = value;
-      shown = null;
-    },
-    // Draws an open sheet as large as fits this height in pixels, or as usual with null.
-    fitTo(height: number | null) {
-      fitHeight = height;
       shown = null;
     },
     resize(newWidth: number, newScale: number) {

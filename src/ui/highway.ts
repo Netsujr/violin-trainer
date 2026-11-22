@@ -3,7 +3,7 @@ import type { PieceNote, StringName } from "../music/notes";
 import { beatInBar, COMMON_TIME, noteLabels, type Meter } from "../music/notes";
 import { getSettings } from "../storage";
 import { h } from "./dom";
-import { contentWidth, timelineScale } from "./layout";
+import { scaleToFit } from "./layout";
 
 const LANES: StringName[] = ["E", "A", "D", "G"];
 const LANE_HEIGHT = 84;
@@ -14,28 +14,30 @@ const TILE_GAP = 8;
 const TILE_HEIGHT = 74;
 const OUTLINE_GAP = 3;
 const OUTLINE_CORNER = 11;
-const LOW_FINGER_COLOR = "#b03020";
-const NAME_COLOR = "#6b3a1e";
-const LETTER_COLOR = "#666";
-const TILE_COLOR = "#f3ead9";
-const CURRENT_COLOR = "#ff9500";
-const HOLD_COLOR = "#4cd07d";
+// Matches the palette in styles/base.css: dark tiles with light labels, the note to play brass, a hit pale blue and a
+// miss a muted red, those three with dark labels.
+const TILE_COLOR = "#222a37";
+const CURRENT_COLOR = "#e6ae48";
+const HIT_TILE_COLOR = "#9ed8ff";
+const MISS_TILE_COLOR = "#e8a3a3";
+const LIGHT_INK = { finger: "#e8ecf2", lowFinger: "#f08a8d", name: "#e8ecf2", letter: "#98a2b3" };
+const DARK_INK = { finger: "#1a1405", lowFinger: "#9b2226", name: "#1a1405", letter: "#4a3a12" };
+const HOLD_COLOR = "#6cc4ff";
 // Pale enough to keep a tile's labels readable.
-const SECTION_COLOR = "rgba(255, 149, 0, 0.16)";
-const SECTION_EDGE_COLOR = "rgba(255, 149, 0, 0.7)";
-const HIT_TILE_COLOR = "#c9edd4";
-const MISS_TILE_COLOR = "#f6cfc8";
-// Matches the palette in style.css.
-const LANE_COLORS = ["#211c16", "#1b1712"];
-const LANE_LABEL_COLOR = "#a39a8b";
-const HIT_LINE_COLOR = "#e8e2d6";
-const BEAT_LINE_COLOR = "#3a3228";
-const BAR_LINE_COLOR = "#5a4e42";
+const SECTION_COLOR = "rgba(230, 174, 72, 0.12)";
+const SECTION_EDGE_COLOR = "rgba(230, 174, 72, 0.6)";
+const LANE_COLORS = ["#131821", "#171d27"];
+const LANE_LABEL_COLOR = "#98a2b3";
+const HIT_LINE_COLOR = "#e6ae48";
+const BEAT_LINE_COLOR = "#222a37";
+const BAR_LINE_COLOR = "#3a4456";
+const FONT = "Barlow, system-ui, sans-serif";
 
 const tileWidth = (note: PieceNote) => (note.beats ?? 1) * BEAT_WIDTH - TILE_GAP;
 
 export type Section = { first: number; last: number };
 
+// The lanes, drawn as large as their box, the panel's drawing area, allows.
 export function createHighway(onPick: (noteIndex: number, extend: boolean) => void, onMove: (beat: number) => void) {
   const canvas = h("canvas");
   const context = canvas.getContext("2d")!;
@@ -76,6 +78,7 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
     },
     track,
   );
+  const element = h("div", { className: "highway" }, canvas, scroller);
   let notes: PieceNote[] = [];
   // The beat each note starts on, then the total, so index notes.length is the end of the piece.
   let starts = [0];
@@ -91,8 +94,8 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
   const fitTrack = () => (track.style.width = `calc(100% + ${starts.at(-1)! * pixelsPerBeat()}px)`);
 
   function fitToScreen() {
-    scale = timelineScale();
-    viewWidth = contentWidth() / scale;
+    scale = scaleToFit(element, HEIGHT);
+    viewWidth = element.clientWidth / scale;
     canvas.width = viewWidth * scale * devicePixelRatio;
     canvas.height = HEIGHT * scale * devicePixelRatio;
     context.setTransform(scale * devicePixelRatio, 0, 0, scale * devicePixelRatio, 0, 0);
@@ -134,19 +137,20 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
     drawGrid();
     LANES.forEach((lane, index) => {
       context.fillStyle = LANE_LABEL_COLOR;
-      context.font = "bold 18px system-ui";
+      context.font = `600 18px ${FONT}`;
       context.textAlign = "left";
       context.fillText(t.strings[lane], 12, index * LANE_HEIGHT + LANE_HEIGHT / 2 + 6);
     });
     context.fillStyle = HIT_LINE_COLOR;
-    context.fillRect(HIT_X - 2, 0, 4, HEIGHT);
+    context.fillRect(HIT_X - 1, 0, 2, HEIGHT);
   }
 
-  function drawTile(note: PieceNote, x: number, result?: boolean) {
+  function drawTile(note: PieceNote, x: number, current: boolean, result?: boolean) {
     const { toggles } = getSettings();
     const y = laneCenter(note);
     const width = tileWidth(note);
-    context.fillStyle = result === undefined ? TILE_COLOR : result ? HIT_TILE_COLOR : MISS_TILE_COLOR;
+    context.fillStyle = current ? CURRENT_COLOR : result === undefined ? TILE_COLOR : result ? HIT_TILE_COLOR : MISS_TILE_COLOR;
+    const ink = current || result !== undefined ? DARK_INK : LIGHT_INK;
     context.beginPath();
     context.roundRect(x, y - TILE_HEIGHT / 2, width, TILE_HEIGHT, 8);
     context.fill();
@@ -156,18 +160,18 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
     const textX = x + Math.min(width, BEAT_WIDTH - TILE_GAP) / 2;
     const { solfege, letter } = noteLabels(note.pitch!);
     if (toggles.fingers) {
-      context.fillStyle = note.finger?.startsWith("L") ? LOW_FINGER_COLOR : "#111";
-      context.font = "bold 22px system-ui";
+      context.fillStyle = note.finger?.startsWith("L") ? ink.lowFinger : ink.finger;
+      context.font = `700 22px ${FONT}`;
       context.fillText(note.finger?.replace("L", "") ?? "?", textX, y - 12);
     }
     if (toggles.noteNames) {
-      context.fillStyle = NAME_COLOR;
-      context.font = "bold 16px system-ui";
+      context.fillStyle = ink.name;
+      context.font = `600 16px ${FONT}`;
       context.fillText(solfege, textX, y + 10);
     }
     if (toggles.letterNames) {
-      context.fillStyle = LETTER_COLOR;
-      context.font = "12px system-ui";
+      context.fillStyle = ink.letter;
+      context.font = `12px ${FONT}`;
       context.fillText(letter, textX, y + 27);
     }
   }
@@ -207,11 +211,9 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
       // A rest leaves the lanes empty.
       if (!note.pitch || x + tileWidth(note) < 0 || x > viewWidth) return;
 
-      drawTile(note, x, results?.get(noteIndex));
-      if (noteIndex !== currentIndex) return;
-
-      outlineTile(note, x, CURRENT_COLOR);
-      if (holdProgress > 0) outlineTile(note, x, HOLD_COLOR, holdProgress);
+      drawTile(note, x, noteIndex === currentIndex, results?.get(noteIndex));
+      // How long the note's been held, as an outline going round it.
+      if (noteIndex === currentIndex && holdProgress > 0) outlineTile(note, x, HOLD_COLOR, holdProgress);
     });
   }
 
@@ -224,7 +226,14 @@ export function createHighway(onPick: (noteIndex: number, extend: boolean) => vo
   fitToScreen();
 
   return {
-    element: h("div", { className: "highway" }, canvas, scroller),
+    element,
+    // How large the lanes are drawn, and how wide they are on the page, for the waveform lined up under them.
+    get scale() {
+      return scale;
+    },
+    get width() {
+      return element.clientWidth;
+    },
     // The piece's bars, for its bar lines.
     setMeter(next: Meter) {
       meter = next;
