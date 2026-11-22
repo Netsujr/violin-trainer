@@ -103,11 +103,16 @@ export function planSection({ day, editable, pieces, practised, onChange, pickin
       item.classList.toggle("done", met);
     }
 
-    // The − stays while the target is being set, and goes 5 seconds after the last tap.
+    // The − stays while the target is being set, in the ✕'s place so a tap meant for it can't remove the piece, and
+    // goes 5 seconds after the last tap, bringing the ✕ back.
     function offerMinus() {
-      minus.hidden = targetOf(pieceId) === undefined;
+      showMinus(targetOf(pieceId) !== undefined);
       clearTimeout(hideMinus);
-      hideMinus = window.setTimeout(() => (minus.hidden = true), MINUS_SHOWN_MS);
+      hideMinus = window.setTimeout(() => showMinus(false), MINUS_SHOWN_MS);
+    }
+    function showMinus(on: boolean) {
+      minus.hidden = !on;
+      remove.hidden = on;
     }
 
     function change(by: 1 | -1) {

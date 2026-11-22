@@ -46,13 +46,13 @@ check("its bar fills to match", (await progress("D (Ré) major")) === "100%" && 
 check("the plan adds up its targets", (await page.locator(".plan-total").innerText()) === "20 of 30 min");
 check("a row a piece, with no − to begin with", (await page.locator(".plan-item").count()) === 3 && !(await minus("Hills and Dales").isVisible()));
 await piece("Twinkle").click();
-check("tapping a piece gives it a minute, and offers a −", (await target("Twinkle")) === "1 min" && (await minus("Twinkle").isVisible()));
+check("tapping a piece gives it a minute, and offers a − in the ✕'s place", (await target("Twinkle")) === "1 min" && (await minus("Twinkle").isVisible()) && (await cell("Twinkle").locator(".plan-remove").isHidden()));
 await piece("Twinkle").click(); await piece("Twinkle").click();
 check("each tap steps up: 2, then 3", (await target("Twinkle")) === "3 min");
 await minus("Twinkle").click();
 check("the − steps back down", (await target("Twinkle")) === "2 min" && (await page.locator(".plan-total").innerText()) === "20 of 32 min");
 await sleep(5300);
-check("the − goes 5 seconds after the last tap", !(await minus("Twinkle").isVisible()));
+check("the − goes 5 seconds after the last tap, and the ✕ comes back", !(await minus("Twinkle").isVisible()) && (await cell("Twinkle").locator(".plan-remove").isVisible()));
 // From 2 minutes: 3, 5, then fives from 10 to an hour, thirteen taps, and one more past it.
 for (let tap = 0; tap < 14; tap++) await piece("Twinkle").click();
 check("past an hour it goes back to no target", (await target("Twinkle")) === "");

@@ -233,7 +233,7 @@
    done and then blue. */
 .plan-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.25rem;
   align-items: center;
   margin: 0;
