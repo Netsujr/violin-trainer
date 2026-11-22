@@ -128,21 +128,6 @@ wav(OUT + "silence.wav", [rest(4)]);
   await s.close();
 }
 
-// Technique's count-in covers the screen, fading as it counts down, then goes.
-{
-  const s = await open(OUT + "a440.wav", undefined, { keepCountIn: true });
-  await seed(s.page, { settings: { listenMode: "technique", countInOn: true, countInBeats: 2, metronomeOn: false } });
-  await start(s.page);
-  const overlay = s.page.locator(".listen .countdown");
-  await overlay.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-  const box = await overlay.boundingBox();
-  check("the count-in covers the screen", box !== null && box.width >= 1000 && box.height >= 900, JSON.stringify(box));
-  await overlay.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-  check("and goes when the first note starts", await overlay.isHidden());
-  await stop(s.page);
-  await s.close();
-}
-
 // Fullscreen in Listen: no sidebar or settings panel, a bigger staff, and back again.
 {
   const s = await open(OUT + "a440.wav");
@@ -358,13 +343,6 @@ wav(OUT + "d4.wav", [note(62, 5)]);
   const kept = await savedSettings(s.page);
   check("each choice is kept", kept.bowString === "D" && kept.bowBeats === 8 && kept.bowNotes === 3 && kept.listenMode === "technique", JSON.stringify(kept));
   check("8 beats a note draws as whole notes", (await s.page.locator(".listen .staff .vf-stavenote").count()) >= 4);
-  // A pause before each note: only for a long bow, a rest after each note, and no beats to pick.
-  const pause = row.locator('button:text-is("Before each note")');
-  check("the pause switch is hidden with three notes to a bow", await pause.isHidden());
-  await row.locator('[aria-label="Notes per bow"] button:text-is("1")').click();
-  await pause.click();
-  const drawn = await s.page.locator(".listen .staff .vf-stavenote").count();
-  check("with it on, a rest comes between each of its six notes, and the beats are hidden", drawn === 11 && (await row.locator('[aria-label="Beats a note"]').isHidden()), `${drawn} drawn`);
   const wide = (await s.page.locator(".listen .staff").boundingBox()).width;
   await pickMode(s.page, "Note guesser");
   check("Technique's staff is as wide as the guesser's, filling its panel", wide === (await s.page.locator(".listen .staff").boundingBox()).width);
@@ -378,29 +356,29 @@ wav(OUT + "d4.wav", [note(62, 5)]);
   await s.close();
 }
 
-// Technique, a long bow: a count-in, then each note for its beats, with the pitch line through them, and how steady
-// it was at the end. A steady A440 is steady whatever the note.
-const techniqueRound = { listenMode: "technique", bpm: 120, countInBeats: 2, bowBeats: 2, toggles: { fingers: true, noteNames: false, letterNames: false } };
+// Technique, a long bow: nothing moves until the first note's heard in tune, then each note comes once the last has
+// been held in tune for its beats, with the pitch line through them, and how steady it was at the end. The A string's
+// notes, A, B, C sharp and D, each played a little longer than its two beats at 120 BPM.
+wav(OUT + "a-string.wav", [69, 71, 73, 74].map((midi) => ({ hz: 440 * 2 ** ((midi - 69) / 12), seconds: 1.5, wave: "sine" })));
+const techniqueRound = { listenMode: "technique", bpm: 120, bowBeats: 2, toggles: { fingers: true, noteNames: false, letterNames: false } };
 {
-  const s = await open(OUT + "a440.wav");
+  const s = await open(OUT + "a-string.wav");
   await seed(s.page, { settings: techniqueRound });
   const bows = (await s.page.locator(".listen .staff text[font-family=Bravura]").allTextContents()).map((mark) => ({ "\uE610": "down", "\uE612": "up" })[mark]);
   check("bows alternate down and up, each marked over its note", bows.join(" ") === "down up down up", bows.join(" "));
   check("the volume curve shows in Technique", await s.page.locator(".volume-curve").isVisible());
-  check("its pause switch and the label toggles are in the settings panel, with their words", (await s.page.locator('.dock button:text-is("Before each note")').isVisible()) && (await s.page.locator('.dock button:text-is("Fingers")').isVisible()));
+  check("the label toggles are in the settings panel, and there's no pause", (await s.page.locator('.dock button:text-is("Fingers")').isVisible()) && (await s.page.locator('.dock button:text-is("Before each note")').count()) === 0);
   await start(s.page);
-  const statusIs = (text) => s.page.waitForFunction((text) => document.querySelector(".technique-status").textContent.startsWith(text), text, { timeout: 4000 });
-  await statusIs("Starts in");
+  const statusIs = (text) => s.page.waitForFunction((text) => document.querySelector(".technique-status").textContent.startsWith(text), text, { timeout: 8000 });
   await statusIs("Note 1 of 4 · Down bow");
   await statusIs("Note 2 of 4 · Up bow");
-  check("a count-in, then each note in turn, down bow and up", true);
+  check("each note in turn, once the last is held, down bow and up", true);
   check("the pitch line runs through the notes", (await s.page.locator(".listen .pitch-trace polyline").count()) > 0);
-  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 6000 });
+  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 12000 });
   const chips = await s.page.locator(".stage-staff .info-chip").allInnerTexts();
-  check("a steady tone scores steady, and held throughout", /^Pitch ±[01] cents?$/.test(chips[0]) && /^Volume steady (9\d|100)%$/.test(chips[1]) && chips[2] === "Held 8/8 beats", chips.join(" | "));
-  check("a tone that never moves to the next note has no note changes to time", chips[3] === "Note changes not heard", chips.join(" | "));
+  check("a steady tone scores steady, with the time it took against its 4 s of beats", /^Pitch ±[01] cents?$/.test(chips[0]) && /^Volume steady (9\d|100)%$/.test(chips[1]) && /^Took \d+ s for 4 s of beats$/.test(chips[2]), chips.join(" | "));
   await s.page.waitForSelector('button:text-is("Start")', { timeout: 3000 });
-  check("the round ends the run, and the results stay", (await s.page.locator(".stage-staff .info-chip").count()) === 4);
+  check("the round ends the run, and the results stay", (await s.page.locator(".stage-staff .info-chip").count()) === 3);
   await s.page.screenshot({ path: OUT + "listen-technique.png" });
   await pickMode(s.page, "Free play");
   check("free play hides the volume curve, and the pitch line goes", (await s.page.locator(".volume-curve").isHidden()) && (await s.page.locator(".listen .pitch-trace polyline").count()) === 0);
@@ -410,29 +388,28 @@ const techniqueRound = { listenMode: "technique", bpm: 120, countInBeats: 2, bow
 {
   const s = await open(OUT + "silence.wav");
   await seed(s.page, { settings: techniqueRound });
-  await start(s.page);
-  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 9000 });
-  const chips = await s.page.locator(".stage-staff .info-chip").allInnerTexts();
-  check("a silent round says nothing was heard", chips.join() === "Nothing heard", chips.join(" | "));
+  await start(s.page); await sleep(3000);
+  check("a silent round waits on its first note", (await s.page.locator(".stage-staff .info-chip").count()) === 0 && (await s.page.locator(".technique-status").innerText()).startsWith("Note 1 of 4"));
+  await stop(s.page);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }
 
-// Technique, slurs: two notes to a bow, each bow marked at its first note with a slur over its notes. A steady A440 is
-// in tune only on its own note, and smooth. A tone that breaks off every second breaks every slur.
-wav(OUT + "broken.wav", Array.from({ length: 8 }, () => [{ hz: 440, seconds: 1, wave: "sine" }, rest(0.12)]).flat());
-for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2", "Held 8/8 beats"]], ["broken.wav", [null, "Smooth slurs 0/2"]]]) {
+// Technique, slurs: two notes to a bow, each bow marked at its first note with a slur over its notes. The A string's
+// notes played straight on are smooth; with a gap after each, every slur breaks.
+wav(OUT + "a-string-broken.wav", [69, 71, 73, 74].flatMap((midi) => [{ hz: 440 * 2 ** ((midi - 69) / 12), seconds: 1.5, wave: "sine" }, rest(0.12)]));
+for (const [file, expected] of [["a-string.wav", "Smooth slurs 2/2"], ["a-string-broken.wav", "Smooth slurs 0/2"]]) {
   const s = await open(OUT + file);
   await seed(s.page, { settings: { ...techniqueRound, bowNotes: 2 } });
-  if (file === "a440.wav") {
+  if (file === "a-string.wav") {
     const bows = (await s.page.locator(".listen .staff text[font-family=Bravura]").allTextContents()).map((mark) => ({ "\uE610": "down", "\uE612": "up" })[mark]);
     check("two notes to a bow: each bow marked once, at its first note", bows.join(" ") === "down up", bows.join(" "));
     check("with a slur over each bow's notes", (await s.page.locator(".listen .staff .vf-slur").count()) === 2);
   }
   await start(s.page);
-  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 9000 });
+  await s.page.waitForSelector(".stage-staff .info-chip", { timeout: 15000 });
   const chips = await s.page.locator(".stage-staff .info-chip").allInnerTexts();
-  check(`slurs from ${file}: ${expected.filter(Boolean).join(", ")}`, expected.every((chip, index) => chip === null || chips[index] === chip), chips.join(" | "));
+  check(`slurs from ${file}: ${expected}`, chips[0] === expected, chips.join(" | "));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

@@ -19,7 +19,7 @@ export const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
 // The least room a note in an open sheet's fullest line gets, so a narrow screen shrinks the sheet rather than crowd it.
 const BAR_NOTE_WIDTH = 40;
-// An open sheet has four bars to a line, however wide the page, unless it's filling its panel.
+// An open sheet has four bars to a line, however wide the page, or as few as fill its panel best.
 const BARS_PER_LINE = 4;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 3: "hd", 4: "w" };
 // How far a line's rows of fingers and names sit outside the staff and its notes, measured to the text's baseline.
@@ -265,13 +265,13 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     return onLine.reduce((nearest, index) => (distance(index) < distance(nearest) ? index : nearest));
   }
 
-  // How many whole bars to a line draw the open sheet largest in its box, and how large, extra being the room above and
-  // below the lines. Never part of a bar on one line and the rest on the next.
+  // How many bars to a line, one to four, draw the open sheet largest in its box, and how large, extra being the room
+  // above and below the lines. A bar is never split across two lines.
   function fillBox(notes: StaffNote[], extra: number) {
     const { clientWidth, clientHeight } = element;
     if (!clientWidth || !clientHeight) return null;
     let best = { perLine: BARS_PER_LINE, scale: 0 };
-    for (let perLine = 1; perLine <= toBars(notes, meter).length; perLine++) {
+    for (let perLine = 1; perLine <= Math.min(BARS_PER_LINE, toBars(notes, meter).length); perLine++) {
       const lines = layOut(notes, meter, perLine);
       const scale = Math.min(clientWidth / lineWidth(lines), clientHeight / (extra + lines.length * LINE_HEIGHT));
       if (scale > best.scale) best = { perLine, scale };
@@ -467,8 +467,6 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       else placeGhost(point.x, point.y, cents, inTune);
     },
     clearTrace: () => trace.clear(),
-    // Picks out the pitch line from one beat to another, as where a note sounded when it shouldn't have.
-    markTrace: (from: number, to: number) => trace.mark(from, to),
     // The piece's bars, for where they fall.
     setMeter(next: Meter) {
       meter = next;

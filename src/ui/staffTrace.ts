@@ -15,17 +15,6 @@ export function createTrace(place: Place) {
   let recent: number[] = [];
   let group: SVGGElement | null = null;
   let segment: { line: SVGPolylineElement; sheetLine: number } | null = null;
-  // Stretches of beats picked out under the line, as a highlighter would.
-  let marks: [from: number, to: number][] = [];
-
-  function drawMark([from, to]: [number, number]) {
-    const points = readings.flatMap((reading) => (reading && reading.beat >= from && reading.beat <= to ? (place(reading.beat, reading.frequency) ?? []) : []));
-    if (!group || points.length < 2) return;
-    const mark = document.createElementNS(SVG, "polyline");
-    mark.classList.add("mark");
-    mark.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
-    group.prepend(mark);
-  }
 
   function draw(reading: Reading | null) {
     const point = group && reading && place(reading.beat, reading.frequency);
@@ -63,17 +52,10 @@ export function createTrace(place: Place) {
       svg.append(group);
       segment = null;
       readings.forEach(draw);
-      marks.forEach(drawMark);
-    },
-    // Picks out the line from one beat to another.
-    mark(from: number, to: number) {
-      marks.push([from, to]);
-      drawMark([from, to]);
     },
     clear() {
       readings = [];
       recent = [];
-      marks = [];
       segment = null;
       group?.replaceChildren();
     },

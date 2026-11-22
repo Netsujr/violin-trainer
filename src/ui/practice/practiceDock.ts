@@ -64,7 +64,7 @@ export function createPracticeDock({ stopRun, render, loadPiece, changed, arrang
     panelButton("board", t.fingerboard, panels, panelsChanged),
     tuner,
   );
-  const paceHint = h("p", { className: "dock-caption" });
+  const paceHint = h("p", { className: "dock-caption", textContent: t.waitHint });
   const pace = dockOption(t.pace, pair("followOn", t.pace, [t.waitForMe, t.keepMoving], changed, true), paceHint);
   const topNote = dockOption(t.topNote, pair("repeatTopOn", t.topNote, [t.once, t.twice], loadPiece, true));
   const pattern = dockOption(
@@ -77,10 +77,6 @@ export function createPracticeDock({ stopRun, render, loadPiece, changed, arrang
     }),
   );
   const countIn = dockOption(t.countIn, createCountInStepper(render));
-  const glide = dockOption(t.tempo, wordToggle(t.glide, settings.tempoOn, (on) => {
-    settings.tempoOn = on;
-    saveSettings();
-  }), h("p", { className: "dock-caption" }, t.glideHint));
   const track = dockOption(t.backingTrack, trackSwitches);
 
   return {
@@ -96,15 +92,15 @@ export function createPracticeDock({ stopRun, render, loadPiece, changed, arrang
       dockOption(t.repeat, pair("loopOn", t.repeat, [t.once, t.loop], changed)),
       topNote,
       countIn,
-      glide,
       track,
     ),
-    // A backing track sets the pace, so there's no Pace, Glide or count-in with one; with Keep moving, no Glide or
-    // count-in either, as nothing waits. The top note and the patterns are for scales.
+    // A backing track sets the pace, so there's no Pace or count-in with one; with Keep moving, no count-in either, as
+    // nothing waits. The top note and the patterns are for scales.
     show(scale: boolean, trackActive: boolean) {
-      paceHint.textContent = settings.followOn ? t.paceHints.move : t.paceHints.wait;
+      // Waiting says what it does; Keep moving speaks for itself.
+      paceHint.hidden = settings.followOn;
       pace.hidden = trackActive;
-      glide.hidden = countIn.hidden = trackActive || settings.followOn;
+      countIn.hidden = trackActive || settings.followOn;
       topNote.hidden = pattern.hidden = !scale;
       track.hidden = trackSwitches.hidden;
     },

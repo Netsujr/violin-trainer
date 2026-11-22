@@ -1,6 +1,6 @@
 // Selecting a section with click, then Shift+click, on the lanes or the staff: what it shows, and what plays.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece, setLanguage, laneScale, setGlide, setPace, pickMode, setChoice } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece, setLanguage, laneScale, setPace, pickMode, setChoice } from "./lib.mjs";
 
 const BEAT = 120, HIT_X = 130, LANE = 84;
 wav(OUT + "section-silent.wav", [rest(3)]);
@@ -137,14 +137,12 @@ await setPace(page, "Wait for me"); await sleep(100);
 
 // Tempo
 await freshPractice(page);
-await setGlide(page, true);
 await clickTile(0); await clickTile(2, true);
 await followNotes(page, { midis: D, delayMs: 150 });
 await begin(page);
 await waitForText(page, "All 3 notes done"); await sleep(150);
 check("Tempo stops at the section's end too, with no glide past it", (await stats()).includes("3 hit") && Math.abs((await scrollLeft()) - 2 * BEAT * (await laneScale(page))) <= 2, String(await scrollLeft()));
 await stop(page); await sleep(200);
-await setGlide(page, false);
 
 // The staff
 await freshPractice(page);

@@ -217,6 +217,12 @@ header .nav-item .icon svg,
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
+  box-shadow: none;
+}
+
+.sub-item:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: -3px;
 }
 
 .sub-item {

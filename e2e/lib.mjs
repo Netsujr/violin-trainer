@@ -162,11 +162,6 @@ export async function clickLanes(page, x, y, scrolled = 0) {
 }
 // How large the lanes are drawn, as against their own units: beats are 120 units wide.
 export const laneScale = async (page) => (await page.locator(".highway canvas").boundingBox()).height / (84 * 4);
-// Glide on or off, in the settings panel.
-export async function setGlide(page, on) {
-  const button = page.locator('.dock button:text-is("Glide")');
-  if ((await button.getAttribute("aria-pressed")) !== String(on)) await button.click();
-}
 // A choice of two in the settings panel, like Pace, one button saying which is picked, found by its group's name.
 export const flip = (page, group) => page.locator(`.dock button[aria-label^="${group}: "]`);
 // Picks one of a choice's two, by its words, pressing the button only if it says the other.

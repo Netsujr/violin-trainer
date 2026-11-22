@@ -185,7 +185,7 @@ main:has(> .fills-window) {
   font-size: 0.875rem;
 }
 
-/* A switch on its own in the settings panel, like Glide: outlined, lit brass when on. */
+/* A switch on its own in the settings panel, like the tuner's: outlined, lit brass when on. */
 .dock-option > button[aria-pressed] {
   min-height: 2.25rem;
   margin: 0;

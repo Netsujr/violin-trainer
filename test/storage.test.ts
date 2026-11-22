@@ -120,7 +120,7 @@ describe("saved pieces", () => {
 describe("settings", () => {
   it("starts with sensible defaults", async () => {
     const { getSettings } = await settingsWith(null);
-    expect(getSettings()).toMatchObject({ toleranceCents: 40, holdMs: 200, tempoOn: false, metronomeOn: false, bpm: 60, pattern: 0, staffOpen: false, sidebarIcons: false });
+    expect(getSettings()).toMatchObject({ toleranceCents: 40, holdMs: 200, metronomeOn: false, bpm: 60, pattern: 0, staffOpen: false, sidebarIcons: false });
     expect(getSettings().countInOn).toBe(true);
     expect(getSettings().toggles).toMatchObject({ fingers: true, noteNames: true, letterNames: true });
   });

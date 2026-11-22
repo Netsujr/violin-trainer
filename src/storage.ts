@@ -14,7 +14,6 @@ export type Settings = {
   toleranceCents: number;
   holdMs: number;
   minRms: number;
-  tempoOn: boolean;
   followOn: boolean;
   loopOn: boolean;
   repeatTopOn: boolean;
@@ -25,7 +24,7 @@ export type Settings = {
   pattern: number;
   // The staff panel's whole sheet, rather than one line moving with the lanes.
   staffOpen: boolean;
-  // In full screen, the whole sheet fills the panel, as many bars to a line as draws it largest, rather than four.
+  // In full screen, the whole sheet fills the panel, with one to four bars to a line, whichever draws it largest.
   sheetFill: boolean;
   // Practice's panels: the lanes, staff and fingerboard each big, small or off, and the tuner on or off.
   practicePanels: { lanes: PanelSize; staff: PanelSize; board: PanelSize; tuner: boolean };
@@ -52,7 +51,6 @@ export type Settings = {
   bowString: StringName;
   bowBeats: number;
   // Technique: a long bow's notes each one beat with a beat's pause before the next, to place the finger before bowing.
-  bowPause: boolean;
   // Listen's panels: the staff and fingerboard each big, small or off, and the tuner on or off.
   listenPanels: { staff: PanelSize; board: PanelSize; tuner: boolean };
   // Tapes on the fingerboard.
@@ -83,7 +81,6 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   toleranceCents: 40,
   holdMs: 200,
   minRms: 0.01,
-  tempoOn: false,
   followOn: false,
   loopOn: false,
   repeatTopOn: false,
@@ -107,7 +104,6 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bowNotes: 1,
   bowString: "A",
   bowBeats: 4,
-  bowPause: false,
   listenPanels: { staff: "big", board: "small", tuner: true },
   fingerboardTapes: true,
 };
@@ -143,7 +139,7 @@ export function getSettings() {
       ...((stored as { yellowOn?: boolean }).yellowOn === false && { toleranceCents: stored.greenCents ?? DEFAULT_SETTINGS.greenCents }),
     };
     // Settings that are gone, the views panels replaced, the drawer today's plan was and switches since removed, aren't kept.
-    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen", "yellowOn", "listenReferenceOn"]) delete (settings as Record<string, unknown>)[old];
+    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen", "yellowOn", "listenReferenceOn", "bowPause", "tempoOn"]) delete (settings as Record<string, unknown>)[old];
   }
   return settings;
 }

@@ -38,7 +38,6 @@ const stopRun = async () => { if (await button("Stop").count()) await press(butt
 // Options are always shown now, above the lanes.
 const options = async () => {};
 // A choice in the settings panel, by its group and its words.
-const setGlide = async (on) => { const glide = page.locator('.dock button:text-is("Glide")'); if ((await glide.getAttribute("aria-pressed")) !== String(on)) await press(glide); await sleep(100); };
 // Practice at a speed, through Options, which starts closed on a phone.
 const practiceAt = async (bpm) => {
   await freshPractice(page);
@@ -133,7 +132,7 @@ check("Practice says so too", (await page.locator(".warning").first().innerText(
 
 flow("4. Practice: a whole scale, waiting for each note");
 await freshPractice(page);
-check("Glide and the count-in are in the settings panel", (await page.locator('.dock button:text-is("Glide")').isVisible()) && (await page.locator(".dock .count-in").isVisible()));
+check("the count-in is in the settings panel", await page.locator(".dock .count-in").isVisible());
 await auditCheck(page, "Practice");
 await shot("4-practice");
 await options();
@@ -174,7 +173,6 @@ check("and turns off", (await page.locator(".reference").getAttribute("aria-pres
 
 flow("6. Tempo and the metronome");
 await practiceAt(90);
-await setGlide(true);
 await press(page.locator('header .metronome-button')); await sleep(100);
 await followNotes(page, { midis: D, delayMs: 120 });
 await spyOnSounds();
@@ -185,14 +183,12 @@ const clicks = (await sounds()).filter((sound) => sound.hz >= 2500);
 check("the run finishes on the beat", (await laneScore(page)).includes("15 hit"), await laneScore(page));
 check("the metronome clicks, audio running", clicks.length >= 10 && clicks.every((click) => click.state === "running") && clicks.some((click) => click.hz === 3200), `${clicks.length} clicks, ${clicks.at(-1)?.state}`);
 await stopRun();
-await setGlide(false);
 await press(page.locator('header .metronome-button')); await sleep(100);
 
 flow("7. Keep moving");
 await practiceAt(120);
 await setChoice(page, "Pace", "Keep moving"); await sleep(300);
 check("Keep moving is picked", (await flip(page, "Pace").innerText()) === "Keep moving");
-check("Glide no longer applies, so it's hidden", await page.locator('.dock button:text-is("Glide")').isHidden());
 await followNotes(page, { midis: D, delays: { 3: 60000 } });
 await startRun();
 await waitForText(page, "Note 3 of 15");

@@ -12,7 +12,6 @@ const { page } = s;
 const dontWait = () => choiceOf(page, "Pace", "Keep moving");
 const waitForMe = () => choiceOf(page, "Pace", "Wait for me");
 const waiting = async () => !(await dontWait().picked());
-const glideShown = () => page.locator('.dock button:text-is("Glide")').isVisible();
 // Once a frame, from inside the page: the lanes' position and the text above them.
 const watch = () => page.evaluate(() => {
   window.frames_ = [];
@@ -25,9 +24,8 @@ await nav(page, "Practice"); await sleep(250);
 BEAT_PX = 120 * (await laneScale(page));
 check("off by default: Pace starts on Wait for me", (await waiting()) && (await savedSettings(page)).followOn === false && (await waitForMe().picked()));
 await dontWait().click(); await sleep(300);
-const hint = await page.locator('.dock-option:has(button[aria-label^="Pace: "]) .dock-caption').innerText();
-check("Keep moving is picked, and explains itself", !(await waiting()) && hint.includes("score"), hint);
-check("saved, and Glide no longer applies", (await savedSettings(page)).followOn === true && !(await glideShown()));
+check("Keep moving is picked, with no line under it", !(await waiting()) && (await page.locator('.dock-option:has(button[aria-label^="Pace: "]) .dock-caption').isHidden()));
+check("saved", (await savedSettings(page)).followOn === true);
 
 // Silence: the lanes wait on the first note, with no count-in
 await freshPractice(page, 120);
@@ -125,7 +123,7 @@ check("a BPM change applies straight away", Math.abs(slowSpeed - BEAT_PX) < 8, `
 await setBpm(page, 120);
 const before = (await savedLog(page)).length;
 await waitForMe().click(); await sleep(300);
-check("switching back to Wait for me ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await savedLog(page)).length === before + 1 && (await glideShown()));
+check("switching back to Wait for me ends the run and logs it", (await page.locator('button:text-is("Start")').count()) === 1 && (await savedLog(page)).length === before + 1);
 check("back to waiting, on the first note", (await progress(page)) === "Note 1 of 15", await progress(page));
 await freshPractice(page, 120); // Ends the synthetic player, which would play the first note again.
 await begin(page); await sleep(3200); // Past the count-in.

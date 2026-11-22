@@ -1,6 +1,5 @@
 import type { createJudge } from "../../practice/judge";
 import type { Session } from "../../practice/session";
-import { getSettings } from "../../storage";
 import type { createStaff } from "../staff";
 import type { createTempoGlide } from "./tempoGlide";
 
@@ -17,9 +16,8 @@ type Deps = {
   moveOn: (session: Session, previousMidi?: number) => void;
 };
 
-// The usual run: each note waits until it's played in tune for its hold time. With tempo on, a hit glides on to the next beat.
+// The usual run: each note waits until it's played in tune for its hold time, then the lanes glide on to the next beat.
 export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdMs, showProgress, moveOn }: Deps) {
-  const settings = getSettings();
 
   // A hit that waited for its beat lands on it.
   function arriveOnBeat(session: Session, { cents, at, arrivesAt }: { cents: number; at: number; arrivesAt: number }) {
@@ -39,7 +37,7 @@ export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdM
       staff.showPlayed(session.index, verdict.cents, verdict.inTune);
       session.heard(verdict.cents);
       if (verdict.hit && !glide.pending) {
-        if (settings.tempoOn && session.index < endIndex() - 1) {
+        if (session.index < endIndex() - 1) {
           glide.glide(session, verdict.averageCents, now, holdMs());
         } else {
           const previousMidi = session.currentMidi;

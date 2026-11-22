@@ -6,7 +6,7 @@ import { deleteRecording, getRecording, getSettings, type Recording, type Record
 import { planSection } from "./calendarPlan";
 import { confirmAction } from "./confirm";
 import { h } from "./dom";
-import { EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON } from "./toggles";
+import { CHART_ICON, EXPAND_ICON, LANES_ICON, NOTE_ICON, SHEET_ICON, STAFF_ICON } from "./toggles";
 import { waveformPlayer } from "./waveform";
 
 // A bit of what was practised, as a small rounded chip.
@@ -95,11 +95,29 @@ type Options = {
 };
 
 // The day picked, beside the month: its date and how much of its plan is done, the plan, with its tools, then what was
-// practised, each piece with its minutes, runs and recordings. Today and later days can be planned.
+// practised, each piece with its minutes and recordings, and its runs under the chart button by the day's total.
+// Today and later days can be planned.
 export function createDayPanel({ entries, pieces, urls, onChange, onPaste }: Options) {
   const settings = getSettings();
   const element = h("section", { className: "day-details" });
   const title = (pieceId: string, fallback = pieceId) => localTitle(pieceId, pieces.find((candidate) => candidate.id === pieceId)?.title ?? fallback);
+  // Each piece's runs in full, or just its minutes, kept from day to day.
+  let detailed = false;
+  const detailsButton = h("button", {
+    type: "button",
+    className: "day-details-toggle",
+    innerHTML: CHART_ICON,
+    title: t.fullDetails,
+    ariaLabel: t.fullDetails,
+    onclick() {
+      detailed = !detailed;
+      showDetails();
+    },
+  });
+  function showDetails() {
+    detailsButton.ariaPressed = String(detailed);
+    element.querySelectorAll<HTMLElement>(".day-piece ul").forEach((runs) => (runs.hidden = !detailed));
+  }
 
   function render(selected: string, today: string, picking: boolean) {
     const date = new Date(`${selected}T12:00`);
@@ -121,8 +139,9 @@ export function createDayPanel({ entries, pieces, urls, onChange, onPaste }: Opt
     element.replaceChildren(
       h("div", {}, h("h2", { className: "day-title" }, date.toLocaleDateString(t.locale, { weekday: "long", day: "numeric", month: "long" })), ...(done ? [h("p", { className: "day-summary" }, t.planDoneOf(done.met, plan.length))] : [])),
       h("div", { className: "day-plan" }, h("p", { className: "panel-heading" }, t.plan, " ", planned.total), ...planned.list, h("div", { className: "plan-add" }, ...planned.tools)),
-      h("div", {}, h("p", { className: "panel-heading day-total" }, total > 0 ? t.practisedFor(localNumber(total, 1)) : selected > today ? t.notYet : t.nothingPractised), ...pieceBlocks),
+      h("div", {}, h("p", { className: "panel-heading day-total" }, total > 0 ? t.practisedFor(localNumber(total, 1)) : selected > today ? t.notYet : t.nothingPractised, ...(total > 0 ? [detailsButton] : [])), ...pieceBlocks),
     );
+    showDetails();
   }
 
   // A little note by the piece for each recorded run, showing it under the title, or hiding it again.

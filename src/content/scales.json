@@ -50,14 +50,14 @@
   },
   {
     "id": "g-major-2oct",
-    "title": "G (Sol) major (2 octaves)",
+    "title": "G (Sol) major (2oct)",
     "subtitle": "Two octaves · all four strings",
     "source": "built-in",
     "notes": [{ "pitch": "G3" }, { "pitch": "A3" }, { "pitch": "B3" }, { "pitch": "C4" }, { "pitch": "D4" }, { "pitch": "E4" }, { "pitch": "F#4" }, { "pitch": "G4" }, { "pitch": "A4" }, { "pitch": "B4" }, { "pitch": "C5" }, { "pitch": "D5" }, { "pitch": "E5" }, { "pitch": "F#5" }, { "pitch": "G5" }]
   },
   {
     "id": "a-major-2oct",
-    "title": "A (Lá) major (2 octaves)",
+    "title": "A (Lá) major (2oct)",
     "subtitle": "Two octaves · all four strings",
     "source": "built-in",
     "notes": [{ "pitch": "A3" }, { "pitch": "B3" }, { "pitch": "C#4" }, { "pitch": "D4" }, { "pitch": "E4" }, { "pitch": "F#4" }, { "pitch": "G#4" }, { "pitch": "A4" }, { "pitch": "B4" }, { "pitch": "C#5" }, { "pitch": "D5" }, { "pitch": "E5" }, { "pitch": "F#5" }, { "pitch": "G#5" }, { "pitch": "A5" }]
@@ -113,7 +113,7 @@
   },
   {
     "id": "g-minor-2oct",
-    "title": "G (Sol) minor (2 octaves)",
+    "title": "G (Sol) minor (2oct)",
     "subtitle": "Two octaves · all four strings",
     "source": "built-in",
     "notes": [{ "pitch": "G3" }, { "pitch": "A3" }, { "pitch": "Bb3" }, { "pitch": "C4" }, { "pitch": "D4" }, { "pitch": "Eb4" }, { "pitch": "F4" }, { "pitch": "G4" }, { "pitch": "A4" }, { "pitch": "Bb4" }, { "pitch": "C5" }, { "pitch": "D5" }, { "pitch": "Eb5" }, { "pitch": "F5" }, { "pitch": "G5" }]

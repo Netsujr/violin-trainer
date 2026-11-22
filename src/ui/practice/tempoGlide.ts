@@ -10,7 +10,7 @@ const MIN_GLIDE_BEATS = 0.1;
 
 type Hit = { cents: number; at: number; arrivesAt: number };
 
-// With tempo on, a hit waits for the next beat while the timeline glides there.
+// A hit waits for the next beat while the timeline glides there.
 // A hit lands one hold time after the bow starts, so the first note's start sets the beat, not its hit.
 export function createTempoGlide(
   metronome: ReturnType<typeof createMetronome>,

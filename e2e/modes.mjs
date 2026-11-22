@@ -96,7 +96,7 @@ await freshPractice(page, 120);
 // A count-in set doesn't apply with Keep moving, which hides it, so it's set first.
 await setCountIn(page, 4);
 await loop().click(); await dontWait().click(); await sleep(200);
-check("Keep moving says what it does, and hides the count-in and Glide, which don't apply", (await page.locator(".count-in").isHidden()) && (await page.locator('.dock button:text-is("Glide")').isHidden()) && (await paceHint()) === "Follow along and get a score at the end", await paceHint());
+check("Keep moving has no line under it, and hides the count-in, which doesn't apply", (await page.locator(".count-in").isHidden()) && (await page.locator('.dock-option:has(button[aria-label^="Pace: "]) .dock-caption').isHidden()));
 await followNotes(page, { midis: D });
 await begin(page);
 await waitForText(page, "last 100%");

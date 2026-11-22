@@ -41,7 +41,7 @@ check("with how much of its plan is done", (await page.locator(".day-summary").i
 check("the plan has +, Copy plan and Clear plan under it", (await toolsShown()) === "Add a piece to the plan,Copy plan,Clear plan", await toolsShown());
 
 // Targets and progress
-check("each planned piece shows how far it's got against its target", (await target("D (Ré) major")) === "Done, 10 min" && (await target("Hills and Dales")) === "20 min" && (await target("Twinkle")) === "", `${await target("D (Ré) major")} | ${await target("Hills and Dales")}`);
+check("each planned piece shows its target, done or not, the bar showing how far it's got", (await target("D (Ré) major")) === "10 min" && (await target("Hills and Dales")) === "20 min" && (await target("Twinkle")) === "", `${await target("D (Ré) major")} | ${await target("Hills and Dales")}`);
 check("its bar fills to match", (await progress("D (Ré) major")) === "100%" && (await progress("Hills and Dales")) === "50%" && (await progress("Twinkle")) === "0%", `${await progress("D (Ré) major")} ${await progress("Hills and Dales")} ${await progress("Twinkle")}`);
 check("the plan adds up its targets", (await page.locator(".plan-total").innerText()) === "20 of 30 min");
 check("a row a piece, with no − to begin with", (await page.locator(".plan-item").count()) === 3 && !(await minus("Hills and Dales").isVisible()));
@@ -60,7 +60,9 @@ await piece("Twinkle").click(); await piece("Twinkle").click();
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("settings")));
 check("targets are saved, and remembered for the piece", saved.planTargets[Object.keys(saved.plan)[0]]["twinkle-twinkle"] === 2 && saved.lastTargets["twinkle-twinkle"] === 2, JSON.stringify(saved.planTargets));
 
-// What was practised, added up
+// What was practised: each piece's minutes, and its runs in full under the chart button by the day's total.
+check("each piece shows just its minutes at first", (await page.locator(".day-piece", { hasText: "Hills and Dales" }).locator("li").isHidden()) && (await page.locator(".day-piece", { hasText: "Hills and Dales" }).locator(".day-piece-title .info-chip").innerText()) === "10.0 min");
+await page.click('.day-total button[aria-label="Full details"]'); await sleep(100);
 const hills = (await page.locator(".day-piece", { hasText: "Hills and Dales" }).locator("li .info-chip").allInnerTexts()).join(" · ");
 check("a piece's runs are summed into one line of chips", hills.startsWith("2 runs, 10.0 min · Score: 60% · 60 hit, 40 missed"), hills);
 

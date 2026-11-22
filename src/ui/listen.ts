@@ -229,7 +229,7 @@ export function listenScreen(goProgress: () => void): Screen {
     guesser: guesser.options,
     technique: technique.options,
   });
-  const stage = createListenStage([staff.element, target.speaker, guesser.banner, technique.status, technique.results, technique.overlay], board.element, [volume.element, tunerFull]);
+  const stage = createListenStage([staff.element, target.speaker, guesser.banner, technique.status, technique.results], board.element, [volume.element, tunerFull]);
   const element = h(
     "section",
     { className: "listen fills-window" },

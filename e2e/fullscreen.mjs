@@ -21,7 +21,7 @@ for (const shown of ['button:text-is("Start")', ".reference", 'button[aria-label
 check("Record and the metronome stay, in the title row", (await page.locator('.title-tools button[aria-label="Record"]').isVisible()) && (await page.locator(".title-tools .metronome-button").isVisible()));
 check("the lanes grow into the sidebar's room", (await canvasWidth()) > before, `${before} > ${await canvasWidth()}`);
 check("the staff keeps the whole sheet, as chosen", (await page.locator(".staff.collapsed").count()) === 0 && (await savedSettings(page)).staffOpen === true);
-// The whole sheet fills its panel, in whole bars to a line, or keeps four bars to a line.
+// The whole sheet fills its panel, with one to four bars to a line, or keeps four.
 const sheet = () => page.locator(".staff-panel .staff svg").evaluate((svg) => ({ height: Math.round(svg.getBoundingClientRect().height), lines: new Set([...svg.querySelectorAll(".vf-stave")].map((stave) => Math.round(stave.getBoundingClientRect().top))).size }));
 const filled = await sheet();
 await page.click('.sheet-fill:text-is("Fill the screen")'); await sleep(300);

@@ -20,16 +20,11 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   // The run's choices, in the settings panel docked under the panels, each in words
   const dock = page.locator(".dock");
   const text = await dock.innerText();
-  check("the settings panel holds the run's choices, with record and the metronome in the sidebar", ["On the notes", "On screen", "Pace", "Repeat", "Top note", "Pattern", "Count-in", "Glide"].every((word) => text.includes(word)) && !["Record", "Metronome"].some((word) => text.includes(word)), text.replaceAll("\n", " ").slice(0, 160));
+  check("the settings panel holds the run's choices, with record and the metronome in the sidebar", ["On the notes", "On screen", "Pace", "Repeat", "Top note", "Pattern", "Count-in"].every((word) => text.includes(word)) && !["Record", "Metronome"].some((word) => text.includes(word)), text.replaceAll("\n", " ").slice(0, 160));
   const record = await page.locator('header button[aria-label="Record"]').boundingBox(), metronome = await page.locator("header .metronome-button").boundingBox();
   check("the sidebar has record just above the metronome", record.y + record.height <= metronome.y + 1 && Math.abs(record.x - metronome.x) < 2);
   check("named with its BPM", /^Metronome \d+$/.test(await page.locator("header .metronome-button").innerText()));
   check("Start is in the title row, the lanes have no bar of their own", (await page.locator('.title-row button:text-is("Start")').count()) === 1 && (await page.locator(".section-bar").count()) === 0);
-  const glide = dock.locator('button:text-is("Glide")');
-  check("options: Glide starts off", (await glide.getAttribute("aria-pressed")) === "false");
-  await glide.click();
-  check("options: and switches on, saved", (await glide.getAttribute("aria-pressed")) === "true" && (await page.evaluate(() => JSON.parse(localStorage.getItem("settings")).tempoOn)) === true);
-  await glide.click();
 
   // The panels
   const arrow = await page.evaluate(() => { const panel = document.querySelector(".staff-panel").getBoundingClientRect(), button = document.querySelector(".staff-toggle").getBoundingClientRect(); return { left: Math.round(button.left - panel.left), bottom: Math.round(panel.bottom - button.bottom) }; });

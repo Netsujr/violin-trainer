@@ -1,7 +1,7 @@
 // Every screen and the main flows on phone and tablet sizes, by touch, plus small computer windows.
 // This is Chrome emulating those sizes: it checks layout and touch handling, not Safari or a real device's mic.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, staffNotes, setGlide, cardOf } from "./lib.mjs";
+import { laneScore, open, nav, sleep, check, followNotes, progress, audit, auditCheck, D_MAJOR as D, OUT, staffNotes, cardOf } from "./lib.mjs";
 
 const SIZES = [
   ["small phone", 320, 568, true],
@@ -122,7 +122,6 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   await page.waitForSelector('button:text-is("Start"):not([disabled])'); // A finished run ends by itself.
 
   // Tempo with the metronome, and a pattern
-  await setGlide(page, true);
   await page.locator('header .metronome-button').click();
   await go('.dock [aria-label="Pattern"] button:text-is("4")'); await sleep(200);
   await auditCheck(page, `${tag} Tempo and pattern`);
@@ -136,7 +135,6 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
     check(`${tag}: Tempo and metronome run through`, true);
   } catch { check(`${tag}: Tempo and metronome run through`, false, await progress(page)); }
   await go('button:text-is("Stop")'); await sleep(200);
-  await setGlide(page, false);
   await page.locator('header .metronome-button').click();
 
   // Turning the device mid-scale

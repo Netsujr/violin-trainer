@@ -60,7 +60,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const endIndex = () => ((spotRun ?? selection.section)?.last ?? piece.notes.length - 1) + 1;
   // A finished section stays on its last note, rather than moving on to the one after it.
   const shownIndex = () => doneAt ?? (controls.session?.finished && selection.section ? endIndex() - 1 : currentIndex());
-  const holdMs = () => holdMsFor(piece.notes[currentIndex()]?.beats, settings.tempoOn && currentIndex() < endIndex() - 1);
+  const holdMs = () => holdMsFor(piece.notes[currentIndex()]?.beats, currentIndex() < endIndex() - 1);
   const withLoopNumber = (text: string) => (loopCount > 1 ? `${text} · ${t.loopNumber(loopCount, lastScore)}` : text);
 
   const judge = createJudge({ get toleranceCents() { return passCents(); }, get holdMs() { return holdMs(); } });

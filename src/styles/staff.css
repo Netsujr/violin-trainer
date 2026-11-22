@@ -60,9 +60,3 @@
   opacity: 0.85;
 }
 
-/* Where a note sounded when it shouldn't have, as Technique's finger timing finds: a highlighter under the line. */
-.pitch-trace polyline.mark {
-  stroke: var(--brass);
-  stroke-width: 10;
-  opacity: 0.45;
-}

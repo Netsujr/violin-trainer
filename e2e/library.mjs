@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveStaff, staffNotes, showGroup, setBpm, setLanguage, openTuning, setGlide, cardOf } from "./lib.mjs";
+import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveStaff, staffNotes, showGroup, setBpm, setLanguage, openTuning, cardOf } from "./lib.mjs";
 
 const profile = OUT + "profile";
 rmSync(profile, { recursive: true, force: true });
@@ -169,7 +169,6 @@ await s.close();
     await nav(page, "Library"); await sleep(150);
     await (await cardOf(page, title)).locator('button:text-is("Practise")').click(); await sleep(300);
     await setBpm(page, tempo ? 90 : 120);
-    if (tempo) await setGlide(page, true);
     await followNotes(page, { midis, delayMs: 150 });
     await start(page); await page.waitForSelector('button:text-is("Stop")');
     await page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 60000 }).catch(() => {});
@@ -180,8 +179,7 @@ await s.close();
   const buns = await play("Hot Cross Buns", [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62]);
   check("Hot Cross Buns plays through, with its repeated notes", buns.includes("17 hit"), buns.replaceAll("\n", " / "));
   const mary = await play("Mary Had a Little Lamb", [66, 64, 62, 64, 66, 66, 66, 64, 64, 64, 66, 69, 69, 66, 64, 62, 64, 66, 66, 66, 66, 64, 64, 66, 64, 62], true);
-  check("Mary plays through with Tempo on", mary.includes("26 hit"), mary.replaceAll("\n", " / "));
-  await setGlide(page, false);
+  check("Mary plays through, gliding on the beat", mary.includes("26 hit"), mary.replaceAll("\n", " / "));
 
   await setLanguage(page, "PT");
   await page.locator("header > nav > button").nth(2).click(); await sleep(200);
