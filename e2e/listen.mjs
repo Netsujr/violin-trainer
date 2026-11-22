@@ -367,7 +367,7 @@ const techniqueRound = { listenMode: "technique", bpm: 120, bowBeats: 2, toggles
   const bows = (await s.page.locator(".listen .staff text[font-family=Bravura]").allTextContents()).map((mark) => ({ "\uE610": "down", "\uE612": "up" })[mark]);
   check("bows alternate down and up, each marked over its note", bows.join(" ") === "down up down up", bows.join(" "));
   check("the volume curve shows in Technique", await s.page.locator(".volume-curve").isVisible());
-  check("the label toggles are in the settings panel, and there's no pause", (await s.page.locator('.dock button:text-is("Fingers")').isVisible()) && (await s.page.locator('.dock button:text-is("Before each note")').count()) === 0);
+  check("the label toggles are in the settings panel", await s.page.locator('.dock button:text-is("Fingers")').isVisible());
   await start(s.page);
   const statusIs = (text) => s.page.waitForFunction((text) => document.querySelector(".technique-status").textContent.startsWith(text), text, { timeout: 8000 });
   await statusIs("Note 1 of 4 · Down bow");

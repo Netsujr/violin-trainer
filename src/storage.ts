@@ -24,9 +24,6 @@ export type Settings = {
   pattern: number;
   // The staff panel's whole sheet, rather than one line moving with the lanes.
   staffOpen: boolean;
-  // In full screen, the whole sheet is drawn as large as fits, with one to four bars to a line, whichever draws it
-  // largest, rather than always four.
-  sheetFill: boolean;
   // Practice's panels: the lanes, staff and fingerboard each big, small or off, and the tuner on or off.
   practicePanels: { lanes: PanelSize; staff: PanelSize; board: PanelSize; tuner: boolean };
   toggles: { fingers: boolean; noteNames: boolean; letterNames: boolean };
@@ -91,7 +88,6 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   bpm: 60,
   pattern: 0,
   staffOpen: false,
-  sheetFill: true,
   practicePanels: { lanes: "big", staff: "small", board: "off", tuner: false },
   toggles: { fingers: true, noteNames: true, letterNames: true },
   highlighted: [],
@@ -140,7 +136,7 @@ export function getSettings() {
       ...((stored as { yellowOn?: boolean }).yellowOn === false && { toleranceCents: stored.greenCents ?? DEFAULT_SETTINGS.greenCents }),
     };
     // Settings that are gone, the views panels replaced, the drawer today's plan was and switches since removed, aren't kept.
-    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen", "yellowOn", "listenReferenceOn", "bowPause", "tempoOn"]) delete (settings as Record<string, unknown>)[old];
+    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen", "yellowOn", "listenReferenceOn", "bowPause", "tempoOn", "sheetFill"]) delete (settings as Record<string, unknown>)[old];
   }
   return settings;
 }

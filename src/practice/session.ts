@@ -3,7 +3,7 @@ import { midiOf, type Piece, type PieceNote } from "../music/notes";
 type NoteHit = { pitch: string; ms: number; cents: number; at: number };
 
 // Further off than this, it's nearer the next note than the one being played, so it's a wrong note, not an out-of-tune one.
-export const NEAR_CENTS = 50;
+const NEAR_CENTS = 50;
 
 export class Session {
   readonly piece: Piece;

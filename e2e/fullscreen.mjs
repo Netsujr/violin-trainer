@@ -13,6 +13,7 @@ const isFullscreen = () => page.evaluate(() => document.documentElement.classLis
 await nav(page, "Practice"); await sleep(250);
 await page.click(".staff-toggle"); await sleep(200);
 const before = await canvasWidth();
+const usual = await page.locator(".staff-panel .staff svg").evaluate((svg) => ({ height: Math.round(svg.getBoundingClientRect().height) }));
 await enter();
 check("uses the browser's own fullscreen", await page.evaluate(() => !!document.fullscreenElement));
 // The panels as set, with Start or Stop, Hear the note and Exit.
@@ -21,15 +22,10 @@ for (const shown of ['button:text-is("Start")', ".reference", 'button[aria-label
 check("Record and the metronome stay, in the title row", (await page.locator('.title-tools button[aria-label="Record"]').isVisible()) && (await page.locator(".title-tools .metronome-button").isVisible()));
 check("the lanes grow into the sidebar's room", (await canvasWidth()) > before, `${before} > ${await canvasWidth()}`);
 check("the staff keeps the whole sheet, as chosen", (await page.locator(".staff.collapsed").count()) === 0 && (await savedSettings(page)).staffOpen === true);
-// The whole sheet is drawn as large as fits, across the panel: with one to four bars to a line, whichever draws it
-// largest, or always four. The scale's four bars fit one line, so 4 bars a line is never the smaller.
-const sheet = () => page.locator(".staff-panel .staff svg").evaluate((svg) => ({ width: Math.round(svg.getBoundingClientRect().width), room: svg.parentElement.clientWidth, height: Math.round(svg.getBoundingClientRect().height), lines: new Set([...svg.querySelectorAll(".vf-stave")].map((stave) => Math.round(stave.getBoundingClientRect().top))).size }));
+// The whole sheet is drawn as large as fits, across the panel, larger than the usual size it had before.
+const sheet = () => page.locator(".staff-panel .staff svg").evaluate((svg) => ({ width: Math.round(svg.getBoundingClientRect().width), room: svg.parentElement.clientWidth, height: Math.round(svg.getBoundingClientRect().height) }));
 const filled = await sheet();
-await page.click('.sheet-fill:text-is("Fill the screen")'); await sleep(300);
-const four = await sheet();
-check("4 bars a line keeps the scale's four bars on one line, across the panel, never smaller than Fill the screen", four.lines === 1 && four.room - four.width <= 2 && filled.height >= four.height && (await savedSettings(page)).sheetFill === false, `${JSON.stringify(filled)} vs ${JSON.stringify(four)}`);
-await page.click('.sheet-fill:text-is("4 bars a line")'); await sleep(300);
-check("and fits inside the panel", await page.locator(".staff-panel .staff").evaluate((box) => box.scrollHeight <= box.clientHeight));
+check("the whole sheet is drawn across the panel, larger than before, and fits inside it", filled.room - filled.width <= 2 && filled.height > usual.height && (await page.locator(".staff-panel .staff").evaluate((box) => box.scrollHeight <= box.clientHeight)), `${JSON.stringify(usual)} → ${JSON.stringify(filled)}`);
 
 // Playing, with a switch out and back in the middle
 await followNotes(page, { midis: D, delayMs: 300 });
@@ -73,7 +69,6 @@ await page.reload(); await page.waitForSelector("nav button");
 await nav(page, "Practice"); await sleep(250);
 check("leaving full screen puts Record and the metronome back in the sidebar", (await page.locator('header button[aria-label="Record"]').isVisible()) && (await page.locator("header .metronome-button").isVisible()));
 check("a reload starts in the normal layout", !(await isFullscreen()) && (await canvasWidth()) === before);
-check("the sheet's fill choice shows only in full screen", await page.locator(".sheet-fill").isHidden());
 await setLanguage(page, "PT");
 check("pt: the button is translated", (await page.locator('button[aria-label="Tela cheia"]').count()) === 1);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));

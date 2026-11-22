@@ -10,8 +10,8 @@ import { dockOption } from "./panels";
 import type { createStaff } from "./staff";
 import { chipGroup } from "./toggles";
 
-export const GUESS_COUNTS = [1, 2, 4];
-export const LEVELS: GuesserLevel[] = ["easy", "medium", "hard"];
+const GUESS_COUNTS = [1, 2, 4];
+const LEVELS: GuesserLevel[] = ["easy", "medium", "hard"];
 const GUESS_BY: GuessBy[] = ["eye", "ear"];
 // By ear, each note sounds this long, and the mic waits this long after, so it doesn't hear the speakers' last of it.
 const EAR_NOTE_MS = 2000;

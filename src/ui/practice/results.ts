@@ -12,20 +12,20 @@ function tally(results: Map<number, boolean>) {
 }
 
 // The score and its counts on one line, for the bar above the lanes. Empty until a note is judged.
-export function scoreLine(results: Map<number, boolean> | null) {
+function scoreLine(results: Map<number, boolean> | null) {
   if (!results?.size) return "";
   const { hit, missed, percent } = tally(results);
   return `${t.score(percent)} · ${t.hitMissed(hit, missed)}`;
 }
 
 // The card after a Keep moving run: the score, and how many notes were hit and missed.
-export function scoreCard(results: Map<number, boolean>) {
+function scoreCard(results: Map<number, boolean>) {
   const { hit, missed, percent } = tally(results);
   return [h("p", { className: "score" }, t.score(percent)), h("p", {}, t.hitMissed(hit, missed))];
 }
 
 // Any of the cards above, with Play again, and a ✕ to close it. The ✕ only shows in fullscreen, where it covers the lanes.
-export function resultsCard(card: Node[], onPlayAgain: () => void, onClose: () => void) {
+function resultsCard(card: Node[], onPlayAgain: () => void, onClose: () => void) {
   return [
     h("button", { type: "button", className: "stats-close", textContent: "✕", title: t.close, ariaLabel: t.close, onclick: onClose }),
     ...card,
@@ -34,7 +34,7 @@ export function resultsCard(card: Node[], onPlayAgain: () => void, onClose: () =
 }
 
 // The card after playing along with a backing track, with nothing heard.
-export const playedAlongCard = () => [h("p", {}, t.playedAlong)];
+const playedAlongCard = () => [h("p", {}, t.playedAlong)];
 
 type Run = { section: Section | null; pattern?: number; startIndex: number };
 

@@ -323,9 +323,8 @@ a[download] {
   display: none;
 }
 
-/* Practice shows it only in fullscreen; Technique's count-in in Listen always shows it, as nothing else needs doing then. */
-.fullscreen .countdown:not([hidden]),
-.listen .countdown:not([hidden]) {
+/* Practice shows it only in fullscreen. */
+.fullscreen .countdown:not([hidden]) {
   position: fixed;
   inset: 0;
   z-index: 10;

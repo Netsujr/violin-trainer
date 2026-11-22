@@ -250,9 +250,8 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   let nudge = 0;
   let section: Section | null = null;
   let followedBeat = 0;
-  // The bars to a line the open sheet can have when it's drawn as large as its box allows, rather than at its usual
-  // size, or null when it isn't.
-  let fill: number[] | null = null;
+  // The open sheet drawn as large as its box allows, rather than at its usual size.
+  let fill = false;
   function noteAt(event: MouseEvent) {
     const box = element.querySelector("svg")!.getBoundingClientRect();
     const x = ((event.clientX - box.left) * sheet.width) / box.width;
@@ -266,14 +265,14 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     return onLine.reduce((nearest, index) => (distance(index) < distance(nearest) ? index : nearest));
   }
 
-  // Which of choices, bars to a line, draws the open sheet largest in its box, and how large: as large as fits it all,
-  // but never smaller than its usual size, where it scrolls instead. extra is the room above and below the lines. A tie
-  // goes to the first choice. A bar is never split across two lines.
-  function fillBox(notes: StaffNote[], extra: number, choices: number[]) {
+  // How many bars to a line, four down to one, draw the open sheet largest in its box, and how large: as large as fits
+  // it all, but never smaller than its usual size, where it scrolls instead. extra is the room above and below the
+  // lines. A tie goes to more bars. A bar is never split across two lines.
+  function fillBox(notes: StaffNote[], extra: number) {
     const { clientWidth, clientHeight } = element;
     if (!clientWidth || !clientHeight) return null;
     let best = { perLine: BARS_PER_LINE, scale: 0 };
-    for (const perLine of choices) {
+    for (let perLine = BARS_PER_LINE; perLine >= 1; perLine--) {
       const lines = layOut(notes, meter, perLine);
       const across = clientWidth / lineWidth(lines);
       const scale = Math.max(Math.min(across, clientHeight / (extra + lines.length * LINE_HEIGHT)), Math.min(1, across));
@@ -309,7 +308,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const labelled = labels.names || labels.fingers || labels.letters;
     const top = labelled ? LABELLED_TOP + (notes.some((note) => note.bow) ? BOW_ROOM : 0) + (notes.some((note) => note.slur) ? SLUR_ROOM : 0) : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
-    const fit = !collapsed && fill ? fillBox(notes, top + bottom, fill) : null;
+    const fit = !collapsed && fill ? fillBox(notes, top + bottom) : null;
     const sheetWidth = collapsed ? width : fit ? element.clientWidth / fit.scale : Math.max(width, lineWidth(layOut(notes, meter)));
     const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter, fit?.perLine);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
@@ -483,9 +482,9 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       collapsed = value;
       shown = null;
     },
-    setFill(choices: number[] | null) {
-      if (String(choices) !== String(fill)) shown = null;
-      fill = choices;
+    setFill(value: boolean) {
+      if (value !== fill) shown = null;
+      fill = value;
     },
     resize(newWidth: number, newScale: number) {
       width = newWidth;

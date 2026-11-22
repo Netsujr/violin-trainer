@@ -4,11 +4,11 @@ import { scoredNotes, scorePercent, type LogEntry } from "./log";
 // The most recent practice days a chart shows.
 export const CHART_DAYS = 30;
 // A note needs this many readings, about 2 seconds of playing it, before its tuning says anything.
-export const MIN_READINGS = 120;
+const MIN_READINGS = 120;
 // Closer than this on average, a note counts as in tune.
-export const OFF_CENTS = 8;
+const OFF_CENTS = 8;
 
-export type DayProgress = { day: string; score: number | null; bpm: number | null };
+type DayProgress = { day: string; score: number | null; bpm: number | null };
 
 // A piece over time: how much, how often, and when it was last practised, and each day's Keep moving score, from
 // all that day's notes, with the fastest tempo it was played at. Only days with a score are charted, the last 30.

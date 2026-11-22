@@ -129,13 +129,10 @@ export async function setRecord(page, on) {
   const button = page.locator('button[aria-label="Record"]').first();
   if ((await button.getAttribute("aria-pressed")) !== String(on)) await button.click();
 }
-export const recordArmed = async (page) => (await page.locator('button[aria-label="Record"]').first().getAttribute("aria-pressed")) === "true";
 // The run's result, in the title row: its score, or the summary of a run that waited for each note.
 export const laneScore = (page) => page.locator(".lane-score").innerText();
 // Menu items only show on hover, so this clicks the piece's item directly, as a tap would.
 export const pickPiece = (page, id) => page.locator(`.piece-menu button[value="${id}"]`).evaluate((item) => item.click());
-// The piece Practice has open, by its title.
-export const pickedPiece = (page) => page.locator(".practice-title h1").innerText();
 // Library shows one group at a time, picked in the sidebar under Library.
 export const showGroup = (page, name) => page.click(`.nav-sub .sub-item:has-text("${name}")`);
 // A piece's card in Library, from whichever group holds it.
