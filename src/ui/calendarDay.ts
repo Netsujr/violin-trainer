@@ -138,7 +138,7 @@ export function createDayPanel({ entries, pieces, urls, onChange, onPaste }: Opt
     );
     element.replaceChildren(
       h("div", {}, h("h2", { className: "day-title" }, date.toLocaleDateString(t.locale, { weekday: "long", day: "numeric", month: "long" })), ...(done ? [h("p", { className: "day-summary" }, t.planDoneOf(done.met, plan.length))] : [])),
-      h("div", { className: "day-plan" }, h("p", { className: "panel-heading" }, t.plan, " ", planned.total), ...planned.list, h("div", { className: "plan-add" }, ...planned.tools)),
+      h("div", { className: "day-plan" }, h("p", { className: "panel-heading" }, t.plan, " ", planned.total), h("div", { className: "plan-add" }, ...planned.tools), ...planned.list),
       h("div", {}, h("p", { className: "panel-heading day-total" }, total > 0 ? t.practisedFor(localNumber(total, 1)) : selected > today ? t.notYet : t.nothingPractised, ...(total > 0 ? [detailsButton] : [])), ...pieceBlocks),
     );
     showDetails();

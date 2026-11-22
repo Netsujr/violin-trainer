@@ -129,10 +129,9 @@ export function planSection({ day, editable, pieces, practised, onChange, pickin
     return item;
   }
 
-  // The same menu as Practice's, with highlighted pieces starred, opened from a +. A piece starts with the target it
-  // last had.
-  const add = createPieceMenu(pieces, "+", (picked) => {
-    if (plan.includes(picked.id)) return;
+  // The same menu as Practice's, with highlighted pieces starred, opened from a +, leaving out the pieces already
+  // planned. A piece starts with the target it last had.
+  const add = createPieceMenu(pieces.filter((piece) => !plan.includes(piece.id)), "+", (picked) => {
     const last = settings.lastTargets[picked.id];
     setPlan([...plan, picked.id], last ? { [picked.id]: last } : {});
   });
@@ -171,8 +170,8 @@ export function planSection({ day, editable, pieces, practised, onChange, pickin
   return {
     total,
     list: plan.length ? [h("ul", { className: "plan", ariaLabel: t.plan }, ...plan.map(cell))] : [h("p", { className: "plan-empty" }, t.nothingPlanned)],
-    // Under the plan: +, copy, then paste. Paste shows on any day once a plan's copied, a past one too, as it pastes into
-    // days picked on the calendar.
+    // Over the plan, so they stay put as it grows: +, copy, then paste. Paste shows on any day once a plan's copied, a
+    // past one too, as it pastes into days picked on the calendar.
     tools: [...(editable ? [add.button, add.menu] : []), ...(plan.length ? [copy] : []), ...(copied?.ids.length ? [paste] : []), ...(plan.length && editable ? [clear] : [])],
   };
 }

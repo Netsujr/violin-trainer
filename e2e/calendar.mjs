@@ -80,7 +80,8 @@ check("each day tapped is pasted into and ticked, and the day picked stays", (aw
 await page.locator('button:text-is("Done pasting")').click(); await sleep(150);
 check("paste again ends picking", (await page.locator(".calendar-day.pickable, .calendar-day.pasted").count()) === 0 && (await page.locator('button:text-is("Paste plan (3)")').getAttribute("aria-pressed")) === "false");
 await page.locator(".plan-add .piece-select").click();
-check("the add menu stars highlighted pieces", (await page.locator(".plan-add .piece-menu button.highlighted").allInnerTexts()).join() === "Hills and Dales");
+const offered = await page.locator(".plan-add .piece-menu button[value]").evaluateAll((items) => items.map((item) => item.value));
+check("the add menu leaves out the pieces already planned", !offered.includes("hills-and-dales") && !offered.includes("twinkle-twinkle") && offered.includes("ode-to-joy"), offered.join());
 await page.locator(".plan-add .piece-menu button[value='ode-to-joy']").evaluate((item) => item.click()); await sleep(150);
 check("picking one adds it", (await page.locator(".plan-item").count()) === 4);
 await cell("Ode to Joy").locator(".plan-remove").click(); await sleep(150);
