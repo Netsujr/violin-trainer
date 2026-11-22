@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm, spyOnRecordings, recordings, cardOf } from "./lib.mjs";
+import { setRecord, nav, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm, spyOnRecordings, recordings, cardOf } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -100,7 +100,7 @@ check("shows no note before one is played", (await heard(page)) === "", await he
 await page.evaluate(() => window.playTone(69));
 await sleep(700);
 check("names an A on the staff, with its finger", (await heard(page)) === "0 Lá A", await heard(page));
-const section = await page.locator("section").innerText();
+const section = await page.locator("main > section").innerText();
 check("gives its pitch", /440\.\d Hz/.test(section), section.replaceAll("\n", " | ").slice(0, 120));
 check("shows it on the staff", (await page.locator(".staff .vf-stavenote").count()) === 1);
 await shot("2-listen-note");
@@ -374,7 +374,7 @@ await say("Delete");
 check("Delete, once confirmed, removes only the recording, leaving the day's summaries", (await page.locator("audio").count()) === 0 && (await page.locator(".recording-note").count()) === 0 && (await page.locator(".day-piece li").count()) >= 2);
 
 flow("13. Calendar");
-const logText = await page.locator("section").innerText();
+const logText = await page.locator("main > section").innerText();
 check("reads sensibly", ["Practised for", "Score: 93%", "D (Ré) major", "Plan"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
 await shot("13-calendar");
 
@@ -382,9 +382,11 @@ flow("14. Settings");
 await press(page.locator("header .set-row nav button")); await sleep(250);
 await auditCheck(page, "Settings");
 await shot("14-settings");
+await nav(page, "Listen"); await press(page.locator(".tuner-toggle")); await sleep(150);
 await page.locator('input[aria-label="Close enough"]').fill("25"); await sleep(100);
-check("Close enough applies and saves", (await savedSettings(page)).toleranceCents === 25 && (await page.locator(".dial-key").innerText()).includes("within 25 cents"));
+check("Close enough, set on the tuner, applies and saves", (await savedSettings(page)).toleranceCents === 25 && (await page.locator(".dial-key").innerText()).includes("within 25 cents"));
 await page.locator('input[aria-label="Close enough"]').fill("40");
+await press(page.locator(".tuner-toggle"));
 
 flow("15. Portuguese");
 await press(button("PT")); await sleep(300);

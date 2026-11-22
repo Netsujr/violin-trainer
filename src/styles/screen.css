@@ -231,4 +231,18 @@ main:has(> .fills-window) {
     min-height: 0;
     padding-bottom: 1rem;
   }
+
+  /* Full screen still fills the window, its panels sharing the height, as on a wider screen. The lanes hidden out of
+     sight keep their own height. */
+  .fullscreen main:has(> .fills-window) {
+    height: 100dvh;
+  }
+
+  .fullscreen .stage-panels {
+    grid-auto-rows: minmax(0, 1fr);
+  }
+
+  .fullscreen .stage-panels > .stage-panel:not(.offstage) {
+    height: auto;
+  }
 }

@@ -170,6 +170,86 @@
   align-self: flex-start;
 }
 
+/* The gear in the tuner's corner, brass while its settings are open. */
+.tuner-toggle {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.tuner-toggle:hover {
+  color: var(--text);
+  background: var(--raised);
+}
+
+.tuner-toggle[aria-pressed="true"] {
+  color: var(--ground);
+  background: var(--brass);
+  border-color: var(--brass);
+}
+
+.tuner-toggle svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.tuner-reading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  align-self: stretch;
+}
+
+/* The tuner's settings, in place of the note heard: the dial's key, then In tune and Close enough stacked. The dial
+   keeps its size, the gear clear of it. */
+.stage-tuner .tuning {
+  align-self: stretch;
+}
+
+.stage-tuner .setting {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0.625rem 0;
+}
+
+.stage-tuner .dial-key {
+  margin: 0 0 0.25rem;
+}
+
+.dial-key {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.625rem;
+  color: #c3cad5;
+  font-size: 0.875rem;
+}
+
+.dial-key span::before {
+  content: "";
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.5rem;
+  background: var(--blue);
+  border-radius: 3px;
+}
+
+.dial-key .close-enough::before {
+  background: var(--brass);
+}
+
+
 .stage-tuner .needle {
   max-width: 15.5rem;
 }
@@ -213,7 +293,7 @@
   color: var(--brass);
 }
 
-/* The fingerboard fills its panel, its picture as large as fits, with the tapes switch in the corner. */
+/* The fingerboard fills its panel, its picture as large as fits. */
 .fingerboard {
   position: relative;
   display: flex;
@@ -222,7 +302,7 @@
   min-height: 0;
 }
 
-.fingerboard > [role="img"] {
+.fingerboard-picture {
   position: relative;
   display: flex;
   flex: 1;
@@ -268,25 +348,37 @@
   border-radius: 1rem;
 }
 
-.fingerboard-tapes-toggle {
-  position: absolute;
-  top: -0.25rem;
-  right: -0.75rem;
-  z-index: 1;
-  min-height: 1.875rem;
-  margin: 0;
-  padding: 0 0.625rem;
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 0.9375rem;
+/* The head, before the nut: a raised block, plainly a button, brass while the tapes are on. */
+.fingerboard-head {
+  cursor: pointer;
 }
 
-.fingerboard-tapes-toggle[aria-pressed="true"] {
-  color: var(--brass-light);
-  border-color: var(--brass);
+.fingerboard-head rect {
+  fill: var(--raised);
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+
+.fingerboard-head:hover rect {
+  stroke: var(--muted);
+}
+
+.fingerboard-head:focus-visible {
+  outline: none;
+}
+
+.fingerboard-head:focus-visible rect {
+  stroke: var(--blue);
+  stroke-width: 3;
+}
+
+.fingerboard-head[aria-pressed="true"] rect {
+  fill: rgb(230 174 72 / 0.18);
+  stroke: var(--brass);
+}
+
+.fingerboard-head[aria-pressed="true"] .fingerboard-letter {
+  fill: var(--brass-light);
 }
 
 /* Full screen: the panels, with Start or Stop and Exit, and the guesser's score. */

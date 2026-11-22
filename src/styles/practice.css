@@ -1,14 +1,42 @@
 /* Practice: the piece and how far the run's got in the title row, the lanes, staff and fingerboard panels with the
    tuner beside them, and the settings panel docked at the bottom. */
+/* The title and its buttons share the top line, and the caption has the whole width under them, so the score joining
+   it mid-run doesn't push the buttons down and shrink the lanes. On a phone the buttons go under the caption. */
+.practice .title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.125rem 1.25rem;
+}
+
 .practice-title {
-  min-width: 0;
+  display: contents;
+}
+
+.practice-title p {
+  grid-column: 1 / -1;
+}
+
+.practice .title-tools {
+  grid-area: 1 / 2;
+}
+
+@media (max-width: 600px) {
+  .practice .title-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .practice .title-tools {
+    grid-area: auto;
+    margin-left: 0;
+  }
 }
 
 .practice-title p {
   display: flex;
   flex-wrap: wrap;
   gap: 0 0.5rem;
-  margin: 0.125rem 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 0.9375rem;
 }
@@ -294,8 +322,9 @@ html:not(.fullscreen) .stats {
 }
 
 @media (max-width: 900px) {
+  /* On a short screen, a phone on its side, the lanes leave room for the title and Start above them. */
   .lanes-panel {
-    height: 15rem;
+    height: min(15rem, 100dvh - 9.5rem);
   }
 
   .staff-panel,

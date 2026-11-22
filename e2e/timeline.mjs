@@ -10,7 +10,7 @@ const scrollLeft = (page) => page.locator(".highway-scroll").evaluate((e) => e.s
 async function clickTile(page, noteIndex, string) {
   const box = await page.locator("canvas").boundingBox();
   const scale = box.height / (LANES.length * LANE_HEIGHT);
-  const x = (HIT_X + noteIndex * SPACING) * scale - (await scrollLeft(page));
+  const x = (HIT_X + (noteIndex + 0.5) * SPACING) * scale - (await scrollLeft(page));
   await page.mouse.click(box.x + x, box.y + (LANES.indexOf(string) + 0.5) * LANE_HEIGHT * scale);
 }
 const currentOnStaff = (page) =>
@@ -130,17 +130,18 @@ wav(OUT + "b4.wav", [note(71, 3)]);
       staves: el.querySelectorAll(".vf-stave").length,
       inside: notes.every((n) => n.left >= box.left && n.right <= box.right) && baselines.every((y) => y > 0 && y < height),
       width: box.width,
-      section: el.parentElement.getBoundingClientRect().width,
+      // The panel's width inside its padding.
+      section: (({ paddingLeft, paddingRight }) => el.parentElement.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight))(getComputedStyle(el.parentElement)),
       svg: el.querySelector("svg").getBoundingClientRect().width,
     };
   });
   check("the staff shows every note in the piece", staff.notes === count, `${staff.notes} of ${count}`);
   check("a long piece breaks onto more lines", staff.staves >= 2, JSON.stringify(staff));
   check("every note is inside the staff box", staff.inside);
-  check("the staff fills the page width", staff.width === staff.section && staff.svg >= staff.width - 17, JSON.stringify(staff));
+  check("the staff fills its panel's width", staff.width === staff.section && staff.svg >= staff.width - 17, JSON.stringify(staff));
   await page.screenshot({ path: OUT + "practice-gmajor.png", fullPage: true });
   const red = await page.locator(".staff .vf-stavenote.current .vf-notehead text").evaluate((t) => getComputedStyle(t).fill);
-  check("the current note is red on the staff", red === "rgb(176, 48, 32)", red);
+  check("the current note is brass on the staff", red === "rgb(230, 174, 72)", red);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

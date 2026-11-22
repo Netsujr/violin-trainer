@@ -3,7 +3,6 @@ import { HIGHEST_MIDI, LOWEST_MIDI, OPEN_STRINGS, stringFor } from "../music/fin
 import { frequencyOf, midiOf, nearestMidi, type PieceNote, type StringName } from "../music/notes";
 import { getSettings, saveSettings } from "../storage";
 import { h, svg } from "./dom";
-import { wordToggle } from "./toggles";
 
 const WIDTH = 1000;
 const HEIGHT = 210;
@@ -47,14 +46,36 @@ function pointOn(string: StringName, semitones: number) {
   return { x, y: along([NUT_YS[index], END_YS[index]], x) };
 }
 
-// The dark board, the nut, and each string's letter beside it.
+// The dark board and the nut.
 const drawBoard = () => [
   svg("path", { d: `M${NUT_X} ${BOARD_TOP[0]}L${END_X} ${BOARD_TOP[1]}V${BOARD_BOTTOM[1]}L${NUT_X} ${BOARD_BOTTOM[0]}Z`, fill: BOARD_COLOR }),
   svg("rect", { x: NUT_X - 6, y: BOARD_TOP[0] - 4, width: 8, height: BOARD_BOTTOM[0] - BOARD_TOP[0] + 8, rx: 2, fill: "#c9c2b0" }),
-  ...STRINGS.map((string, index) =>
-    svg("text", { class: "fingerboard-letter", x: LETTER_X, y: NUT_YS[index] + 6, "text-anchor": "middle" }, document.createTextNode(t.strings[string])),
-  ),
 ];
+
+// The board's head, before the nut, with each string's letter: pressed, it puts beginners' tapes on the board or
+// takes them off, brass while they're on.
+function drawHead(on: boolean, onToggle: (on: boolean) => void) {
+  const head = svg(
+    "g",
+    { class: "fingerboard-head", role: "button", tabindex: "0", "aria-label": t.tapes, "aria-pressed": String(on) },
+    svg("rect", { x: LETTER_X - 24, y: BOARD_TOP[0] - 12, width: 48, height: BOARD_BOTTOM[0] - BOARD_TOP[0] + 24, rx: 14 }),
+    ...STRINGS.map((string, index) =>
+      svg("text", { class: "fingerboard-letter", x: LETTER_X, y: NUT_YS[index] + 6, "text-anchor": "middle" }, document.createTextNode(t.strings[string])),
+    ),
+  );
+  const toggle = () => {
+    const next = head.getAttribute("aria-pressed") !== "true";
+    head.setAttribute("aria-pressed", String(next));
+    onToggle(next);
+  };
+  head.addEventListener("click", toggle);
+  head.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggle();
+  });
+  return head;
+}
 
 const drawStrings = () =>
   STRINGS.map((_, index) => svg("line", { x1: NUT_X, y1: NUT_YS[index], x2: END_X, y2: END_YS[index], stroke: "#c9d1dc", "stroke-width": STRING_WIDTHS[index] }));
@@ -73,7 +94,7 @@ function drawTape(semitones: number, index: number) {
 // A violin's fingerboard in first position, drawn across the screen with the nut on the left and the E string at the
 // top, to show where a note is played: a brass circle, with its finger in it, where it's stopped, turning blue once
 // it's played in tune. What's heard shows as a blue ghost where it's played, on whichever string, joined to the circle
-// by a dashed line, with a word saying which way to go. A small switch in its corner puts beginners' tapes on it. For
+// by a dashed line, with a word saying which way to go. Pressing its head puts beginners' tapes on it. For
 // use wherever a note to play is shown.
 export function createFingerboard() {
   const settings = getSettings();
@@ -83,16 +104,17 @@ export function createFingerboard() {
   const line = svg("line", { stroke: HEARD_COLOR, "stroke-width": 2.5, "stroke-dasharray": "6 5" });
   const nextRing = svg("circle", { class: "fingerboard-next", r: 15, fill: "none", stroke: TARGET_COLOR, "stroke-width": 2, "stroke-dasharray": "5 4" });
   const ghost = svg("circle", { class: "fingerboard-ghost", r: 12, fill: HEARD_COLOR, "fill-opacity": 0.4, stroke: HEARD_COLOR, "stroke-width": 2.5 });
-  const picture = svg("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}`, "aria-hidden": "true" }, ...drawBoard(), tapes, ...drawStrings(), nextRing, line, target, finger, ghost);
-  const hint = h("p", { className: "fingerboard-hint", hidden: true });
-  const tapesToggle = wordToggle(t.tapes, settings.fingerboardTapes, (on) => {
+  const head = drawHead(settings.fingerboardTapes, (on) => {
     settings.fingerboardTapes = on;
     saveSettings();
     showTapes();
   });
-  tapesToggle.className = "fingerboard-tapes-toggle";
+  // The drawing is one picture to screen readers, with the head a button beside it.
+  const board = svg("g", { role: "img", "aria-label": t.fingerboard }, ...drawBoard(), tapes, ...drawStrings(), nextRing, line, target, finger, ghost);
+  const picture = svg("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}` }, board, head);
+  const hint = h("p", { className: "fingerboard-hint", hidden: true });
   const showTapes = () => (tapes.style.display = settings.fingerboardTapes ? "" : "none");
-  const element = h("div", { className: "fingerboard" }, h("div", { role: "img", ariaLabel: t.fingerboard }, picture, hint), tapesToggle);
+  const element = h("div", { className: "fingerboard" }, h("div", { className: "fingerboard-picture" }, picture, hint));
   let note: { string: StringName; semitones: number } | null = null;
   showTapes();
 

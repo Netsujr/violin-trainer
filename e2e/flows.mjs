@@ -29,7 +29,7 @@ flow("1. First visit");
   check("no recording, no log yet", (await log(s.page)).length === 0);
   await s.page.screenshot({ path: OUT + "1-listen.png" });
   for (const name of ["Practice", "Library", "Calendar"]) { await nav(s.page, name); await sleep(250); await s.page.screenshot({ path: `${OUT}1-${name}.png` }); }
-  const empty = await s.page.locator("section").innerText();
+  const empty = await s.page.locator("main > section").innerText();
   check("an empty Calendar reads sensibly", empty.includes("Nothing practised this day.") && !empty.includes("undefined") && !empty.includes("NaN"), empty.replaceAll("\n", " | ").slice(0, 160));
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -110,7 +110,7 @@ flow("5. Practice: the reference tone");
   const s = await open("q-silent.wav");
   await nav(s.page, "Practice"); await sleep(200);
   await s.page.click(".reference"); await sleep(150);
-  check("Hear the note works before starting, and doesn't start anything", (await progress(s.page)) === "Note 1 of 15" && (await s.page.locator('button:text-is("Start")').count()) === 1 && (await s.page.locator('button[aria-label="Stop reference"]').count()) === 1);
+  check("Hear the note works before starting, and doesn't start anything", (await progress(s.page)) === "Note 1 of 15" && (await s.page.locator('button:text-is("Start")').count()) === 1 && (await s.page.locator(".reference").getAttribute("aria-pressed")) === "true");
   await s.page.click(".reference"); await sleep(100);
   check("and it turns off again", (await s.page.locator(".reference").getAttribute("aria-pressed")) === "false");
   await s.close();
@@ -213,6 +213,8 @@ flow("8. Calendar: recordings");
   await s.page.reload(); await s.page.waitForSelector("nav button"); await nav(s.page, "Calendar"); await sleep(400);
   check("still gone after a reload", (await s.page.locator(".recording-note").count()) === 0);
   await openSettings(s.page);
+  // The browser works out the size a moment after.
+  await s.page.waitForFunction(() => document.querySelector(".storage-used").textContent !== "", null, { timeout: 3000 }).catch(() => {});
   const storage = await s.page.locator(".setting:has-text('Storage used') .storage-used").innerText();
   check("Settings shows the storage used", /^\d+\.\d MB$/.test(storage), storage);
   check("no console problems", s.problems.length === 0, s.problems.join(" | "));

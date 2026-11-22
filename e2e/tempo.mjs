@@ -115,7 +115,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await start(s.page);
   await s.page.waitForFunction(() => document.querySelector(".highway-scroll").scrollLeft > 5);
   const box = await s.page.locator("canvas").boundingBox();
-  await clickLanes(s.page, 130 + 5 * 120, 126, await scroll(s.page));
+  await clickLanes(s.page, 130 + 5 * 120 + 40, 126, await scroll(s.page));
   await sleep(700);
   check("tempo: clicking a note during a glide goes there", (await progress(s.page)) === "Note 6 of 15" && Math.abs((await scroll(s.page)) - 5 * 120 * (await laneScale(s.page))) <= 1);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));

@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveStaff, staffNotes, showGroup, setBpm, setLanguage, openSettings, setGlide, cardOf } from "./lib.mjs";
+import { setRecord, laneScore, open, nav, start, stop, sleep, check, followNotes, progress, D_MAJOR, OUT, answer, saveStaff, staffNotes, showGroup, setBpm, setLanguage, openTuning, setGlide, cardOf } from "./lib.mjs";
 
 const profile = OUT + "profile";
 rmSync(profile, { recursive: true, force: true });
@@ -21,7 +21,8 @@ await (await cardOf(page, "D (Ré) major")).locator(".piece-name").click();
 await page.screenshot({ path: OUT + "library.png" });
 
 // Settings and toggles survive reload
-await openSettings(page);
+await nav(page, "Listen");
+await openTuning(page);
 await page.locator('input[aria-label="Close enough"]').fill("25");
 await nav(page, "Practice");
 const fingers = () => page.locator('.dock button:text-is("Fingers")');
@@ -35,11 +36,13 @@ await sleep(100);
 await page.screenshot({ path: OUT + "practice-toggled.png" });
 check("a saved bar switch comes back off", (await fingers().getAttribute("aria-pressed")) === "false");
 await fingers().click();
-await openSettings(page);
+await nav(page, "Listen");
+await openTuning(page);
 await page.locator('input[aria-label="Close enough"]').fill("40");
 
 // Record a full practice pass
 await nav(page, "Library");
+await showGroup(page, "My songs");
 check("saved piece survives a reload", (await page.locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
 await (await cardOf(page, "D (Ré) major")).locator('button:text-is("Practise")').click();
 await setRecord(page, true);
@@ -98,7 +101,7 @@ check("15 markers, each landing on its note", jump.rows.length === 15 && jump.ro
 
 // The Calendar: today's minutes on its tile, and what was practised
 const dayText = await page.locator(".day-details").innerText();
-check("today's tile shows the minutes, and the day lists the piece", (await page.locator(".calendar-day.today .calendar-minutes").innerText()).endsWith("′") && dayText.includes("D (Ré) major") && dayText.includes("min practised"), dayText.replaceAll("\n", " | ").slice(0, 160));
+check("today's tile shows the minutes, and the day lists the piece", /^\d+ min$/.test(await page.locator(".calendar-day.today .calendar-minutes").innerText()) && dayText.includes("D (Ré) major") && dayText.includes("Practised for"), dayText.replaceAll("\n", " | ").slice(0, 160));
 
 // Download link and delete
 check("download link has a filename", (await page.locator("a[download]").getAttribute("download")).endsWith(".m4a"), await page.locator("a[download]").getAttribute("download"));

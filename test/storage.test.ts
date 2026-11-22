@@ -17,11 +17,16 @@ async function settingsWith(stored: object | null, language = "en-US") {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("passCents", () => {
-  it("counts out to yellow's edge, or only green with yellow off or set inside green", async () => {
+  it("counts out to yellow's edge, or only green with yellow slid down inside green", async () => {
     const { passCents } = await import("../src/storage");
-    expect(passCents({ greenCents: 10, toleranceCents: 40, yellowOn: true })).toBe(40);
-    expect(passCents({ greenCents: 10, toleranceCents: 40, yellowOn: false })).toBe(10);
-    expect(passCents({ greenCents: 20, toleranceCents: 15, yellowOn: true })).toBe(20);
+    expect(passCents({ greenCents: 10, toleranceCents: 40 })).toBe(40);
+    expect(passCents({ greenCents: 20, toleranceCents: 15 })).toBe(20);
+  });
+
+  it("carries Close enough's old off switch over to its slider at the bottom", async () => {
+    const settings = (await settingsWith({ yellowOn: false, greenCents: 12, toleranceCents: 40 })).getSettings();
+    expect(settings.toleranceCents).toBe(12);
+    expect("yellowOn" in settings).toBe(false);
   });
 });
 

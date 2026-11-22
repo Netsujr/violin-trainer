@@ -544,8 +544,10 @@ const cardSizes = async (page, t, label) => {
   check(`${label}: each tall enough to tap`, buttons.every(({ tall }) => tall >= 38), buttons.map(({ tall }) => tall).join());
   const answers = await t.row("My tune").evaluate((row) => [...row.querySelectorAll(".card-button")].every((control) => {
     control.scrollIntoView({ block: "center" });
+    // The buttons are pills, so each edge is tried at its middle rather than in the rounded corners.
     const box = control.getBoundingClientRect();
-    return [[box.left + 4, box.top + 4], [box.right - 4, box.top + 4], [box.left + 4, box.bottom - 4], [box.right - 4, box.bottom - 4]].every(([x, y]) => control.contains(document.elementFromPoint(x, y)));
+    const [middleX, middleY] = [(box.left + box.right) / 2, (box.top + box.bottom) / 2];
+    return [[box.left + 4, middleY], [box.right - 4, middleY], [middleX, box.top + 4], [middleX, box.bottom - 4]].every(([x, y]) => control.contains(document.elementFromPoint(x, y)));
   }));
   check(`${label}: the whole tap area answers`, answers);
   await auditCheck(page, `${label}: Library cards`, ".library");

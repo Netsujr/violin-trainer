@@ -1,7 +1,7 @@
 // Practice's settings panel, the staff's labels and its two modes, Settings, and the dial's zones.
 import { readFileSync, writeFileSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, sleep, check, seed, progress, OUT, pickPiece, heard, openSettings, setLanguage, clickLanes } from "./lib.mjs";
+import { open, nav, start, sleep, check, seed, progress, OUT, pickPiece, heard, openSettings, openTuning, setLanguage, clickLanes } from "./lib.mjs";
 
 wav(OUT + "s-silent.wav", [rest(3)]);
 const detuned = (cents) => 440 * 2 ** (cents / 1200);
@@ -84,15 +84,18 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   const clef = await page.evaluate(() => { const panel = document.querySelector(".staff").getBoundingClientRect(), clef = document.querySelector(".staff .vf-clef").getBoundingClientRect(); return { left: Math.round(clef.left - panel.left), scrolled: document.querySelector(".staff").scrollLeft }; });
   check("staff: the clef isn't cut off at the start", clef.left >= 8 && clef.scrolled === 0, JSON.stringify(clef));
   const box = await page.locator("canvas").boundingBox();
-  await clickLanes(page, 130 + 6 * 120, 126);
+  // F sharp, the third note, on the D string.
+  await clickLanes(page, 130 + 2 * 120 + 40, 2.5 * 84);
   await sleep(900);
-  check("staff: follows the timeline to a clicked sharp note", (await progress(page)) === "Note 7 of 15" && Math.abs(await headOffset()) <= 1, `${await progress(page)} ${await headOffset()}`);
-  check("staff: marks the same note", (await page.locator(".staff .vf-stavenote").evaluateAll((notes) => notes.findIndex((n) => n.classList.contains("current")))) === 6);
+  check("staff: follows the timeline to a clicked sharp note", (await progress(page)) === "Note 3 of 15" && Math.abs(await headOffset()) <= 1, `${await progress(page)} ${await headOffset()}`);
+  check("staff: marks the same note", (await page.locator(".staff .vf-stavenote").evaluateAll((notes) => notes.findIndex((n) => n.classList.contains("current")))) === 2);
+  const staffScroll = () => page.evaluate(() => document.querySelector(".staff").scrollLeft);
+  const staffBefore = await staffScroll();
   await page.mouse.move(box.x + 500, box.y + 60);
   await page.mouse.wheel(240, 0);
   await sleep(350);
-  const moved = await page.evaluate(() => document.querySelector(".staff").scrollLeft);
-  check("staff: moves when the timeline is scrolled by hand", moved > 400, String(moved));
+  const moved = await staffScroll();
+  check("staff: moves when the timeline is scrolled by hand", moved > staffBefore + 100, `${staffBefore} → ${moved}`);
   await page.click(".staff-toggle");
   await sleep(200);
   check("staff: the arrow opens the full sheet", (await page.locator(".staff.collapsed").count()) === 0 && (await page.locator(".staff-toggle").getAttribute("aria-expanded")) === "true");
@@ -122,22 +125,23 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   await s.close();
 }
 
-// The Settings screen, with the dial as it will look
+// Tuning, set on the tuner itself, its dial redrawn as you slide; the Settings screen keeps the rest
 {
   const s = await open(OUT + "s-silent.wav");
   const current = () => s.page.locator('nav button[aria-current="page"]').innerText();
-  await nav(s.page, "Practice");
-  await openSettings(s.page);
-  check("settings: a screen of its own, marked in the sidebar", (await current()) === "Settings", await current());
-  const arc = () => s.page.locator(".settings .dial-yellow").getAttribute("d");
+  await nav(s.page, "Listen");
+  await openTuning(s.page);
+  const arc = () => s.page.locator(".stage-tuner .dial-yellow").getAttribute("d");
   const before = await arc();
   await s.page.locator('input[aria-label="Close enough"]').fill("30");
   const saved = await s.page.evaluate(() => JSON.parse(localStorage.getItem("settings")).toleranceCents);
-  check("settings: saved as you slide", saved === 30, String(saved));
-  check("settings: the dial's close-enough arc moves as you slide", (await arc()) !== before);
-  await s.page.click('.settings [aria-label="Close enough"] button:text-is("Off")');
-  check("settings: Close enough off hides its slider and its arc", (await s.page.locator('input[aria-label="Close enough"]').isHidden()) && (await s.page.locator(".settings .dial-yellow").evaluate((path) => path.style.visibility)) === "hidden");
-  await s.page.click('.settings [aria-label="Close enough"] button:text-is("On")');
+  check("tuning: saved as you slide", saved === 30, String(saved));
+  check("tuning: the dial's close-enough arc moves as you slide", (await arc()) !== before);
+  await s.page.locator('input[aria-label="Close enough"]').fill("10");
+  check("tuning: Close enough slid down to in tune is off, its arc gone and its key saying so", (await s.page.locator(".stage-tuner .dial-yellow").evaluate((path) => path.style.visibility)) === "hidden" && (await s.page.locator(".dial-key").innerText()).includes("Close enough: off"));
+  await s.page.locator('input[aria-label="Close enough"]').fill("40");
+  await openSettings(s.page);
+  check("settings: a screen of its own, marked in the sidebar, with no tuning on it", (await current()) === "Settings" && (await s.page.locator(".settings .needle").count()) === 0, await current());
   await setLanguage(s.page, "PT");
   check("settings: switching language stays on Settings", (await current()) === "Configurações", await current());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
@@ -177,9 +181,8 @@ for (const [file, cents, zone] of [["s-green.wav", 8, "green"], ["s-yellow.wav",
 }
 {
   const s = await open(OUT + "s-yellow.wav");
-  await openSettings(s.page);
+  await openTuning(s.page);
   await s.page.locator('input[aria-label="Close enough"]').fill("50");
-  await nav(s.page, "Listen");
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1200);

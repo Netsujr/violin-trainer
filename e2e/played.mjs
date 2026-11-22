@@ -1,6 +1,6 @@
 // The ghost note on the staff: where it sits against the current note, which way its arrow points, and when it shows.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT, setCountIn, setBpm, openSettings } from "./lib.mjs";
+import { open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, D_MAJOR as D, OUT, setCountIn, setBpm, openSettings, setPace } from "./lib.mjs";
 
 wav(OUT + "played-silent.wav", [rest(3)]);
 const s = await open(OUT + "played-silent.wav");
@@ -139,7 +139,7 @@ await stop(page); await sleep(200);
 await setCountIn(page, 0);
 
 await freshPractice(page);
-await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
+await setPace(page, "Keep moving"); await sleep(100);
 await setBpm(page, 120);
 // The first note in tune starts the lanes. The rest are sharp.
 await followNotes(page, { midis: D.map((midi, index) => (index === 0 ? midi : midi + 2)) });
@@ -150,7 +150,7 @@ seen = await ghost();
 // Keep moving draws the pitch line, with the ghost at its tip, where the sound was played, just before the hit line.
 check("Keep moving shows it too, at the tip of its pitch line", seen && seen.arrow === "↓" && seen.color === OFF && (await page.locator(".pitch-trace polyline").count()) > 0, JSON.stringify(seen));
 await stop(page); await sleep(200);
-await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
+await setPace(page, "Wait for me"); await sleep(100);
 
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

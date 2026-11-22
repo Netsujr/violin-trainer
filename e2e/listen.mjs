@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, savedLog, heard, spyOnRecordings, recordings, OUT, openSettings, pickMode, panelButton } from "./lib.mjs";
+import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, savedLog, heard, spyOnRecordings, recordings, OUT, openTuning, pickMode, panelButton } from "./lib.mjs";
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
@@ -11,7 +11,7 @@ wav(OUT + "a440.wav", [{ hz: 440, seconds: 5, wave: "sine" }]);
   await sleep(1000);
   const readings = [];
   for (let i = 0; i < 40; i++) {
-    const text = await s.page.locator("section").innerText();
+    const text = await s.page.locator("main > section").innerText();
     const hz = hzOf(text);
     if (hz) readings.push(hz);
     await sleep(25);
@@ -117,7 +117,7 @@ wav(OUT + "silence.wav", [rest(4)]);
   await pickMode(s.page, "Note guesser");
   await chart.click();
   const text = await s.page.locator(".progress").innerText();
-  check("it shows the guesser's score chart, and Technique waiting for a round", text.includes("Listen: progress") && (await s.page.locator(".progress-piece .progress-chart").count()) === 1 && text.includes("Not practised yet\nTechnique"), text.slice(0, 200));
+  check("it shows the guesser's score chart, and Technique waiting for a round", text.includes("Listen: progress") && (await s.page.locator(".progress-piece .progress-chart").count()) === 1 && /Not practised yet\s+Technique/.test(text), text.slice(0, 200));
   check("its back button is named for Listen", (await s.page.locator(".progress-back").getAttribute("aria-label")) === "Back to Listen");
   await s.page.click(".progress-back");
   check("its back button returns to Listen", await s.page.locator(".listen").isVisible());
@@ -206,9 +206,9 @@ wav(OUT + "a440-short.wav", [{ hz: 440, seconds: 2.5, wave: "sine" }, rest(5)]);
 }
 
 // The guesser's fingerboard, stepped from the settings panel: off, then big, taking a row of its own under the staff,
-// then small, sharing a row with the staff once that's small too. The last panel on never goes off. Its corner switch
+// then small, stacked under the staff once that's small too, with no big one. The last panel on never goes off. Pressing its head
 // takes its tapes off. A brass circle shows where the note to play goes, and, for a note played flat, a ghost and a
-// word saying which way to move. With Close enough switched off in Settings only in tune counts: the dial loses its
+// word saying which way to move. With Close enough slid down on the tuner only in tune counts: the dial loses its
 // brass at once, and a note 40 cents flat isn't right.
 wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
 {
@@ -216,7 +216,7 @@ wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
   await s.page.addInitScript(dealDThenA);
   await seed(s.page, { settings: { countInOn: false, listenMode: "guesser", listenPanels: { staff: "big", board: "off", tuner: true }, toggles: { fingers: false, noteNames: false, letterNames: false } } });
   const board = s.page.locator(".fingerboard");
-  const tapes = s.page.locator('.fingerboard button:text-is("Finger tapes")');
+  const tapes = s.page.locator(".fingerboard-head");
   check("the fingerboard is off at first, and so is its tapes switch", (await board.isHidden()) && (await tapes.isHidden()));
   await panelButton(s.page, "Fingerboard").click();
   const box = (selector) => s.page.locator(selector).boundingBox();
@@ -226,14 +226,14 @@ wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
   const tapesShown = () => s.page.evaluate(() => document.querySelector(".fingerboard-tapes").style.display !== "none");
   check("with its tapes on", (await tapesShown()) && (await tapes.getAttribute("aria-pressed")) === "true");
   await tapes.click();
-  check("which its corner switch takes off", !(await tapesShown()) && (await tapes.getAttribute("aria-pressed")) === "false");
+  check("which pressing its head takes off", !(await tapesShown()) && (await tapes.getAttribute("aria-pressed")) === "false");
   const yellowShown = () => s.page.locator(".needle .dial-yellow").evaluate((arc) => arc.style.visibility !== "hidden");
   const loose = await yellowShown();
-  await openSettings(s.page);
-  await s.page.click('.settings [aria-label="Close enough"] button:text-is("Off")');
-  check("yellow off takes the dial's yellow away at once, and hides its slider", loose && (await s.page.locator('input[aria-label="Close enough"]').isHidden()));
-  await nav(s.page, "Listen");
-  check("and the dial on Listen has no yellow", !(await yellowShown()));
+  await openTuning(s.page);
+  await s.page.locator('input[aria-label="Close enough"]').fill("10");
+  check("Close enough slid down to in tune is off: the dial's yellow goes at once, and its slider says Off", loose && !(await yellowShown()) && (await s.page.locator('.slide:has(input[aria-label="Close enough"]) output').innerText()) === "Off");
+  await s.page.click(".tuner-toggle");
+  check("and the gear turns the tuner back, with no yellow", !(await yellowShown()) && (await s.page.locator(".tuner-note").isVisible()));
   await start(s.page);
   await sleep(1800);
   const seen = await s.page.evaluate(() => {
@@ -253,7 +253,7 @@ wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
   await panelButton(s.page, "Fingerboard").click();
   await panelButton(s.page, "Staff").click();
   [staffBox, boardBox] = [await box(".stage-staff"), await box(".stage-board")];
-  check("both small, they share a row", Math.abs(staffBox.y - boardBox.y) < 2 && boardBox.x > staffBox.x, JSON.stringify({ staffBox, boardBox }));
+  check("both small, with no big one, they stack", boardBox.y >= staffBox.y + staffBox.height - 1 && Math.abs(boardBox.x - staffBox.x) < 2, JSON.stringify({ staffBox, boardBox }));
   await panelButton(s.page, "Staff").click();
   check("the staff off leaves the fingerboard alone", (await s.page.locator(".stage-staff").isHidden()) && (await board.isVisible()));
   await panelButton(s.page, "Fingerboard").click();
@@ -318,7 +318,7 @@ wav(OUT + "d4.wav", [note(62, 5)]);
   check("with the toggles off, the note to play has no labels", (await labels()).length === 0);
   for (const toggle of ["Fingers", "Do Ré Mi", "A B C"]) await s.page.click(`.dock button:text-is("${toggle}")`);
   const shown = await labels();
-  check("the toggles put its finger, name and letter on it", shown.length === 2 && /^[0-4]$/.test(shown[0]) && / [A-G]/.test(shown[1]), shown.join(" | "));
+  check("the toggles put its finger, name and letter on it", shown.length === 2 && /^H?[0-4]$/.test(shown[0]) && / [A-G]/.test(shown[1]), shown.join(" | "));
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

@@ -28,7 +28,7 @@ for (const [index, name] of ["Ouvir", "Praticar", "Biblioteca", "Calendário", "
 
 await page.locator("header > nav > button").nth(3).click();
 await sleep(200);
-const logText = await page.locator("section").innerText();
+const logText = await page.locator("main > section").innerText();
 check("pt: log titles and numbers are translated", logText.includes("Ré maior") && logText.includes("Prática livre") && logText.includes("3,2 min") && logText.includes("2 passadas"), logText.slice(0, 80).replaceAll("\n", " "));
 check("pt: saved logs keep the English title", await page.evaluate(() => JSON.parse(localStorage.getItem("log"))[0].pieceTitle === "D major"));
 
@@ -36,7 +36,7 @@ await page.locator("header > nav > button").nth(1).click();
 await sleep(250);
 const staffLabels = await page.locator(".staff > svg > text").evaluateAll((texts) => texts.map((text) => text.textContent).join(" "));
 check("pt: the staff labels use Portuguese names", staffLabels.includes("Fá♯") && staffLabels.includes("Dó♯"), staffLabels.slice(0, 50));
-await page.locator('.dock [aria-label="Pattern"] button').nth(1).click();
+await page.locator('.dock [aria-label="Padrão"] button').nth(1).click();
 await sleep(100);
 
 await page.locator("header > nav > button").nth(0).click();
@@ -46,7 +46,7 @@ await page.waitForSelector('button:text-is("Parar")');
 await sleep(800);
 const shown = await heard(page);
 check("pt: Listen names the note on the staff", shown === "0 Lá A", shown);
-const hertz = await page.locator("section").innerText();
+const hertz = await page.locator("main > section").innerText();
 check("pt: a decimal comma", /\d+,\d Hz/.test(hertz));
 await setLanguage(page, "EN");
 await sleep(500);

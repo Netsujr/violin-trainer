@@ -37,7 +37,7 @@ export function createNeedle() {
   function drawZones() {
     green.setAttribute("d", arc(getSettings().greenCents));
     yellow.setAttribute("d", arc(passCents()));
-    yellow.style.visibility = getSettings().yellowOn ? "" : "hidden";
+    yellow.style.visibility = passCents() > getSettings().greenCents ? "" : "hidden";
   }
 
   function show(cents: number | null) {

@@ -1,6 +1,6 @@
 // Loop, repeating a scale's top note, and the violin reference note, from the settings panel and the title row.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn, setBpm, spyOnRecordings, recordings, setLanguage, clickLanes, laneScale } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn, setBpm, spyOnRecordings, recordings, setLanguage, clickLanes, laneScale, setPace } from "./lib.mjs";
 
 const D_TOP_TWICE = [62, 64, 66, 67, 69, 71, 73, 74, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "modes-silent.wav", [rest(3)]);
@@ -233,7 +233,7 @@ await s.close();
   check("count-in: off starts on the sheet straight away", (await showing()) === "Note 1 of 15", await showing());
   await stop(page); await sleep(200);
   await setCountIn(page, 2);
-  await dontWait().click(); await sleep(100);
+  await setPace(page, "Keep moving"); await sleep(100);
   await setBpm(page, 120);
   await watch();
   await begin(page); await sleep(1000);

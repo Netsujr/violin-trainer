@@ -17,6 +17,8 @@ type WriteLabel = (text: string, x: number, y: number, fill: string, fontSize: n
 const TOP = 30;
 export const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
+// The least room a note in an open sheet's fullest line gets, so a narrow screen shrinks the sheet rather than crowd it.
+const BAR_NOTE_WIDTH = 40;
 // An open sheet always has four bars to a line, however wide the page.
 const BARS_PER_LINE = 4;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 3: "hd", 4: "w" };
@@ -285,7 +287,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const labelled = labels.names || labels.fingers || labels.letters;
     const top = labelled ? LABELLED_TOP + (notes.some((note) => note.bow) ? BOW_ROOM : 0) + (notes.some((note) => note.slur) ? SLUR_ROOM : 0) : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
-    const sheetWidth = width;
+    const sheetWidth = collapsed ? width : Math.max(width, CLEF_SPACE + 20 + Math.max(...layOut(notes, meter).map((line) => line.flat().length)) * BAR_NOTE_WIDTH);
     const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
     const fullWidth = collapsed ? COLLAPSED_NOTE_START + totalBeats * COLLAPSED_BEAT_WIDTH + width : sheetWidth;

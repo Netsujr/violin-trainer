@@ -52,7 +52,7 @@ for (const [label, width, height, touch] of SIZES.filter(([, w, h]) => !process.
   const s = await open(OUT + "screens-silent.wav", undefined, { viewport: { width, height }, hasTouch: touch, isMobile: touch, deviceScaleFactor: touch ? 2 : 1 });
   const { page } = s;
   const go = (selector) => (touch ? page.locator(selector).first().tap() : page.locator(selector).first().click());
-  const goNav = (name) => (touch ? page.locator(`nav button:text-is("${name}")`).tap() : nav(page, name));
+  const goNav = (name) => (touch ? page.locator(`nav button:has(.nav-word:text-is("${name}"))`).tap() : nav(page, name));
 
   if (touch) check(`${tag}: the browser reports a finger, not a mouse`, await page.evaluate(() => matchMedia("(pointer: coarse)").matches));
 

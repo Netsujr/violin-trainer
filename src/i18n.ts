@@ -22,7 +22,6 @@ const en = {
   finger: (finger: string) => finger,
 
   tuning: "Tuning",
-  tuningCaption: "Used everywhere the app checks your tuning: Listen, the note guesser, Technique and Practice.",
   listening: "Listening",
   yourData: "Your data",
   greenZone: "In tune",
@@ -31,6 +30,7 @@ const en = {
   yellowCaption: "Notes this close still count",
   inTuneWithin: (cents: number) => `In tune: within ${centsText(cents)}`,
   closeEnoughWithin: (cents: number) => `Close enough: within ${centsText(cents)}`,
+  closeEnoughOff: "Close enough: off",
   holdTime: "Hold time",
   holdCaption: "How long a note must sound before it counts",
   micSensitivity: "Mic sensitivity",
@@ -320,7 +320,6 @@ const pt: Strings = {
   finger: (finger) => finger.replace(/^L(\d)$/, "$1 baixo").replace(/^H(\d)$/, "$1 alto"),
 
   tuning: "Afinação",
-  tuningCaption: "Usado em todo lugar onde o app confere sua afinação: Ouvir, Adivinhe a nota, Técnica e Praticar.",
   listening: "Escuta",
   yourData: "Seus dados",
   greenZone: "Afinado",
@@ -329,6 +328,7 @@ const pt: Strings = {
   yellowCaption: "Notas tão perto assim ainda contam",
   inTuneWithin: (cents) => `Afinado: até ${centsText(cents)}`,
   closeEnoughWithin: (cents) => `Quase lá: até ${centsText(cents)}`,
+  closeEnoughOff: "Quase lá: desligado",
   holdTime: "Tempo de sustentação",
   holdCaption: "Quanto tempo uma nota precisa soar antes de contar",
   micSensitivity: "Sensibilidade do microfone",

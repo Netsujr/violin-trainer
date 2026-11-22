@@ -44,7 +44,8 @@ for (const [label, leaveHow] of [["Stop then Calendar at once", "calendar"], ["S
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])', { timeout: 5000 });
   check("a recording that can't be saved says so, and Start works again", (await s.page.locator(".warning").first().innerText()).includes("couldn't be saved"), await s.page.locator(".warning").first().innerText());
   await nav(s.page, "Calendar");
-  await s.page.waitForSelector(".calendar-grid");
+  // The day lists the run, and the note for its recording goes once the Calendar finds nothing was saved.
+  await s.page.waitForFunction(() => document.querySelectorAll(".day-piece li").length === 1 && !document.querySelector(".recording-note"), null, { timeout: 3000 }).catch(() => {});
   check("the screen can still be left, with the session in the Calendar", (await s.page.locator(".day-piece li").count()) === 1 && (await s.page.locator(".recording-note").count()) === 0);
   await s.close();
 }

@@ -9,10 +9,9 @@ export type Settings = {
   language: Language;
   // The sidebar shrunk to its icons.
   sidebarIcons: boolean;
-  // How far off, in cents, is in tune (green), and still counts (yellow), if yellow is on.
+  // How far off, in cents, is in tune (green), and still counts (yellow). Yellow no wider than green is off.
   greenCents: number;
   toleranceCents: number;
-  yellowOn: boolean;
   holdMs: number;
   minRms: number;
   tempoOn: boolean;
@@ -81,7 +80,6 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   sidebarIcons: false,
   greenCents: 10,
   toleranceCents: 40,
-  yellowOn: true,
   holdMs: 200,
   minRms: 0.01,
   tempoOn: false,
@@ -140,9 +138,11 @@ export function getSettings() {
       listenPanels: stored.listenPanels ?? listenPanelsFrom(stored as { listenView?: ListenView; guesserView?: ListenView }),
       // Practice had a button stepping through the lanes and staff, a bigger staff, and the staff alone, before it had panels.
       practicePanels: stored.practicePanels ?? practicePanelsFrom(stored as { staffBig?: boolean; staffOnly?: boolean }),
+      // Close enough had its own switch before sliding it down to in tune turned it off.
+      ...((stored as { yellowOn?: boolean }).yellowOn === false && { toleranceCents: stored.greenCents ?? DEFAULT_SETTINGS.greenCents }),
     };
     // The views those panels replaced, and the drawer today's plan was, aren't kept once carried over.
-    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen"]) delete (settings as Record<string, unknown>)[old];
+    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen", "yellowOn"]) delete (settings as Record<string, unknown>)[old];
   }
   return settings;
 }
@@ -161,7 +161,7 @@ function practicePanelsFrom({ staffBig, staffOnly }: { staffBig?: boolean; staff
 export const saveSettings = () => write("settings", getSettings());
 
 // How far off a note still counts: out to yellow's edge, or green's with yellow off or inside green.
-export const passCents = ({ greenCents, toleranceCents, yellowOn }: Pick<Settings, "greenCents" | "toleranceCents" | "yellowOn"> = getSettings()) => (yellowOn ? Math.max(greenCents, toleranceCents) : greenCents);
+export const passCents = ({ greenCents, toleranceCents }: Pick<Settings, "greenCents" | "toleranceCents"> = getSettings()) => Math.max(greenCents, toleranceCents);
 
 // Practice opens on the piece it had open last.
 export function rememberPiece(pieceId: string) {

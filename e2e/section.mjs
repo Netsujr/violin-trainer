@@ -1,6 +1,6 @@
 // Selecting a section with click, then Shift+click, on the lanes or the staff: what it shows, and what plays.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece, setLanguage, laneScale, setGlide } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece, setLanguage, laneScale, setGlide, setPace, dockButton, pickMode } from "./lib.mjs";
 
 const BEAT = 120, HIT_X = 130, LANE = 84;
 wav(OUT + "section-silent.wav", [rest(3)]);
@@ -30,7 +30,7 @@ const clickTile = async (index, shift = false) => {
   await sleep(500);
 };
 const clickStaffNote = async (index, shift = false) => {
-  await page.locator(".staff .vf-stavenote").nth(index).evaluate((note) => scrollBy({ top: note.getBoundingClientRect().top - innerHeight / 2, behavior: "instant" }));
+  await page.locator(".staff .vf-stavenote").nth(index).evaluate((note) => note.scrollIntoView({ block: "center", behavior: "instant" }));
   const center = await page.locator(".staff .vf-stavenote").nth(index).locator(".vf-notehead").evaluate((head) => { const box = head.getBoundingClientRect(); return { x: box.right - 6, y: box.top + box.height / 2 }; });
   if (shift) await page.keyboard.down("Shift");
   await page.mouse.click(center.x, center.y);
@@ -102,7 +102,7 @@ await stop(page); await sleep(200);
 
 // Loop
 await freshPractice(page);
-await page.locator('button[aria-label="Loop"]').click();
+await dockButton(page, "Loop").click();
 await clickTile(2); await clickTile(3, true);
 await followNotes(page, { midis: D, delayMs: 150 });
 await begin(page);
@@ -111,7 +111,7 @@ check("Loop repeats only the section", (await progress(page)).startsWith("Note 3
 await waitForText(page, "Loop 3");
 check("again and again", (await progress(page)).startsWith("Note 3 of 15"), await progress(page));
 await stop(page); await sleep(200);
-await page.locator('button[aria-label="Loop"]').click(); await sleep(100);
+await page.click('.dock [aria-label="Repeat"] button:text-is("Once")'); await sleep(100);
 
 // Selecting mid-run
 await freshPractice(page);
@@ -125,7 +125,7 @@ await stop(page); await sleep(200);
 
 // Keep moving
 await freshPractice(page, 120);
-await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
+await setPace(page, "Keep moving"); await sleep(100);
 await clickTile(4); await clickTile(6, true);
 await followNotes(page, { midis: D });
 await begin(page);
@@ -133,7 +133,7 @@ await waitForText(page, "All 3 notes done"); await sleep(200);
 check("Keep moving scores only the section", (await laneScore(page)) === "Score: 100% · 3 hit, 0 missed" && (await stats()).includes("3 hit, 0 missed"), (await stats()).replaceAll("\n", " / "));
 check("the lanes stop at its end", Math.abs((await scrollLeft()) - 7 * BEAT * (await laneScale(page))) <= 2, String(await scrollLeft()));
 await stop(page); await sleep(200);
-await page.locator('button[aria-label="Don\'t wait"]').click(); await sleep(100);
+await setPace(page, "Wait for me"); await sleep(100);
 
 // Tempo
 await freshPractice(page);
@@ -182,9 +182,9 @@ await page.locator('.dock [aria-label="Pattern"] button:text-is("2")').click(); 
 check("so does changing the pattern", (await bands()) === 0, String(await bands()));
 await page.locator('.dock [aria-label="Pattern"] button:text-is("1")').click(); await sleep(300);
 await clickTile(0); await clickTile(1, true);
-await page.locator('button[aria-label="Repeat the top note"]').click(); await sleep(300);
+await page.click('.dock [aria-label="Top note"] button:text-is("Twice")'); await sleep(300);
 check("and repeating the top note", (await bands()) === 0 && (await progress(page)) === "Note 1 of 16", await progress(page));
-await page.locator('button[aria-label="Repeat the top note"]').click(); await sleep(300);
+await page.click('.dock [aria-label="Top note"] button:text-is("Once")'); await sleep(300);
 
 // Fullscreen, and the other screens
 await page.click('button[aria-label="Fullscreen"]'); await sleep(400);
@@ -198,8 +198,9 @@ await page.locator("header > nav > button").nth(1).click(); await sleep(250);
 await clickTile(0); await clickTile(1, true);
 check("pt: translated", (await line()) === "Notas 1 a 2", await line());
 await setLanguage(page, "EN");
-await nav(page, "Listen"); await sleep(200);
+await nav(page, "Listen"); await pickMode(page, "Note guesser"); await sleep(200);
 const listenStaff = await page.locator(".staff").evaluate((staff) => getComputedStyle(staff).cursor);
-check("the staff on Listen isn't clickable", listenStaff !== "pointer", listenStaff);
+// Free play's staff picks a note to copy instead, and the guesser's by ear sounds the note again.
+check("the guesser's staff, read by eye, isn't clickable", listenStaff !== "pointer", listenStaff);
 check("no page errors", s.problems.length === 0, s.problems.join(" | "));
 await s.close();

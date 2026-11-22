@@ -156,12 +156,12 @@ export async function setCountIn(page, beats) {
 // Clicks the lanes at a spot in their own units, before scaling, as x across and y down from their top left corner:
 // they draw as large as their panel allows, 84 units a lane. scrolled is how far they've moved, in pixels on screen.
 export async function clickLanes(page, x, y, scrolled = 0) {
-  const box = await page.locator("canvas").boundingBox();
+  const box = await page.locator(".highway canvas").boundingBox();
   const scale = box.height / (84 * 4);
   await page.mouse.click(box.x + x * scale - scrolled, box.y + y * scale);
 }
 // How large the lanes are drawn, as against their own units: beats are 120 units wide.
-export const laneScale = async (page) => (await page.locator("canvas").boundingBox()).height / (84 * 4);
+export const laneScale = async (page) => (await page.locator(".highway canvas").boundingBox()).height / (84 * 4);
 // Glide on or off, in the settings panel.
 export async function setGlide(page, on) {
   const button = page.locator('.dock button:text-is("Glide")');
@@ -171,7 +171,7 @@ export async function setGlide(page, on) {
 export const setPace = (page, name) => page.click(`.dock [aria-label="Pace"] button:text-is("${name}")`);
 // A button in the settings panel, by its words, like "Keep moving" or "Loop".
 export const dockButton = (page, text) => page.locator(`.dock button:text-is("${text}")`);
-export const nav = (page, name) => page.click(`nav button:text-is("${name}")`);
+export const nav = (page, name) => page.click(`nav button:has(.nav-word:text-is("${name}"))`);
 // Picks one of Listen's modes, from the sidebar under Listen.
 export const pickMode = (page, name) => page.click(`.nav-sub .sub-item:has-text("${name}")`);
 // A panel's button in the settings panel's On screen group, which steps it big, small and off, or switches the tuner.
@@ -185,6 +185,11 @@ export const setLanguage = async (page, language) => {
 export const openSettings = async (page) => {
   await page.click("header .set-row nav button");
   await page.waitForSelector(".settings");
+};
+// The tuner's own settings, on the screen shown, if they aren't open already.
+export const openTuning = async (page) => {
+  const toggle = page.locator(".tuner-toggle");
+  if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
 };
 export const start = (page) => page.click('button:text-is("Start")');
 // Stops a run if one is going. A finished run has already stopped by itself, and one can finish just as this clicks.

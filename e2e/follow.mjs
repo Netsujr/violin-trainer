@@ -31,6 +31,8 @@ check("saved, and Glide no longer applies", (await savedSettings(page)).followOn
 
 // Silence: the lanes wait on the first note, with no count-in
 await freshPractice(page, 120);
+// Keep moving has fewer settings below than Wait for me, so the lanes draw larger.
+BEAT_PX = 120 * (await laneScale(page));
 check("it stays on after a reload", !(await waiting()));
 await watch();
 await begin(page);

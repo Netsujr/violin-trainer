@@ -1,4 +1,4 @@
-/* Settings: tuning, listening and your data, each a panel of settings, a name and a line saying what it does beside
+/* Settings: listening and your data, each a panel of settings, a name and a line saying what it does beside
    each control. */
 .settings {
   display: flex;
@@ -30,8 +30,7 @@
   border-top: 1px solid var(--line);
 }
 
-h2 + .setting,
-.tuning .setting:first-child {
+h2 + .setting {
   border-top: none;
 }
 
@@ -45,46 +44,6 @@ h2 + .setting,
   margin: 0.25rem 0 0;
   color: var(--faint);
   font-size: 0.875rem;
-}
-
-/* The dial on the left, as it will look, and its two settings stacked beside it. */
-.tuning {
-  display: grid;
-  grid-template-columns: 18.75rem minmax(0, 1fr);
-  gap: 1.75rem;
-  align-items: center;
-  padding: 0.5rem 0 0.75rem;
-}
-
-.tuning .setting {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.setting .segments {
-  justify-self: start;
-}
-
-.dial-key {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin-top: 0.625rem;
-  color: #c3cad5;
-  font-size: 0.875rem;
-}
-
-.dial-key span::before {
-  content: "";
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-right: 0.5rem;
-  background: var(--blue);
-  border-radius: 3px;
-}
-
-.dial-key .close-enough::before {
-  background: var(--brass);
 }
 
 .slide {
@@ -123,12 +82,7 @@ h2 + .setting,
 }
 
 @media (max-width: 900px) {
-  .setting,
-  .tuning {
+  .setting {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .tuning > div:first-child {
-    max-width: 20rem;
   }
 }
