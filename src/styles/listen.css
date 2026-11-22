@@ -58,7 +58,8 @@
   min-height: 0;
 }
 
-/* The staff fills its panel, its sheet sitting at the bottom so it barely moves as labels come and go. */
+/* The staff fills its panel, with a tenth of the room clear on each side, its sheet sitting at the bottom so it barely
+   moves as labels come and go. */
 .stage-staff .staff {
   display: flex;
   flex: 1 1 0;
@@ -69,26 +70,59 @@
 }
 
 .stage-staff .staff svg {
-  width: 100%;
-  height: 100%;
+  width: 80%;
+  height: 80%;
+  margin: auto;
 }
 
-/* What a tap on the staff does, under it, when it does something. */
-.stage-hint {
-  margin: 0.25rem 0 0;
+/* Free play's speaker, in the staff's top right corner beside its size button, or in the corner itself when that's
+   hidden: brass while the note sounds, and dim until a note is picked to sound. */
+.target-speaker {
+  position: absolute;
+  top: 0.375rem;
+  right: 2.75rem;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
   color: var(--muted);
-  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5rem;
 }
 
-.stage-hint > span,
-.listen[data-mode="technique"] .stage-hint,
-.listen[data-mode="guesser"] .staff:not(.by-ear) ~ .stage-hint {
+.stage-staff:has(> .panel-size[hidden]) .target-speaker {
+  right: 0.375rem;
+}
+
+.target-speaker:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--raised);
+}
+
+.target-speaker:disabled {
+  /* Still takes its own clicks, so one on it doesn't fall through and pick a note on the staff behind. */
+  pointer-events: auto;
+  cursor: default;
+  opacity: 0.4;
+}
+
+.target-speaker[aria-pressed="true"] {
+  color: var(--on-brass);
+  background: var(--brass);
+  border-color: var(--brass);
+}
+
+.target-speaker svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.listen:not([data-mode="free"]) .target-speaker {
   display: none;
-}
-
-.listen[data-mode="free"] .hint-free,
-.listen[data-mode="guesser"] .hint-ear {
-  display: inline;
 }
 
 /* Each mode's own parts show only in it. */
@@ -145,7 +179,6 @@
 
 /* Technique: what the round is doing, then how it went, under the staff. Each keeps its line, so nothing jumps. */
 .technique-status {
-  min-height: 1lh;
   margin: 0.25rem 0 0;
   color: var(--muted);
   text-align: center;
@@ -153,8 +186,13 @@
 
 .stage-staff > .chip-row {
   justify-content: center;
-  min-height: 1.75rem;
   margin: 0;
+}
+
+/* Until a round says something, its lines leave the staff the room. */
+.technique-status:empty,
+.stage-staff > .chip-row:empty {
+  display: none;
 }
 
 /* The tuner: the note heard, large, with its name and how in tune it is under the dial. */
@@ -390,6 +428,11 @@
 @media (max-width: 900px) {
   .stage {
     flex-direction: column;
+  }
+
+  /* The size button isn't shown here, so the speaker takes the corner. */
+  .target-speaker {
+    right: 0.375rem;
   }
 
   .stage-panels {

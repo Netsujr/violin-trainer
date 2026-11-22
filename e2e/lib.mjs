@@ -167,14 +167,27 @@ export async function setGlide(page, on) {
   const button = page.locator('.dock button:text-is("Glide")');
   if ((await button.getAttribute("aria-pressed")) !== String(on)) await button.click();
 }
+// A choice of two in the settings panel, like Pace, one button saying which is picked, found by its group's name.
+export const flip = (page, group) => page.locator(`.dock button[aria-label^="${group}: "]`);
+// Picks one of a choice's two, by its words, pressing the button only if it says the other.
+export async function setChoice(page, group, name) {
+  const button = flip(page, group);
+  if ((await button.innerText()) !== name) await button.click();
+}
+// One of a choice's two words: click picks it, and picked says whether it's the one showing.
+export const choiceOf = (page, group, name) => ({
+  click: () => setChoice(page, group, name),
+  picked: async () => (await flip(page, group).innerText()) === name,
+  isHidden: () => flip(page, group).isHidden(),
+});
 // Pace, in the settings panel: "Wait for me" or "Keep moving".
-export const setPace = (page, name) => page.click(`.dock [aria-label="Pace"] button:text-is("${name}")`);
-// A button in the settings panel, by its words, like "Keep moving" or "Loop".
-export const dockButton = (page, text) => page.locator(`.dock button:text-is("${text}")`);
+export const setPace = (page, name) => setChoice(page, "Pace", name);
 export const nav = (page, name) => page.click(`nav button:has(.nav-word:text-is("${name}"))`);
 // Picks one of Listen's modes, from the sidebar under Listen.
 export const pickMode = (page, name) => page.click(`.nav-sub .sub-item:has-text("${name}")`);
-// A panel's button in the settings panel's On screen group, which steps it big, small and off, or switches the tuner.
+// A panel's own corner button, making it big or small, by the panel's selector.
+export const sizeOf = (page, panel) => page.locator(`${panel} .panel-size`);
+// A panel's button in the settings panel's On screen group, which shows or hides it, or switches the tuner.
 export const panelButton = (page, name) => page.locator(`.dock [role="group"]:has(button:text-is("Tuner")) button:text-is("${name}")`);
 // Switches the language with the sidebar's EN | PT, beside Settings.
 export const setLanguage = async (page, language) => {

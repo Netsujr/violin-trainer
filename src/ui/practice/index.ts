@@ -6,11 +6,11 @@ import { withPattern, withRepeatedTop } from "../../music/patterns";
 import { createJudge } from "../../practice/judge";
 import type { Session } from "../../practice/session";
 import { aroundSpot } from "../../practice/trouble";
-import { allPieces, getSettings, isScale, passCents, rememberPiece } from "../../storage";
+import { allPieces, getSettings, isScale, passCents, rememberPiece, saveSettings } from "../../storage";
 import { h, type Screen } from "../dom";
 import { createFingerboard } from "../fingerboard";
 import type { Section } from "../highway";
-import { arrangePanels } from "../panels";
+import { arrangePanels, sizeButton } from "../panels";
 import { createRunControls } from "../runControls";
 import { createTuner } from "../tuner";
 import { createBackingTrack } from "./backingTrack";
@@ -31,7 +31,7 @@ const LOOP_GAP_MS = 2000;
 const METRONOME_TICK_MS = 25;
 // How much of the height the lanes, the staff and the fingerboard each take when big.
 const LANES_WEIGHT = 3;
-const STAFF_WEIGHT = 1.6;
+const STAFF_WEIGHT = 2.6;
 const BOARD_WEIGHT = 2;
 
 // aligning, when given, opens the piece to line its backing track up, and is the way back to Library.
@@ -73,7 +73,17 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const board = createStaffSection(pickNote, renderNotes, (beat) => track.showBeat(beat));
   const fingerboard = createFingerboard();
   const tuner = createTuner();
-  const boardPanel = h("div", { className: "stage-panel stage-board" }, fingerboard.element);
+  // Each panel's corner button makes it big or small.
+  const sized = () => {
+    saveSettings();
+    arrange();
+  };
+  const lanesSize = sizeButton("lanes", t.lanes, settings.practicePanels, sized);
+  const staffSize = sizeButton("staff", t.staff, settings.practicePanels, sized);
+  const boardSize = sizeButton("board", t.fingerboard, settings.practicePanels, sized);
+  board.lanesPanel.append(lanesSize);
+  board.staffPanel.append(staffSize);
+  const boardPanel = h("div", { className: "stage-panel stage-board" }, fingerboard.element, boardSize);
   const panels = h("div", { className: "stage-panels" }, board.lanesPanel, board.staffPanel, boardPanel);
   const results = createResults(board, playAgain, { onSpot: (spot) => { selection.spot(spot); renderNotes(); }, onPractise: practiseSpot });
   const { staff, highway } = board;
@@ -267,11 +277,11 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   // The panels as the settings panel sets them. With the lanes off they keep running out of sight, because the staff
   // follows them.
   function arrange() {
-    const { lanes, staff: staffSize, board: boardSize, tuner: tunerOn } = settings.practicePanels;
+    const { lanes, staff, board: boardShown, tuner: tunerOn } = settings.practicePanels;
     arrangePanels(panels, [
-      { element: board.lanesPanel, size: lanes, weight: LANES_WEIGHT },
-      { element: board.staffPanel, size: staffSize, weight: STAFF_WEIGHT },
-      { element: boardPanel, size: boardSize, weight: BOARD_WEIGHT },
+      { element: board.lanesPanel, size: lanes, weight: LANES_WEIGHT, sizeButton: lanesSize },
+      { element: board.staffPanel, size: staff, weight: STAFF_WEIGHT, sizeButton: staffSize },
+      { element: boardPanel, size: boardShown, weight: BOARD_WEIGHT, sizeButton: boardSize },
     ]);
     board.lanesPanel.hidden = false;
     board.lanesPanel.classList.toggle("offstage", lanes === "off");

@@ -45,7 +45,7 @@ await (await chooser).setFiles(CLICKS);
 await page.waitForSelector(".track-align-panel .track-align-title", { timeout: 15000 });
 check("choosing a file finds its beat and opens it to line up", (await page.locator(".track-align-title").innerText()).startsWith("Aligning track-clicks-100.wav") && (await field("BPM").inputValue()) === "100" && (await field("First note at (s)").inputValue()) === "2");
 BEAT_PX = 120 * (await laneScale(page));
-check("with the track's controls above the panels, the waveform under the lanes, and no settings panel", (await page.locator(".track-align-panel").isVisible()) && (await page.locator(".lanes-panel .highway + .waveform").isVisible()) && (await page.locator(".dock").count()) === 0 && (await progress(page)) === "Note 1 of 17");
+check("with the track's controls above the panels, the waveform under the lanes, and no settings panel", (await page.locator(".track-align-panel").isVisible()) && (await page.locator(".lanes-panel .highway ~ .waveform").isVisible()) && (await page.locator(".dock").count()) === 0 && (await progress(page)) === "Note 1 of 17");
 check("at full speed to start", (await page.locator(".track-align-panel .speed input").inputValue()) === "100" && (await page.locator(".track-align-panel .speed output").innerText()) === "Speed 100%");
 
 // Lining it up
@@ -84,7 +84,7 @@ check("where the card names its track, with buttons to line it up and remove it"
 await card().locator('button:text-is("Practise")').click(); await sleep(500);
 const playAlong = () => page.locator('.dock button:text-is("Play along")');
 const ear = () => page.locator('.dock button:text-is("Listen to my notes")');
-const paceShown = () => page.locator('.dock [aria-label="Pace"]').isVisible();
+const paceShown = () => page.locator('.dock button[aria-label^="Pace: "]').isVisible();
 check("Practice puts its switches in the settings panel: playing along on, the mic off", (await playAlong().isVisible()) && (await playAlong().getAttribute("aria-pressed")) === "true" && (await ear().getAttribute("aria-pressed")) === "false" && (await page.locator(".waveform").count()) === 0);
 check("and its speed, in the title row, stands in for the sidebar's BPM", (await page.locator(".title-tools .speed").isVisible()) && !(await page.locator("header .metronome-button").isVisible()) && (await page.locator(".title-tools .speed output").innerText()) === "Speed 100%");
 check("the track sets the pace, so Pace is hidden", !(await paceShown()));

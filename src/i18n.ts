@@ -1,5 +1,4 @@
 import type { StringName } from "./music/notes";
-import type { PanelSize } from "./storage";
 
 export type Language = "en" | "pt";
 
@@ -79,7 +78,7 @@ const en = {
   onScreen: "On screen",
   staff: "Staff",
   tuner: "Tuner",
-  panelSize: (panel: string, size: PanelSize) => `${panel}: ${{ big: "big", small: "small", off: "off" }[size]}`,
+  panelBig: (panel: string) => `${panel}: big`,
   youArePlaying: "You're playing",
   tunerCaption: (hertz: string, tuning: string) => `${hertz} Hz, ${tuning}`,
   tuningWords: { inTune: "in tune", littleSharp: "a little sharp", littleFlat: "a little flat", sharp: "sharp", flat: "flat" },
@@ -169,7 +168,6 @@ const en = {
   notesAtATime: "Notes at a time",
   guessByLabel: "Guess by",
   guessBy: { eye: "Eye", ear: "Ear" },
-  hearAgain: "Tap the staff to hear the note again",
   guessed: (right: number, total: number) => `${right} of ${total} right`,
   nextIn: (seconds: number) => `Right! Next in ${seconds}…`,
   guessDone: (total: number, seconds: number) => `Done! All ${total} right. New game in ${seconds}…`,
@@ -213,9 +211,6 @@ const en = {
   slowest: (notes: string) => `Slowest: ${notes}`,
   playAgain: "Play again",
   close: "Close",
-  sound: "Sound",
-  referenceSound: "Play the note I pick",
-  pickNoteHint: "Tap the staff to pick a note to copy, and tap again to clear it",
   timelineLabel: "Note timeline. Scroll to a note and press Enter to start from it.",
 
   scales: "Scales",
@@ -377,7 +372,7 @@ const pt: Strings = {
   onScreen: "Na tela",
   staff: "Pauta",
   tuner: "Afinador",
-  panelSize: (panel, size) => `${panel}: ${{ big: "grande", small: "menor", off: "fora da tela" }[size]}`,
+  panelBig: (panel) => `${panel}: grande`,
   youArePlaying: "Você está tocando",
   tunerCaption: (hertz, tuning) => `${hertz} Hz, ${tuning}`,
   tuningWords: { inTune: "afinado", littleSharp: "um pouco alto", littleFlat: "um pouco baixo", sharp: "alto demais", flat: "baixo demais" },
@@ -467,7 +462,6 @@ const pt: Strings = {
   notesAtATime: "Notas por vez",
   guessByLabel: "Adivinhar pelo",
   guessBy: { eye: "Olho", ear: "Ouvido" },
-  hearAgain: "Toque na pauta para ouvir a nota de novo",
   guessed: (right: number, total: number) => `${right} de ${total} certas`,
   nextIn: (seconds: number) => `Certo! Próxima em ${seconds}…`,
   guessDone: (total: number, seconds: number) => `Pronto! Acertou as ${total}. Novo jogo em ${seconds}…`,
@@ -510,9 +504,6 @@ const pt: Strings = {
   slowest: (notes) => `Mais lentas: ${notes}`,
   playAgain: "Tocar de novo",
   close: "Fechar",
-  sound: "Som",
-  referenceSound: "Tocar a nota que eu escolher",
-  pickNoteHint: "Toque na pauta para escolher uma nota para imitar, e toque de novo para tirá-la",
   timelineLabel: "Linha do tempo das notas. Role até uma nota e aperte Enter para começar por ela.",
 
   scales: "Escalas",

@@ -1,6 +1,6 @@
 // Selecting a section with click, then Shift+click, on the lanes or the staff: what it shows, and what plays.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece, setLanguage, laneScale, setGlide, setPace, dockButton, pickMode } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, D_MAJOR as D, OUT, pickPiece, setLanguage, laneScale, setGlide, setPace, pickMode, setChoice } from "./lib.mjs";
 
 const BEAT = 120, HIT_X = 130, LANE = 84;
 wav(OUT + "section-silent.wav", [rest(3)]);
@@ -102,7 +102,7 @@ await stop(page); await sleep(200);
 
 // Loop
 await freshPractice(page);
-await dockButton(page, "Loop").click();
+await setChoice(page, "Repeat", "Loop");
 await clickTile(2); await clickTile(3, true);
 await followNotes(page, { midis: D, delayMs: 150 });
 await begin(page);
@@ -111,7 +111,7 @@ check("Loop repeats only the section", (await progress(page)).startsWith("Note 3
 await waitForText(page, "Loop 3");
 check("again and again", (await progress(page)).startsWith("Note 3 of 15"), await progress(page));
 await stop(page); await sleep(200);
-await page.click('.dock [aria-label="Repeat"] button:text-is("Once")'); await sleep(100);
+await setChoice(page, "Repeat", "Once"); await sleep(100);
 
 // Selecting mid-run
 await freshPractice(page);
@@ -182,9 +182,9 @@ await page.locator('.dock [aria-label="Pattern"] button:text-is("2")').click(); 
 check("so does changing the pattern", (await bands()) === 0, String(await bands()));
 await page.locator('.dock [aria-label="Pattern"] button:text-is("1")').click(); await sleep(300);
 await clickTile(0); await clickTile(1, true);
-await page.click('.dock [aria-label="Top note"] button:text-is("Twice")'); await sleep(300);
+await setChoice(page, "Top note", "Twice"); await sleep(300);
 check("and repeating the top note", (await bands()) === 0 && (await progress(page)) === "Note 1 of 16", await progress(page));
-await page.click('.dock [aria-label="Top note"] button:text-is("Once")'); await sleep(300);
+await setChoice(page, "Top note", "Once"); await sleep(300);
 
 // Fullscreen, and the other screens
 await page.click('button[aria-label="Fullscreen"]'); await sleep(400);

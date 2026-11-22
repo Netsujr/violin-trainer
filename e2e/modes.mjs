@@ -1,21 +1,22 @@
 // Loop, repeating a scale's top note, and the violin reference note, from the settings panel and the title row.
 import { wav, rest } from "./wav.mjs";
-import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn, setBpm, spyOnRecordings, recordings, setLanguage, clickLanes, laneScale, setPace } from "./lib.mjs";
+import { laneScore, open, nav, stop, sleep, check, followNotes, progress, begin, waitForText, freshPractice, savedLog, savedSettings, D_MAJOR as D, OUT, pickPiece, setCountIn, setBpm, spyOnRecordings, recordings, setLanguage, clickLanes, laneScale, setPace, choiceOf } from "./lib.mjs";
 
 const D_TOP_TWICE = [62, 64, 66, 67, 69, 71, 73, 74, 74, 73, 71, 69, 67, 66, 64, 62];
 wav(OUT + "modes-silent.wav", [rest(3)]);
 const s = await open(OUT + "modes-silent.wav");
 const { page } = s;
 // Each choice in the settings panel, by its group and its words.
-const choice = (group, name) => page.locator(`.dock [aria-label="${group}"] button:text-is("${name}")`);
+const choice = (group, name) => choiceOf(page, group, name);
 const loop = () => choice("Repeat", "Loop");
 const once = () => choice("Repeat", "Once");
 const top = () => choice("Top note", "Twice");
 const topOnce = () => choice("Top note", "Once");
 const dontWait = () => choice("Pace", "Keep moving");
 const waitForMe = () => choice("Pace", "Wait for me");
-const paceHint = () => page.locator('.dock-option:has([aria-label="Pace"]) .dock-caption').innerText();
-const pressed = async (button) => (await button.getAttribute("aria-pressed")) === "true";
+const paceHint = () => page.locator('.dock-option:has(button[aria-label^="Pace: "]) .dock-caption').innerText();
+// A choice of two says which it shows; other buttons are pressed or not.
+const pressed = async (button) => (button.picked ? button.picked() : (await button.getAttribute("aria-pressed")) === "true");
 
 await nav(page, "Practice"); await sleep(250);
 check("there's no Skip", (await page.locator('button:text-is("Skip")').count()) === 0);

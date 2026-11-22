@@ -1,7 +1,7 @@
 // The pitch line: with Keep moving on the moving line, what's played is drawn through the staff, the ghost notehead at
 // its tip. In tune, it crosses the middle of each notehead. It comes with Keep moving, with no switch of its own.
 import { wav, rest } from "./wav.mjs";
-import { open, nav, stop, sleep, check, followNotes, begin, freshPractice, savedSettings, waitForText, D_MAJOR, OUT, setPace, panelButton } from "./lib.mjs";
+import { open, nav, stop, sleep, check, followNotes, begin, freshPractice, savedSettings, waitForText, D_MAJOR, OUT, setPace } from "./lib.mjs";
 
 wav(OUT + "pitchline-silent.wav", [rest(3)]);
 const s = await open(OUT + "pitchline-silent.wav");
@@ -38,8 +38,8 @@ check("it stays once the run is over, until the next", (await page.locator(".pit
 
 // Only on the moving line: a bigger staff keeps it, the whole sheet doesn't.
 const lines = () => page.locator(".pitch-trace polyline").count();
-// Small at first, so off, then big.
-await panelButton(page, "Staff").click(); await panelButton(page, "Staff").click(); await sleep(200);
+// Small at first; its corner button makes it big.
+await page.click(".staff-panel .panel-size"); await sleep(200);
 check("a bigger staff is still the moving line, so the line stays", (await lines()) > 0);
 await page.click(".staff-toggle"); await sleep(200);
 check("the whole sheet isn't, so the line goes", (await lines()) === 0);

@@ -8,7 +8,6 @@ import { createFingerboard } from "./fingerboard";
 import { createFreeTarget } from "./freeTarget";
 import { createListenDock } from "./listenDock";
 import { createListenStage } from "./listenStage";
-import { dockOption } from "./panels";
 import { createFullscreen } from "./practice/fullscreen";
 import { createRunControls } from "./runControls";
 import { createStaff } from "./staff";
@@ -18,9 +17,11 @@ import { createVolumeCurve } from "./volumeCurve";
 
 const SILENCE_MS = 300;
 const MODES: ListenMode[] = ["free", "guesser", "technique"];
-// The staff's width, in its own units: Technique's rounds have up to eight notes, each with its name under it.
+// The longest a line of the staff is drawn, in its own units: room for the clef, then each note's share, and never
+// shorter than a lone note's line.
 const SHEET_WIDTH = 300;
-const WIDE_SHEET_WIDTH = 480;
+const LINE_START = 80;
+const NOTE_ROOM = 70;
 // Each mode's time goes in the log under its own name, in English like the pieces', and translated where it's shown.
 // ponytail: a run whose mode is switched partway is logged under the mode it started in; split it on a switch if that matters.
 const LOGGED_AS = {
@@ -69,9 +70,6 @@ export function listenScreen(goProgress: () => void): Screen {
     h("button", { type: "button", className: "sub-item", onclick: () => setMode(mode) }, h("span", { className: "sub-name" }, modeNames[mode]), h("span", { className: "sub-hint" }, t.modeHints[mode])),
   );
   const title = h("h1");
-  // What a tap on the staff does, under it: in free play it picks a note to copy, and by ear it sounds the note again.
-  // The CSS shows the one that applies.
-  const staffHint = h("p", { className: "stage-hint" }, h("span", { className: "hint-free" }, t.pickNoteHint), h("span", { className: "hint-ear" }, t.hearAgain));
 
   // Each mode has its own settings in the settings panel, and its own parts on the stage, which the CSS shows from
   // data-mode: Technique also shows how loud the playing is, under the tuner.
@@ -82,8 +80,6 @@ export function listenScreen(goProgress: () => void): Screen {
     modeButtons.forEach((button, index) => (button.ariaPressed = String(MODES[index] === mode)));
     title.textContent = modeNames[mode];
     dock.showMode(mode);
-    const width = mode === "technique" ? WIDE_SHEET_WIDTH : SHEET_WIDTH;
-    staff.resize(width, 1);
     staff.hidePlayed();
     staff.clearTrace();
     staff.element.classList.remove("preview");
@@ -96,7 +92,27 @@ export function listenScreen(goProgress: () => void): Screen {
     if (mode === "technique") technique.start();
     renderNote();
     showBoard(null);
+    fitStaff();
   }
+
+  // The sheet drawn as large as its panel allows: as wide, in its own units, as matches the panel's shape, so it fills
+  // the panel's height as well as its width, but no longer than its notes need, so a short, wide panel shows it at its
+  // full height and centred rather than spread along a long line. The staff itself never crowds a round's notes.
+  let sheetWidth = 0;
+  function fitStaff() {
+    const box = staff.element;
+    const sheet = box.querySelector("svg")?.viewBox.baseVal;
+    if (!sheet?.height || !box.clientHeight) return;
+    const notes = box.querySelectorAll(".vf-stavenote").length;
+    const width = Math.min(Math.max(SHEET_WIDTH, LINE_START + notes * NOTE_ROOM), Math.round((sheet.height * box.clientWidth) / box.clientHeight));
+    if (Math.abs(width - sheetWidth) < 4) return;
+    sheetWidth = width;
+    staff.resize(width, 1);
+    relabel();
+  }
+  // Refitted when the panel changes size, and when a mode draws new notes, as a round or a question can have more or fewer.
+  const staffObserver = new ResizeObserver(fitStaff);
+  const drawObserver = new MutationObserver(fitStaff);
 
   // The fingerboard: in free play the note picked, with what's heard against it, or else the note heard, where it's
   // played; in Technique the note to play now, with what's heard. The guesser shows its own.
@@ -120,11 +136,12 @@ export function listenScreen(goProgress: () => void): Screen {
     staff.draw(shown === null ? [] : [fillFingering({ pitch: pitchOf(shown) })], 0, toggleLabels());
   }
 
-  // A toggle changed: the notes drawn again with the labels now on.
+  // A toggle changed: the notes drawn again with the labels now on, and the sheet fitted to its new height.
   function relabel() {
     if (settings.listenMode === "guesser") guesser.relabel();
     else if (settings.listenMode === "technique") technique.relabel();
     else renderNote();
+    fitStaff();
   }
 
   function hear(frequency: number, now: number) {
@@ -185,11 +202,11 @@ export function listenScreen(goProgress: () => void): Screen {
   controls.startButton.classList.add("listen-start");
 
   const dock = createListenDock(relabel, () => stage.arrange(), {
-    free: [dockOption(t.sound, target.speaker)],
+    free: [],
     guesser: guesser.options,
     technique: technique.options,
   });
-  const stage = createListenStage([staff.element, staffHint, guesser.banner, technique.status, technique.results, technique.overlay], board.element, [volume.element]);
+  const stage = createListenStage([staff.element, target.speaker, guesser.banner, technique.status, technique.results, technique.overlay], board.element, [volume.element]);
   const element = h(
     "section",
     { className: "listen fills-window" },
@@ -201,6 +218,8 @@ export function listenScreen(goProgress: () => void): Screen {
 
   setMode(settings.listenMode);
   goQuiet();
+  staffObserver.observe(staff.element);
+  drawObserver.observe(staff.element, { childList: true });
 
   return {
     element,
@@ -212,6 +231,8 @@ export function listenScreen(goProgress: () => void): Screen {
       if (settings.listenMode === "technique") technique.start();
     },
     leave() {
+      staffObserver.disconnect();
+      drawObserver.disconnect();
       target.clear();
       guesser.hush();
       fullscreen.leave();

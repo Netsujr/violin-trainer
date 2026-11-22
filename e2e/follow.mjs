@@ -1,6 +1,6 @@
 // Keep moving: the lanes start on the first note played in tune, then keep moving at the BPM, each note is judged as it passes, and a run ends with a score.
 import { wav, rest } from "./wav.mjs";
-import { setRecord, open, nav, stop, sleep, check, followNotes, near, progress, laneScore, begin, waitForText, freshPractice, savedLog, savedSettings, canvasHasColor, D_MAJOR as D, OUT, setBpm, setLanguage, clickLanes, laneScale, cardOf } from "./lib.mjs";
+import { setRecord, open, nav, stop, sleep, check, followNotes, near, progress, laneScore, begin, waitForText, freshPractice, savedLog, savedSettings, canvasHasColor, D_MAJOR as D, OUT, setBpm, setLanguage, clickLanes, laneScale, cardOf, choiceOf } from "./lib.mjs";
 
 const BUNS = [66, 64, 62, 66, 64, 62, 62, 62, 62, 62, 64, 64, 64, 64, 66, 64, 62];
 // A beat's width on screen, once the lanes are drawn at their panel's scale.
@@ -9,9 +9,9 @@ wav(OUT + "follow-silent.wav", [rest(3)]);
 const s = await open(OUT + "follow-silent.wav", undefined, { keepCountIn: true });
 const { page } = s;
 // Pace, in the settings panel: Wait for me or Keep moving.
-const dontWait = () => page.locator('.dock [aria-label="Pace"] button:text-is("Keep moving")');
-const waitForMe = () => page.locator('.dock [aria-label="Pace"] button:text-is("Wait for me")');
-const waiting = async () => (await dontWait().getAttribute("aria-pressed")) === "false";
+const dontWait = () => choiceOf(page, "Pace", "Keep moving");
+const waitForMe = () => choiceOf(page, "Pace", "Wait for me");
+const waiting = async () => !(await dontWait().picked());
 const glideShown = () => page.locator('.dock button:text-is("Glide")').isVisible();
 // Once a frame, from inside the page: the lanes' position and the text above them.
 const watch = () => page.evaluate(() => {
@@ -23,9 +23,9 @@ const watch = () => page.evaluate(() => {
 const frames = () => page.evaluate(() => window.frames_);
 await nav(page, "Practice"); await sleep(250);
 BEAT_PX = 120 * (await laneScale(page));
-check("off by default: Pace starts on Wait for me", (await waiting()) && (await savedSettings(page)).followOn === false && (await waitForMe().getAttribute("aria-pressed")) === "true");
+check("off by default: Pace starts on Wait for me", (await waiting()) && (await savedSettings(page)).followOn === false && (await waitForMe().picked()));
 await dontWait().click(); await sleep(300);
-const hint = await page.locator('.dock-option:has([aria-label="Pace"]) .dock-caption').innerText();
+const hint = await page.locator('.dock-option:has(button[aria-label^="Pace: "]) .dock-caption').innerText();
 check("Keep moving is picked, and explains itself", !(await waiting()) && hint.includes("score"), hint);
 check("saved, and Glide no longer applies", (await savedSettings(page)).followOn === true && !(await glideShown()));
 

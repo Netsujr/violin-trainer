@@ -138,14 +138,6 @@ main:has(> .fills-window) {
   border-radius: 1rem;
 }
 
-.stage-panel[data-size="big"] {
-  grid-column: 1 / -1;
-}
-
-.stage-panel[data-size="small"] {
-  order: 1;
-}
-
 /* The settings panel, docked at the bottom: each setting its name over its control, in one wrapping row. */
 .dock {
   display: flex;
@@ -162,6 +154,13 @@ main:has(> .fills-window) {
 
 .dock-mode {
   display: contents;
+}
+
+/* Starts a new row of settings, taking back the row gap its own empty row would add. */
+.dock-break {
+  flex-basis: 100%;
+  height: 0;
+  margin-top: -0.875rem;
 }
 
 .dock-option {
@@ -185,7 +184,7 @@ main:has(> .fills-window) {
   font-size: 0.875rem;
 }
 
-/* A switch on its own in the settings panel, like Sound: outlined, lit brass when on. */
+/* A switch on its own in the settings panel, like Glide: outlined, lit brass when on. */
 .dock-option > button[aria-pressed] {
   min-height: 2.25rem;
   margin: 0;
@@ -204,18 +203,54 @@ main:has(> .fills-window) {
   border-color: var(--brass);
 }
 
-/* A panel's size in the On screen group: big is solid brass, small a dim brass, off plain. */
-.segments > button[data-size="big"] {
+/* A choice of two, like Pace: solid brass, as a picked choice is, saying which it is, with arrows to say a press
+   switches to the other. */
+.dock-option > .flip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0 0.875rem;
   color: var(--on-brass);
+  font-size: 0.875rem;
   font-weight: 700;
   background: var(--brass);
-  border-color: var(--brass);
+  border: 1px solid var(--brass);
+  border-radius: 1.125rem;
 }
 
-.segments > button[data-size="small"] {
-  color: var(--brass-light);
-  font-weight: 600;
-  background: var(--brass-dim);
+.dock-option > .flip::after {
+  content: "⇄";
+  opacity: 0.6;
+}
+
+/* A panel's own button, in its top right corner: arrows out to make it big, in to make it small. */
+.panel-size {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5rem;
+}
+
+.panel-size:hover {
+  color: var(--text);
+  background: var(--raised);
+}
+
+.panel-size svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* Phones: a group too wide for the row wraps onto another, rather than running off the panel. */
@@ -244,5 +279,10 @@ main:has(> .fills-window) {
 
   .fullscreen .stage-panels > .stage-panel:not(.offstage) {
     height: auto;
+  }
+
+  /* Each panel has a set height here, so big and small don't apply. */
+  .panel-size {
+    display: none;
   }
 }

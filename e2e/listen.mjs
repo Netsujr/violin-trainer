@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, savedLog, heard, spyOnRecordings, recordings, OUT, openTuning, pickMode, panelButton } from "./lib.mjs";
+import { setRecord, open, seed, nav, start, stop, sleep, check, savedSettings, savedLog, heard, spyOnRecordings, recordings, OUT, openTuning, pickMode, panelButton, sizeOf } from "./lib.mjs";
 
 const hzOf = (t) => Number(t.match(/([\d.]+) Hz/)?.[1]);
 
@@ -20,8 +20,13 @@ wav(OUT + "a440.wav", [{ hz: 440, seconds: 5, wave: "sine" }]);
   check("A440 reads 440 Hz ±1", min >= 439 && max <= 441, `min ${min} max ${max} n=${readings.length}`);
   const shown = await heard(s.page);
   check("A440 shows on the staff as finger 0, Lá, A", shown === "0 Lá A", shown);
-  const staff = await s.page.locator(".listen .staff svg").boundingBox();
-  check("the staff is a fifth larger than its 300-unit sheet", staff.width >= 360, `${staff.width}px`);
+  // Drawn as wide as matches its panel's shape, the sheet fills the panel's height as well as its width, unless that
+  // would make its line longer than its notes need, when it fills the height, centred.
+  const fit = await s.page.locator(".listen .staff").evaluate((box) => {
+    const sheet = box.querySelector("svg").viewBox.baseVal;
+    return { box: +(box.clientWidth / box.clientHeight).toFixed(2), sheet: +(sheet.width / sheet.height).toFixed(2), width: sheet.width };
+  });
+  check("the sheet is the shape of its panel, or as long as its note needs", Math.abs(fit.box - fit.sheet) / fit.box < 0.03 || (fit.width === 300 && fit.sheet < fit.box), JSON.stringify(fit));
   await s.page.screenshot({ path: OUT + "listen-a440.png" });
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
@@ -205,9 +210,9 @@ wav(OUT + "a440-short.wav", [{ hz: 440, seconds: 2.5, wave: "sine" }, rest(5)]);
   await s.close();
 }
 
-// The guesser's fingerboard, stepped from the settings panel: off, then big, taking a row of its own under the staff,
-// then small, stacked under the staff once that's small too, with no big one. The last panel on never goes off. Pressing its head
-// takes its tapes off. A brass circle shows where the note to play goes, and, for a note played flat, a ghost and a
+// The guesser's fingerboard, shown from the settings panel: big, taking a row of its own under the staff. Its corner
+// button makes it small, giving the staff the room, and with both small they stack. The last panel on can't be hidden.
+// Pressing its head takes its tapes off. A brass circle shows where the note to play goes, and, for a note played flat, a ghost and a
 // word saying which way to move. With Close enough slid down on the tuner only in tune counts: the dial loses its
 // brass at once, and a note 40 cents flat isn't right.
 wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
@@ -222,7 +227,12 @@ wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
   const box = (selector) => s.page.locator(selector).boundingBox();
   let [staffBox, boardBox] = [await box(".stage-staff"), await box(".stage-board")];
   check("switched on, it's big, a row of its own under the staff, as wide", boardBox.y >= staffBox.y + staffBox.height - 1 && Math.abs(boardBox.width - staffBox.width) < 2, JSON.stringify({ staffBox, boardBox }));
-  check("and its button says so to screen readers", (await panelButton(s.page, "Fingerboard").getAttribute("aria-label")) === "Fingerboard: big");
+  check("and its button says it's shown, and its corner button that it's big", (await panelButton(s.page, "Fingerboard").getAttribute("aria-pressed")) === "true" && (await sizeOf(s.page, ".stage-board").getAttribute("aria-label")) === "Fingerboard: big" && (await sizeOf(s.page, ".stage-board").getAttribute("aria-pressed")) === "true");
+  const staffBig = staffBox.height;
+  await sizeOf(s.page, ".stage-board").click();
+  [staffBox, boardBox] = [await box(".stage-staff"), await box(".stage-board")];
+  check("its corner button makes it small, and the staff plainly grows", (await sizeOf(s.page, ".stage-board").getAttribute("aria-pressed")) === "false" && staffBox.height > staffBig * 1.15, `${Math.round(staffBig)} → ${Math.round(staffBox.height)}`);
+  await sizeOf(s.page, ".stage-board").click();
   const tapesShown = () => s.page.evaluate(() => document.querySelector(".fingerboard-tapes").style.display !== "none");
   check("with its tapes on", (await tapesShown()) && (await tapes.getAttribute("aria-pressed")) === "true");
   await tapes.click();
@@ -250,14 +260,16 @@ wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
   check("the circle stays brass, the ghost shows, and the word says slide down", seen.stroke === "#e6ae48" && seen.dot && seen.hint === "↓ Slide down", JSON.stringify(seen));
   check("and the note isn't counted", (await s.page.locator(".guess-score").innerText()) === "0 of 10 right");
   await s.page.screenshot({ path: OUT + "listen-fingerboard.png" });
-  await panelButton(s.page, "Fingerboard").click();
-  await panelButton(s.page, "Staff").click();
+  await sizeOf(s.page, ".stage-board").click();
+  await sizeOf(s.page, ".stage-staff").click();
   [staffBox, boardBox] = [await box(".stage-staff"), await box(".stage-board")];
   check("both small, with no big one, they stack", boardBox.y >= staffBox.y + staffBox.height - 1 && Math.abs(boardBox.x - staffBox.x) < 2, JSON.stringify({ staffBox, boardBox }));
   await panelButton(s.page, "Staff").click();
-  check("the staff off leaves the fingerboard alone", (await s.page.locator(".stage-staff").isHidden()) && (await board.isVisible()));
+  check("the staff hidden leaves the fingerboard alone, with no size button, as it fills the room either way", (await s.page.locator(".stage-staff").isHidden()) && (await board.isVisible()) && (await panelButton(s.page, "Staff").getAttribute("aria-pressed")) === "false" && (await sizeOf(s.page, ".stage-board").isHidden()));
   await panelButton(s.page, "Fingerboard").click();
-  check("and the last panel on skips off, back to big", (await board.isVisible()) && (await panelButton(s.page, "Fingerboard").getAttribute("aria-label")) === "Fingerboard: big");
+  check("and the last panel on can't be hidden", (await board.isVisible()) && (await panelButton(s.page, "Fingerboard").getAttribute("aria-pressed")) === "true");
+  await panelButton(s.page, "Staff").click();
+  check("a panel shown again comes back big", (await sizeOf(s.page, ".stage-staff").getAttribute("aria-pressed")) === "true");
   await panelButton(s.page, "Tuner").click();
   check("the tuner switches off", (await s.page.locator(".stage-tuner").isHidden()) && (await savedSettings(s.page)).listenPanels.tuner === false);
   await stop(s.page);
@@ -425,8 +437,9 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
   await s.close();
 }
 
-// Free play's note to copy: a tap on the staff picks the natural note there and sounds it on the violin, its Sound
-// switch silences it but keeps it, and a second tap takes it away. Only free play has the switch.
+// Free play's note to copy: a tap on the staff picks the natural note there, silently, and lets the speaker in the
+// staff's corner sound it on the violin until pressed again, the staff keeping its size. A second tap takes the note
+// away, and the speaker can't be pressed again until there's another. Only free play has the speaker.
 {
   const s = await open(OUT + "a440.wav");
   await seed(s.page, { settings: { listenMode: "free" } });
@@ -438,19 +451,25 @@ for (const [file, expected] of [["a440.wav", ["In tune 1/4", "Smooth slurs 2/2",
     return { x: box.left + box.width * 0.6, y: lines[2].top + lines[2].height / 2 };
   });
   const drawn = () => s.page.locator(".listen .staff .vf-stavenote").count();
-  const speaker = s.page.locator('.dock button:text-is("Play the note I pick")');
+  const speaker = s.page.locator(".target-speaker");
+  check("with no note picked, the speaker shows but can't be pressed", (await speaker.isVisible()) && (await speaker.isDisabled()));
+  const staffBefore = await s.page.locator(".listen .staff svg").boundingBox();
   await s.page.mouse.click(middle.x, middle.y); await sleep(500);
-  let played = (await recordings(s.page)).at(-1);
-  check("a tap on the middle line picks B4, drawn, and sounds it on the violin", (await drawn()) === 1 && played?.midi === 71 && !played.stopped, JSON.stringify(played));
+  const staffAfter = await s.page.locator(".listen .staff svg").boundingBox();
+  check("a tap on the middle line picks B4, drawn, silently, the speaker now pressable", (await drawn()) === 1 && (await recordings(s.page)).length === 0 && (await speaker.isEnabled()));
+  check("and the staff keeps its size", JSON.stringify(staffBefore) === JSON.stringify(staffAfter), `${JSON.stringify(staffBefore)} → ${JSON.stringify(staffAfter)}`);
+  await speaker.click(); await sleep(300);
+  const played = (await recordings(s.page)).at(-1);
+  check("the speaker sounds it on the violin", played?.midi === 71 && !played.stopped && (await speaker.getAttribute("aria-pressed")) === "true", JSON.stringify(played));
   await speaker.click(); await sleep(200);
-  check("the Sound switch silences it, keeping the note, and is saved", (await drawn()) === 1 && (await recordings(s.page)).at(-1).stopped && (await savedSettings(s.page)).listenReferenceOn === false);
+  check("and pressed again, stops it, keeping the note", (await drawn()) === 1 && (await recordings(s.page)).at(-1).stopped && (await speaker.getAttribute("aria-pressed")) === "false");
   await speaker.click(); await sleep(300);
   await s.page.mouse.click(middle.x, middle.y); await sleep(200);
   // Away from the staff, so the note a tap would pick doesn't show faintly in its place.
   await s.page.mouse.move(5, 5); await sleep(100);
-  check("a second tap takes the note away, and the sound", (await drawn()) === 0 && (await recordings(s.page)).at(-1).stopped);
+  check("a second tap takes the note away and its sound, and the speaker can't be pressed", (await drawn()) === 0 && (await recordings(s.page)).at(-1).stopped && (await speaker.isDisabled()));
   await pickMode(s.page, "Note guesser");
-  check("only free play has the Sound switch", await speaker.isHidden());
+  check("only free play has the speaker", await speaker.isHidden());
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

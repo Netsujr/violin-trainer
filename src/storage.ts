@@ -40,7 +40,6 @@ export type Settings = {
   // What Listen does: show the note heard, the note guesser, or technique exercises.
   listenMode: ListenMode;
   // Free play: whether a note picked on the staff sounds.
-  listenReferenceOn: boolean;
   // The note guesser: the level of its random notes, and notes shown at a time.
   guesserLevel: GuesserLevel;
   guesserCount: number;
@@ -99,7 +98,6 @@ const DEFAULT_SETTINGS: Omit<Settings, "language"> = {
   planTargets: {},
   lastTargets: {},
   listenMode: "free",
-  listenReferenceOn: true,
   guesserLevel: "easy",
   guesserCount: 1,
   guesserBy: "eye",
@@ -141,8 +139,8 @@ export function getSettings() {
       // Close enough had its own switch before sliding it down to in tune turned it off.
       ...((stored as { yellowOn?: boolean }).yellowOn === false && { toleranceCents: stored.greenCents ?? DEFAULT_SETTINGS.greenCents }),
     };
-    // The views those panels replaced, and the drawer today's plan was, aren't kept once carried over.
-    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen", "yellowOn"]) delete (settings as Record<string, unknown>)[old];
+    // Settings that are gone, the views panels replaced, the drawer today's plan was and switches since removed, aren't kept.
+    for (const old of ["listenView", "guesserView", "staffBig", "staffOnly", "todayPlanOpen", "yellowOn", "listenReferenceOn"]) delete (settings as Record<string, unknown>)[old];
   }
   return settings;
 }

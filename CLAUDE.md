@@ -27,7 +27,8 @@ Read this file before making any change, and follow it.
 - **Hide what doesn't apply.** Don't grey it out.
 - Controls show their words. Only the icons everyone knows stand alone: + for add, full screen, back, previous and
   next, and a bin for delete or clear. An icon-only button has an `aria-label`, and no control relies on a tooltip.
-- Choices are joined segments (`chipGroup`), the one picked solid brass. A panel's button steps big, small and off.
+- Choices are joined segments (`chipGroup`), the one picked solid brass. The On screen buttons show or hide panels,
+  and each panel's corner button, top right, makes it big or small. Panels keep their order whatever their size.
 - Listen and Practice fill the window: a title row, the panels taking the height that's left, and the settings panel
   docked at the bottom. A screen's own items, like Listen's modes, go in the sidebar under its button.
 - Ask before anything that can't be undone, with `confirmAction`.

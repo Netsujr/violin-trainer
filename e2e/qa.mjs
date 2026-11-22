@@ -4,7 +4,7 @@
 // to them on a computer, but it isn't one: no real mic or speakers, and no iOS fullscreen or audio routing.
 import { readFileSync, rmSync } from "node:fs";
 import { chromium, devices, webkit } from "playwright-core";
-import { setRecord, nav, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm, spyOnRecordings, recordings, cardOf } from "./lib.mjs";
+import { setRecord, nav, auditCheck, canvasHasColor, check, D_MAJOR as D, followNotes, freshPractice, laneScore, OUT, progress, savedLog, savedSettings, saveStaff, sleep, staffNotes, waitForText, setCountIn, heard, setBpm, spyOnRecordings, recordings, cardOf, setChoice, flip } from "./lib.mjs";
 
 const PROFILES = {
   desktop: { engine: chromium, launch: { channel: "chrome", args: ["--autoplay-policy=no-user-gesture-required"] }, device: { viewport: { width: 1440, height: 900 } }, touch: false },
@@ -38,7 +38,6 @@ const stopRun = async () => { if (await button("Stop").count()) await press(butt
 // Options are always shown now, above the lanes.
 const options = async () => {};
 // A choice in the settings panel, by its group and its words.
-const choice = (group, name) => page.locator(`.dock [aria-label="${group}"] button:text-is("${name}")`);
 const setGlide = async (on) => { const glide = page.locator('.dock button:text-is("Glide")'); if ((await glide.getAttribute("aria-pressed")) !== String(on)) await press(glide); await sleep(100); };
 // Practice at a speed, through Options, which starts closed on a phone.
 const practiceAt = async (bpm) => {
@@ -184,8 +183,8 @@ await press(page.locator('header .metronome-button')); await sleep(100);
 
 flow("7. Keep moving");
 await practiceAt(120);
-await press(choice("Pace", "Keep moving")); await sleep(300);
-check("Keep moving is picked", (await choice("Pace", "Keep moving").getAttribute("aria-pressed")) === "true");
+await setChoice(page, "Pace", "Keep moving"); await sleep(300);
+check("Keep moving is picked", (await flip(page, "Pace").innerText()) === "Keep moving");
 check("Glide no longer applies, so it's hidden", await page.locator('.dock button:text-is("Glide")').isHidden());
 await followNotes(page, { midis: D, delays: { 3: 60000 } });
 await startRun();
@@ -203,20 +202,20 @@ const score = await laneScore(page);
 check("ends with a score: 14 of 15 is 93%", (await laneScore(page)) === "Score: 93% · 14 hit, 1 missed" && score.includes("14 hit, 1 missed"), score.replaceAll("\n", " / "));
 await stopRun();
 check("the score goes in the log", (await savedLog(page)).at(-1).score === 93);
-await press(choice("Pace", "Wait for me")); await sleep(100);
+await setChoice(page, "Pace", "Wait for me"); await sleep(100);
 
 flow("8. Loop and the top note twice");
 await freshPractice(page);
-await press(choice("Top note", "Twice")); await sleep(300);
+await setChoice(page, "Top note", "Twice"); await sleep(300);
 check("Twice adds the note", (await progress(page)) === "Note 1 of 16", await progress(page));
-await press(choice("Top note", "Once")); await sleep(300);
-await press(choice("Repeat", "Loop")); await sleep(100);
+await setChoice(page, "Top note", "Once"); await sleep(300);
+await setChoice(page, "Repeat", "Loop"); await sleep(100);
 await followNotes(page, { midis: D, delayMs: 120 });
 await startRun();
 await waitForText(page, "Loop 2", 60000);
 check("Loop goes round again", (await progress(page)).startsWith("Note 1 of 15"), await progress(page));
 await stopRun();
-await press(choice("Repeat", "Once")); await sleep(100);
+await setChoice(page, "Repeat", "Once"); await sleep(100);
 
 flow("9. Picking notes");
 await freshPractice(page);

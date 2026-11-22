@@ -21,8 +21,8 @@ type Deps = {
   trackSwitches: HTMLElement;
 };
 
-// Practice's settings panel, docked under the panels in one wrapping row: what's written on the notes, which panels are
-// on screen, then how a run goes. show hides what doesn't apply.
+// Practice's settings panel, docked under the panels: what's written on the notes, which panels are on screen and the
+// pattern, then, on a row of its own, how a run goes. show hides what doesn't apply.
 export function createPracticeDock({ stopRun, render, loadPiece, changed, arrange, trackSwitches }: Deps) {
   const settings = getSettings();
   const panels = settings.practicePanels;
@@ -30,14 +30,26 @@ export function createPracticeDock({ stopRun, render, loadPiece, changed, arrang
     saveSettings();
     arrange();
   };
-  // A choice of two, kept, which some choices make end the run first.
-  const pair = <Key extends "followOn" | "loopOn" | "repeatTopOn">(key: Key, label: string, names: [string, string], apply: () => void, stops = false) =>
-    chipGroup(label, [false, true], (on) => names[Number(on)], () => settings[key], async (on) => {
-      settings[key] = on;
-      saveSettings();
-      if (stops) await stopRun();
-      apply();
+  // A choice of two, kept, as one button saying which is picked: pressing it picks the other. Some end the run first.
+  function pair<Key extends "followOn" | "loopOn" | "repeatTopOn">(key: Key, label: string, names: [string, string], apply: () => void, stops = false) {
+    const button = h("button", {
+      type: "button",
+      className: "flip",
+      async onclick() {
+        settings[key] = !settings[key];
+        saveSettings();
+        show();
+        if (stops) await stopRun();
+        apply();
+      },
     });
+    const show = () => {
+      button.textContent = names[Number(settings[key])];
+      button.ariaLabel = `${label}: ${button.textContent}`;
+    };
+    show();
+    return button;
+  }
 
   const labels = h("div", { role: "group", className: "segments", ariaLabel: t.onTheNotes }, ...(["fingers", "noteNames", "letterNames"] as const).map((key) => createLabelToggle(key, render)));
   const tuner = wordToggle(t.tuner, panels.tuner, (on) => {
@@ -77,10 +89,12 @@ export function createPracticeDock({ stopRun, render, loadPiece, changed, arrang
       { className: "dock", ariaLabel: t.screens.Settings },
       dockOption(t.onTheNotes, labels),
       dockOption(t.onScreen, onScreen),
+      pattern,
+      // How a run goes starts a row of its own.
+      h("div", { className: "dock-break" }),
       pace,
       dockOption(t.repeat, pair("loopOn", t.repeat, [t.once, t.loop], changed)),
       topNote,
-      pattern,
       countIn,
       glide,
       track,

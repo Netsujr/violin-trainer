@@ -1,7 +1,7 @@
 // A five-minute recording: it saves, plays back in the Calendar, and its note markers land on their notes.
 import { rmSync } from "node:fs";
 import { wav, note, rest } from "./wav.mjs";
-import { open, nav, start, stop, sleep, check, setRecord, dockButton, D_MAJOR, OUT } from "./lib.mjs";
+import { open, nav, start, stop, sleep, check, setRecord, D_MAJOR, OUT, setChoice } from "./lib.mjs";
 const profile = OUT + "profile-long";
 rmSync(profile, { recursive: true, force: true });
 wav(OUT + "dmajor-long.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);
@@ -10,7 +10,7 @@ const page = s.page;
 await nav(page, "Practice");
 await setRecord(page, true);
 // Loop keeps the run going round the scale for the whole five minutes.
-await dockButton(page, "Loop").click();
+await setChoice(page, "Repeat", "Loop");
 await start(page);
 await page.waitForSelector('button:text-is("Stop")');
 await sleep(5 * 60 * 1000 + 5000);
