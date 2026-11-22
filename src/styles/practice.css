@@ -114,6 +114,11 @@
   position: relative;
 }
 
+/* The tuner's column, beside the last row of panels only. */
+.practice .stage-panels {
+  --side-width: 18.75rem;
+}
+
 /* The staff: one line moving with the lanes, or the whole sheet, scrolling if it's longer than its panel. */
 .staff-panel {
   padding: 0.5rem 0.75rem;
@@ -322,6 +327,12 @@ html:not(.fullscreen) .stats {
 }
 
 @media (max-width: 900px) {
+  /* The panels stack, the tuner last, under them all. */
+  .practice .stage-panels > * {
+    grid-row: auto !important;
+    grid-column: 1 / -1 !important;
+  }
+
   /* On a short screen, a phone on its side, the lanes leave room for the title and Start above them. */
   .lanes-panel {
     height: min(15rem, 100dvh - 9.5rem);

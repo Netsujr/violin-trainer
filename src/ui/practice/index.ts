@@ -84,7 +84,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   board.lanesPanel.append(lanesSize);
   board.staffPanel.append(staffSize);
   const boardPanel = h("div", { className: "stage-panel stage-board" }, fingerboard.element, boardSize);
-  const panels = h("div", { className: "stage-panels" }, board.lanesPanel, board.staffPanel, boardPanel);
+  // The tuner sits beside the last row of panels only, so the rows above have the whole width.
+  const panels = h("div", { className: "stage-panels" }, board.lanesPanel, board.staffPanel, boardPanel, tuner.element);
   const results = createResults(board, playAgain, { onSpot: (spot) => { selection.spot(spot); renderNotes(); }, onPractise: practiseSpot });
   const { staff, highway } = board;
   const countIn = createCountIn(metronome, (text) => (progress.textContent = withLoopNumber(text)));
@@ -282,7 +283,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       { element: board.lanesPanel, size: lanes, weight: LANES_WEIGHT, sizeButton: lanesSize },
       { element: board.staffPanel, size: staff, weight: STAFF_WEIGHT, sizeButton: staffSize },
       { element: boardPanel, size: boardShown, weight: BOARD_WEIGHT, sizeButton: boardSize },
-    ]);
+    ], tunerOn ? tuner.element : undefined);
     board.lanesPanel.hidden = false;
     board.lanesPanel.classList.toggle("offstage", lanes === "off");
     tuner.element.hidden = !tunerOn;
@@ -305,7 +306,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
       controls.message,
       // Aligning, the controls for lining the track up sit above the panels, and its waveform under the lanes.
       ...(track.panel ? [track.panel] : []),
-      h("div", { className: "stage" }, panels, tuner.element),
+      h("div", { className: "stage" }, panels),
       ...(track.panel ? [] : [toolbar.dock]),
       results.element,
       countIn.overlay,

@@ -11,8 +11,9 @@ type Panel = { element: HTMLElement; size: PanelSize; weight: number; sizeButton
 
 // Lays out panels in grid in their own order, whatever their size, so none moves when another changes: each big one a
 // row of its own, and two small ones side by side sharing a row. With no big one, the small ones stack instead of
-// squeezing into thin columns. Each corner button shows which way it would go, and goes when its panel is alone.
-export function arrangePanels(grid: HTMLElement, panels: Panel[]) {
+// squeezing into thin columns. Each corner button shows which way it would go, and goes when its panel is alone. side,
+// if given, sits at the end of the last row only, as tall as it, leaving the rows above the whole width.
+export function arrangePanels(grid: HTMLElement, panels: Panel[], side?: HTMLElement) {
   const shown = panels.filter((panel) => panel.size !== "off");
   for (const panel of panels) {
     panel.element.hidden = panel.size === "off";
@@ -25,19 +26,28 @@ export function arrangePanels(grid: HTMLElement, panels: Panel[]) {
   const anyBig = shown.some((panel) => panel.size === "big");
   const rows: number[] = [];
   let paired = false;
+  let lastFull: HTMLElement | null = null;
   for (let index = 0; index < shown.length; index++) {
     const [panel, next] = [shown[index], shown[index + 1]];
     if (anyBig && panel.size === "small" && next?.size === "small") {
       rows.push(Math.max(panel.weight, next.weight) * SMALL_SHARE);
       panel.element.style.gridColumn = next.element.style.gridColumn = "";
       paired = true;
+      lastFull = null;
       index++;
     } else {
       rows.push(anyBig && panel.size === "small" ? panel.weight * SMALL_SHARE : panel.weight);
       panel.element.style.gridColumn = "1 / -1";
+      lastFull = panel.element;
     }
   }
-  grid.style.gridTemplateColumns = paired ? "repeat(2, minmax(0, 1fr))" : "minmax(0, 1fr)";
+  const columns = paired ? "repeat(2, minmax(0, 1fr))" : "minmax(0, 1fr)";
+  grid.style.gridTemplateColumns = side ? `${columns} var(--side-width)` : columns;
+  if (side) {
+    if (lastFull) lastFull.style.gridColumn = "1 / -2";
+    side.style.gridRow = String(rows.length);
+    side.style.gridColumn = "-2 / -1";
+  }
   grid.style.gridTemplateRows = rows.map((weight) => `minmax(0, ${weight}fr)`).join(" ");
 }
 

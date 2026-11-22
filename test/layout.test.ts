@@ -37,6 +37,15 @@ describe("arrangePanels", () => {
     expect(sizeButton.hidden).toBe(true);
   });
 
+  it("puts a side panel beside the last row only, leaving the rows above the whole width", () => {
+    const grid = { style: {} } as HTMLElement;
+    const [top, bottom] = [panel("big", 3), panel("small", 2)];
+    const side = { style: {} } as HTMLElement;
+    arrangePanels(grid, [top, bottom], side);
+    expect([top.element.style.gridColumn, bottom.element.style.gridColumn, side.style.gridColumn, side.style.gridRow]).toEqual(["1 / -1", "1 / -2", "-2 / -1", "2"]);
+    expect(grid.style.gridTemplateColumns).toBe("minmax(0, 1fr) var(--side-width)");
+  });
+
   it("keeps the panels in their order, so a small one above a big one stays above it, across the whole width", () => {
     const small = panel("small", 2);
     expect(rowsOf(small, panel("big", 1.6))).toBe("minmax(0, 1fr) minmax(0, 1.6fr)");
