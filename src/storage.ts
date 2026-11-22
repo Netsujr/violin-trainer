@@ -24,7 +24,8 @@ export type Settings = {
   pattern: number;
   // The staff panel's whole sheet, rather than one line moving with the lanes.
   staffOpen: boolean;
-  // In full screen, the whole sheet fills the panel, with one to four bars to a line, whichever draws it largest.
+  // In full screen, the whole sheet is drawn as large as fits, with one to four bars to a line, whichever draws it
+  // largest, rather than always four.
   sheetFill: boolean;
   // Practice's panels: the lanes, staff and fingerboard each big, small or off, and the tuner on or off.
   practicePanels: { lanes: PanelSize; staff: PanelSize; board: PanelSize; tuner: boolean };

@@ -37,7 +37,7 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
       viewChanged();
     },
   });
-  // In full screen, the whole sheet fills the panel, or keeps four bars to a line.
+  // In full screen, the whole sheet is drawn as large as fits: with as many bars to a line as draws it largest, or four.
   const fillButton = h("button", {
     type: "button",
     className: "sheet-fill",
@@ -66,7 +66,7 @@ export function createStaffSection(pickNote: (index: number, extend: boolean) =>
   function refit() {
     staffPanel.style.setProperty("--timeline-scale", String(staffScale()));
     highway.resize();
-    staff.setFill(settings.sheetFill && document.documentElement.classList.contains("fullscreen"));
+    staff.setFill(document.documentElement.classList.contains("fullscreen") ? (settings.sheetFill ? [4, 3, 2, 1] : [4]) : null);
     staff.resize(staffWidth(), staffScale());
     render();
   }

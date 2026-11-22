@@ -28,6 +28,8 @@ for (const [index, name] of ["Ouvir", "Praticar", "Biblioteca", "Calendário", "
 
 await page.locator("header > nav > button").nth(3).click();
 await sleep(200);
+// Each piece's runs in full, under the chart button by the day's total.
+await page.click(".day-details-toggle"); await sleep(100);
 const logText = await page.locator("main > section").innerText();
 check("pt: log titles and numbers are translated", logText.includes("Ré maior") && logText.includes("Prática livre") && logText.includes("3,2 min") && logText.includes("2 passadas"), logText.slice(0, 80).replaceAll("\n", " "));
 check("pt: saved logs keep the English title", await page.evaluate(() => JSON.parse(localStorage.getItem("log"))[0].pieceTitle === "D major"));

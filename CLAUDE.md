@@ -5,7 +5,7 @@ Read this file before making any change, and follow it.
 ## Working with the user
 
 - **Don't run any tests** (unit or browser, targeted or full) unless the user asks for a run. Write or update tests to match a change, but don't run them.
-- **Never commit or push** unless told to, every time. Leave changes local so the user can see them.
+- **Commit** each finished piece of work without asking. **Push** only when told to.
 - **Stay in scope.** Build only what was asked. Offer extras in one line, and don't build them.
 - **Short answers.** Under 100 words where possible. Say what was skipped and what is still unchecked.
 - **Don't build parked ideas** unless asked: Align as its own screen, and listen-to-draft in Add piece.

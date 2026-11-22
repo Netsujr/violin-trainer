@@ -376,6 +376,8 @@ await say("Delete");
 check("Delete, once confirmed, removes only the recording, leaving the day's summaries", (await page.locator("audio").count()) === 0 && (await page.locator(".recording-note").count()) === 0 && (await page.locator(".day-piece li").count()) >= 2);
 
 flow("13. Calendar");
+// Each piece's runs in full, under the chart button by the day's total.
+await press(page.locator(".day-details-toggle")); await sleep(100);
 const logText = await page.locator("main > section").innerText();
 check("reads sensibly", ["Practised for", "Score: 93%", "D (Ré) major", "Plan"].every((word) => logText.includes(word)) && !/NaN|undefined|null/.test(logText), logText.replaceAll("\n", " | ").slice(0, 200));
 await shot("13-calendar");

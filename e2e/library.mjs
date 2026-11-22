@@ -45,6 +45,8 @@ await nav(page, "Library");
 await showGroup(page, "My songs");
 check("saved piece survives a reload", (await page.locator(".piece", { hasText: "Pasted D major" }).count()) === 1);
 await (await cardOf(page, "D (Ré) major")).locator('button:text-is("Practise")').click();
+// The recording plays a note every 0.62 s, so the lanes glide on a quicker beat, to be there before each note.
+await setBpm(page, 120);
 await setRecord(page, true);
 await start(page);
 const deadline = Date.now() + 30000;
@@ -112,7 +114,8 @@ check("Delete, once confirmed, removes the player and note", (await page.locator
 // Closing mid-session still logs
 await nav(page, "Practice");
 await start(page);
-await sleep(500);
+// Long enough for the first note to land on its beat.
+await sleep(1500);
 const before = await page.evaluate(() => JSON.parse(localStorage.getItem("log")).length);
 await page.reload();
 await page.waitForSelector("nav button");

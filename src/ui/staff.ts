@@ -19,7 +19,7 @@ export const LINE_HEIGHT = 130;
 const CLEF_SPACE = 60;
 // The least room a note in an open sheet's fullest line gets, so a narrow screen shrinks the sheet rather than crowd it.
 const BAR_NOTE_WIDTH = 40;
-// An open sheet has four bars to a line, however wide the page, or as few as fill its panel best.
+// An open sheet has four bars to a line, however wide the page, unless fewer draw it larger in full screen.
 const BARS_PER_LINE = 4;
 const DURATIONS: Record<number, string> = { 0.5: "8", 1: "q", 1.5: "qd", 2: "h", 3: "hd", 4: "w" };
 // How far a line's rows of fingers and names sit outside the staff and its notes, measured to the text's baseline.
@@ -250,8 +250,9 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
   let nudge = 0;
   let section: Section | null = null;
   let followedBeat = 0;
-  // The open sheet drawn as large as its box allows, rather than at its usual size.
-  let fill = false;
+  // The bars to a line the open sheet can have when it's drawn as large as its box allows, rather than at its usual
+  // size, or null when it isn't.
+  let fill: number[] | null = null;
   function noteAt(event: MouseEvent) {
     const box = element.querySelector("svg")!.getBoundingClientRect();
     const x = ((event.clientX - box.left) * sheet.width) / box.width;
@@ -265,15 +266,17 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     return onLine.reduce((nearest, index) => (distance(index) < distance(nearest) ? index : nearest));
   }
 
-  // How many bars to a line, one to four, draw the open sheet largest in its box, and how large, extra being the room
-  // above and below the lines. A bar is never split across two lines.
-  function fillBox(notes: StaffNote[], extra: number) {
+  // Which of choices, bars to a line, draws the open sheet largest in its box, and how large: as large as fits it all,
+  // but never smaller than its usual size, where it scrolls instead. extra is the room above and below the lines. A tie
+  // goes to the first choice. A bar is never split across two lines.
+  function fillBox(notes: StaffNote[], extra: number, choices: number[]) {
     const { clientWidth, clientHeight } = element;
     if (!clientWidth || !clientHeight) return null;
     let best = { perLine: BARS_PER_LINE, scale: 0 };
-    for (let perLine = 1; perLine <= Math.min(BARS_PER_LINE, toBars(notes, meter).length); perLine++) {
+    for (const perLine of choices) {
       const lines = layOut(notes, meter, perLine);
-      const scale = Math.min(clientWidth / lineWidth(lines), clientHeight / (extra + lines.length * LINE_HEIGHT));
+      const across = clientWidth / lineWidth(lines);
+      const scale = Math.max(Math.min(across, clientHeight / (extra + lines.length * LINE_HEIGHT)), Math.min(1, across));
       if (scale > best.scale) best = { perLine, scale };
     }
     return best;
@@ -306,7 +309,7 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     const labelled = labels.names || labels.fingers || labels.letters;
     const top = labelled ? LABELLED_TOP + (notes.some((note) => note.bow) ? BOW_ROOM : 0) + (notes.some((note) => note.slur) ? SLUR_ROOM : 0) : TOP;
     const bottom = labelled ? LABELLED_BOTTOM : 0;
-    const fit = !collapsed && fill ? fillBox(notes, top + bottom) : null;
+    const fit = !collapsed && fill ? fillBox(notes, top + bottom, fill) : null;
     const sheetWidth = collapsed ? width : fit ? element.clientWidth / fit.scale : Math.max(width, lineWidth(layOut(notes, meter)));
     const lines = collapsed ? [{ line: toBars(notes, meter), formatWidth: totalBeats * COLLAPSED_BEAT_WIDTH }] : openLines(notes, sheetWidth, meter, fit?.perLine);
     // Collapsed, there is a screen of empty staff after the last note, so it can still reach the hit line.
@@ -322,11 +325,11 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
     // In a box taller than the sheet, as Listen keeps, the sheet sits at the bottom, so its staff barely moves as
     // labels come and go.
     svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
-    // Open, the sheet fills the page, as the CSS says, or its box when filling it. Collapsed, it keeps the timeline's
-    // scale and scrolls.
-    const drawnAt = collapsed ? scale : fit?.scale;
-    svg.style.width = drawnAt ? `${Math.floor(fullWidth * drawnAt)}px` : "";
-    svg.style.height = drawnAt ? `${Math.floor(height * drawnAt)}px` : "";
+    // Open, the sheet fills the page, as the CSS says, or its box when filling it, a fraction of a pixel short so it
+    // never scrolls. Collapsed, it keeps the timeline's scale exactly, so its notes line up with the lanes, and scrolls.
+    const size = (units: number) => (collapsed ? `${units * scale}px` : fit ? `${Math.floor(units * fit.scale)}px` : "");
+    svg.style.width = size(fullWidth);
+    svg.style.height = size(height);
 
     const allNotes: StaveNote[] = [];
     lines.forEach(({ line, formatWidth }, lineIndex) => {
@@ -480,9 +483,9 @@ export function createStaff(width = 300, startCollapsed = false, scale = 1, onPi
       collapsed = value;
       shown = null;
     },
-    setFill(value: boolean) {
-      if (value !== fill) shown = null;
-      fill = value;
+    setFill(choices: number[] | null) {
+      if (String(choices) !== String(fill)) shown = null;
+      fill = choices;
     },
     resize(newWidth: number, newScale: number) {
       width = newWidth;

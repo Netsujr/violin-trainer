@@ -1,7 +1,7 @@
 // Each user flow on a computer, from start to finish, as a person would do it.
 import { chromium } from "playwright-core";
 import { wav, note, rest } from "./wav.mjs";
-import { laneScore, setRecord, begin, nav, start, stop, sleep, check, skipCountIn, trackNotes, progress, D_MAJOR as D, OUT, answer, saveStaff, staffNotes, heard, openSettings, clickLanes, cardOf } from "./lib.mjs";
+import { laneScore, setRecord, begin, nav, start, stop, sleep, check, skipCountIn, trackNotes, progress, D_MAJOR as D, OUT, answer, saveStaff, staffNotes, heard, openSettings, clickLanes, cardOf, setBpm } from "./lib.mjs";
 wav(OUT + "q-scale.wav", [...D.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);
 wav(OUT + "q-a4.wav", [note(69, 5)]);
 wav(OUT + "q-silent.wav", [rest(3)]);
@@ -83,6 +83,8 @@ flow("4. Practice: a whole scale, again, and stop");
 {
   const s = await open("q-scale.wav");
   await nav(s.page, "Practice"); await sleep(200);
+  // The recording plays a note every 0.62 s, so the lanes glide on a quicker beat, to be there before each note.
+  await setBpm(s.page, 120);
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")');
   await s.page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("All"), null, { timeout: 25000 });
   await sleep(300);
@@ -180,6 +182,8 @@ flow("8. Calendar: recordings");
 {
   const s = await open("q-scale.wav");
   await nav(s.page, "Practice"); await sleep(200);
+  // The recording plays a note every 0.62 s, so the lanes glide on a quicker beat, to be there before each note.
+  await setBpm(s.page, 120);
   await setRecord(s.page, true);
   await start(s.page); await s.page.waitForSelector('button:text-is("Stop")');
   check("Record locks during a session", await s.page.locator('header button[aria-label="Record"]').isDisabled());

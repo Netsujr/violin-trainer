@@ -151,11 +151,10 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
   header.writeUInt32LE(36 + data.length, 4);
   header.writeUInt32LE(data.length, 40);
   writeFileSync(OUT + "s-quiet.wav", Buffer.concat([header, data]));
+  // Free play listens on its own, with no Start.
   for (const [minRms, expected] of [[0.01, "0 Lá A"], [0.05, ""]]) {
     const s = await open(OUT + "s-quiet.wav");
     await seed(s.page, { settings: { minRms } });
-    await start(s.page);
-    await s.page.waitForSelector('button:text-is("Stop")');
     await sleep(1200);
     const shown = await heard(s.page);
     check(`gate ${minRms}: a quiet note reads ${expected || "nothing"}`, shown === expected, shown);
@@ -166,8 +165,6 @@ const picture = (page) => page.locator("canvas").evaluate((canvas) => canvas.toD
 // The needle
 for (const [file, cents, zone] of [["s-green.wav", 8, "green"], ["s-yellow.wav", 30, "yellow"], ["s-out.wav", 46, "out"]]) {
   const s = await open(OUT + file);
-  await start(s.page);
-  await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1200);
   // The needle turns 1.8 degrees a cent, 90 at 50 cents sharp.
   const seen = await s.page.locator(".needle").evaluate((needle) => ({ zone: needle.dataset.zone, cents: parseFloat(needle.querySelector(".dial-needle").style.transform.match(/-?[\d.]+/)[0]) / 1.8 }));
@@ -178,8 +175,6 @@ for (const [file, cents, zone] of [["s-green.wav", 8, "green"], ["s-yellow.wav",
   const s = await open(OUT + "s-yellow.wav");
   await openTuning(s.page);
   await s.page.locator('input[aria-label="Close enough"]').fill("50");
-  await start(s.page);
-  await s.page.waitForSelector('button:text-is("Stop")');
   await sleep(1200);
   // Close enough at 50 cents reaches the dial's ends, the first at (30, 160).
   const seen = await s.page.evaluate(() => ({ zone: document.querySelector(".needle").dataset.zone, arc: document.querySelector(".needle .dial-yellow").getAttribute("d") }));

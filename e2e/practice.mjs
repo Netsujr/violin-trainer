@@ -1,5 +1,5 @@
 import { wav, note, rest } from "./wav.mjs";
-import { begin, laneScore, open, nav, start, stop, sleep, check, progress, freshPractice, canvasHasColor, D_MAJOR, OUT, pickPiece, clickLanes, cardOf } from "./lib.mjs";
+import { begin, laneScore, open, nav, start, stop, sleep, check, progress, freshPractice, canvasHasColor, D_MAJOR, OUT, pickPiece, clickLanes, cardOf, setBpm } from "./lib.mjs";
 
 const indexOf = (text) => Number(text.match(/Note (\d+) of/)?.[1] ?? 99);
 
@@ -9,6 +9,8 @@ wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), 
   const s = await open(OUT + "dmajor.wav");
   await nav(s.page, "Practice");
   await s.page.waitForSelector("canvas");
+  // The recording plays a note every 0.62 s, so the lanes glide on a quicker beat, to be there before each note.
+  await setBpm(s.page, 120);
   await sleep(200);
   await s.page.screenshot({ path: OUT + "practice-idle.png" });
   await start(s.page);
@@ -79,7 +81,8 @@ wav(OUT + "ended.wav", [note(62, 3)]);
   await nav(s.page, "Practice");
   await start(s.page);
   await s.page.waitForSelector('button:text-is("Stop")');
-  await sleep(600);
+  // Long enough for the first note to land on its beat.
+  await sleep(1500);
   await pickPiece(s.page, "g-major-2oct");
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])');
   const log = await s.page.evaluate(() => JSON.parse(localStorage.getItem("log")));
@@ -112,7 +115,8 @@ wav(OUT + "e4.wav", [note(64, 5)]);
   const during = await progress(s.page);
   check("the target doesn't count while the reference sounds", during.startsWith("Note 2 of"), during);
   await s.page.click(".reference");
-  await sleep(800);
+  // A hit lands on the next beat, up to a second later at 60 BPM.
+  await sleep(1800);
   const after = await progress(s.page);
   check("it counts once the reference stops", after.startsWith("Note 3 of"), after);
   await s.close();
@@ -161,7 +165,8 @@ wav(OUT + "longbow.wav", [note(62, 4)]);
   await nav(s.page, "Library");
   await (await cardOf(s.page, "Repeat")).locator('button:text-is("Practise")').click();
   await start(s.page);
-  await sleep(1000);
+  // Past the first beat, where the first note's hit lands.
+  await sleep(1800);
   const during = await progress(s.page);
   check("one long bow clears only the first repeated note", during.startsWith("Note 2 of 3"), during);
   await sleep(4500);

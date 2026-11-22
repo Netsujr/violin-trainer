@@ -106,7 +106,7 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await s.close();
 }
 {
-  const s = await practice("t-silent.wav", { settings: { bpm: 30 } }, { midis: D, delays: { 6: 60000, 7: 60000 } });
+  const s = await practice("t-silent.wav", { settings: { bpm: 30 } }, { midis: D, delays: { 5: 60000, 6: 60000 } });
   await run(s);
   await s.page.waitForFunction(() => document.querySelector(".highway-scroll").scrollLeft > 5);
   await stop(s.page);
@@ -115,9 +115,10 @@ wav(OUT + "t-clicked.wav", D.flatMap((m) => [note(m, 0.48), { hz: 2500, seconds:
   await start(s.page);
   await s.page.waitForFunction(() => document.querySelector(".highway-scroll").scrollLeft > 5);
   const box = await s.page.locator("canvas").boundingBox();
-  await clickLanes(s.page, 130 + 5 * 120 + 40, 126, await scroll(s.page));
+  // The fifth note, which shows on the screen at the start.
+  await clickLanes(s.page, 130 + 4 * 120 + 40, 126, await scroll(s.page));
   await sleep(700);
-  check("tempo: clicking a note during a glide goes there", (await progress(s.page)) === "Note 6 of 15" && Math.abs((await scroll(s.page)) - 5 * 120 * (await laneScale(s.page))) <= 1);
+  check("tempo: clicking a note during a glide goes there", (await progress(s.page)) === "Note 5 of 15" && Math.abs((await scroll(s.page)) - 4 * 120 * (await laneScale(s.page))) <= 1, `${await progress(s.page)} ${await scroll(s.page)} vs ${4 * 120 * (await laneScale(s.page))}`);
   check("no page errors", s.problems.length === 0, s.problems.join(" | "));
   await s.close();
 }

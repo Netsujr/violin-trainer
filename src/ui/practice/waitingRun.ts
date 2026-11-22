@@ -18,7 +18,6 @@ type Deps = {
 
 // The usual run: each note waits until it's played in tune for its hold time, then the lanes glide on to the next beat.
 export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdMs, showProgress, moveOn }: Deps) {
-
   // A hit that waited for its beat lands on it.
   function arriveOnBeat(session: Session, { cents, at, arrivesAt }: { cents: number; at: number; arrivesAt: number }) {
     const previousMidi = session.currentMidi;
