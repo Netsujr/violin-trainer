@@ -3,7 +3,7 @@ import { PATTERNS } from "../../music/patterns";
 import { getSettings, saveSettings } from "../../storage";
 import { h } from "../dom";
 import { dockOption, panelButton } from "../panels";
-import { chipGroup, createLabelToggle, wordToggle } from "../toggles";
+import { chipGroup, noteLabelToggles, wordToggle } from "../toggles";
 import { createCountInStepper } from "./options";
 
 type Deps = {
@@ -51,7 +51,7 @@ export function createPracticeDock({ stopRun, render, loadPiece, changed, arrang
     return button;
   }
 
-  const labels = h("div", { role: "group", className: "segments", ariaLabel: t.onTheNotes }, ...(["fingers", "noteNames", "letterNames"] as const).map((key) => createLabelToggle(key, render)));
+  const labels = noteLabelToggles(render);
   const tuner = wordToggle(t.tuner, panels.tuner, (on) => {
     panels.tuner = on;
     panelsChanged();

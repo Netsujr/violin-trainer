@@ -33,6 +33,12 @@
   border-color: var(--brass);
 }
 
+/* Full screen: what's on the notes, brought into the title row, kept small beside its buttons. */
+.fullscreen .title-tools .note-labels > button {
+  padding: 0 0.5rem;
+  font-size: 0.8125rem;
+}
+
 /* Listen and Practice fill the window: a title row on top, the panels taking whatever height is left, and the
    settings panel docked at the bottom, never moving. */
 main:has(> .fills-window) {

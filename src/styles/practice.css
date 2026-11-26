@@ -321,7 +321,7 @@ html:not(.fullscreen) .stats {
   display: none;
 }
 
-/* Full screen: the panels, with Start or Stop, Hear the note and Exit. */
+/* Full screen: the panels, with what's on the notes, Start or Stop, Hear the note and Exit. */
 .fullscreen .practice :is(.dock, .piece-select, .speed, .practice-title h1) {
   display: none;
 }

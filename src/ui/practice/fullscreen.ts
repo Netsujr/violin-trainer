@@ -23,10 +23,22 @@ export function createFullscreen(onChange: (on: boolean) => void) {
     else document.querySelector(".rail-tools")?.prepend(...tools);
   }
 
+  // What's written on the notes comes too, first in the title row, from the settings panel that's hidden, and goes back.
+  let labelsHome: Element | null = null;
+  function moveLabels() {
+    const labels = document.querySelector(".note-labels");
+    if (!labels) return;
+    if (on) {
+      labelsHome = labels.parentElement;
+      button.parentElement?.prepend(labels);
+    } else labelsHome?.append(labels);
+  }
+
   function set(value: boolean) {
     on = value;
     document.documentElement.classList.toggle("fullscreen", value);
     moveRailTools();
+    moveLabels();
     label();
     onChange(value);
   }

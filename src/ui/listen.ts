@@ -209,7 +209,7 @@ export function listenScreen(goProgress: () => void): Screen {
     },
   });
 
-  // Fullscreen leaves the panels with Start or Stop and Exit, and the guesser's score; CSS lays it out. In free play the
+  // Fullscreen leaves the panels with what's on the notes, Start or Stop and Exit, and the guesser's score; CSS lays it out. In free play the
   // tuner's own button makes it full screen alone.
   const fullscreen = createFullscreen((on) => on || element.classList.remove("tuner-full"));
   controls.startButton.classList.add("listen-start");

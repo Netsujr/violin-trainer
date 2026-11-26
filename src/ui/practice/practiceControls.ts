@@ -55,7 +55,7 @@ export function createPracticeControls({ run, pieces, piece, board, track, refer
     track.speedControl.hidden = !track.active;
   }
   board.whenViewChanges(showModes);
-  // Full screen leaves the panels with Start or Stop, Hear the note and Exit; the panels refit themselves.
+  // Full screen leaves the panels with what's on the notes, Start or Stop, Hear the note and Exit; the panels refit themselves.
   const fullscreen = createFullscreen(() => {});
 
   return {

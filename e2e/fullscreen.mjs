@@ -19,6 +19,10 @@ check("uses the browser's own fullscreen", await page.evaluate(() => !!document.
 // The panels as set, with Start or Stop, Hear the note and Exit.
 for (const hidden of ["header", ".dock", ".piece-select", ".practice-title h1"]) check(`hides ${hidden}`, await page.locator(hidden).first().isHidden());
 for (const shown of ['button:text-is("Start")', ".reference", 'button[aria-label="Exit fullscreen"]', ".practice-progress", "canvas", ".staff"]) check(`keeps ${shown}`, await page.locator(shown).isVisible());
+check("what's on the notes comes into the title row", await page.locator(".title-tools .note-labels").isVisible());
+await page.click('.title-tools .note-labels button:text-is("Fingers")'); await sleep(100);
+check("and switches them there", (await savedSettings(page)).toggles.fingers === false);
+await page.click('.title-tools .note-labels button:text-is("Fingers")'); await sleep(100);
 check("Record and the metronome stay, in the title row", (await page.locator('.title-tools button[aria-label="Record"]').isVisible()) && (await page.locator(".title-tools .metronome-button").isVisible()));
 check("the lanes grow into the sidebar's room", (await canvasWidth()) > before, `${before} > ${await canvasWidth()}`);
 check("the staff keeps the whole sheet, as chosen", (await page.locator(".staff.collapsed").count()) === 0 && (await savedSettings(page)).staffOpen === true);
@@ -53,6 +57,7 @@ await page.keyboard.press("Escape"); await sleep(300);
 check("Esc leaves fullscreen", !(await isFullscreen()) && !(await page.evaluate(() => document.fullscreenElement)));
 check("the sidebar and the lanes' width are back", (await page.locator("header").isVisible()) && (await canvasWidth()) === before);
 check("the settings panel is back", await page.locator(".dock").isVisible());
+check("what's on the notes is back in it", await page.locator(".dock .note-labels").isVisible());
 check("the full sheet is back", (await page.locator(".staff.collapsed").count()) === 0);
 await enter();
 await page.evaluate(() => document.exitFullscreen()); await sleep(300);

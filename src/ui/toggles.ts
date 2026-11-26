@@ -68,12 +68,15 @@ export function chipGroup<T>(label: string, values: T[], name: (value: T) => str
   return h("div", { role: "group", className: "segments", ariaLabel: label }, ...buttons);
 }
 
-// One of the labels on the notes, their fingers, names and letters, switched on and off with its word.
-export function createLabelToggle(key: keyof Settings["toggles"], onChange: () => void) {
+// The labels on the notes, their fingers, names and letters, each switched on and off with its word. Full screen moves
+// the group into the title row, as the settings panel it's in is hidden there.
+export function noteLabelToggles(onChange: () => void) {
   const { toggles } = getSettings();
-  return wordToggle(t.toggles[key], toggles[key], (on) => {
-    toggles[key] = on;
-    saveSettings();
-    onChange();
-  });
+  const toggle = (key: keyof Settings["toggles"]) =>
+    wordToggle(t.toggles[key], toggles[key], (on) => {
+      toggles[key] = on;
+      saveSettings();
+      onChange();
+    });
+  return h("div", { role: "group", className: "segments note-labels", ariaLabel: t.onTheNotes }, toggle("fingers"), toggle("noteNames"), toggle("letterNames"));
 }

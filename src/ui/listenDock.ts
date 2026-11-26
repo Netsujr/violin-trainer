@@ -2,7 +2,7 @@ import { t } from "../i18n";
 import { getSettings, saveSettings, type ListenMode } from "../storage";
 import { h } from "./dom";
 import { dockOption, panelButton } from "./panels";
-import { createLabelToggle, wordToggle } from "./toggles";
+import { noteLabelToggles, wordToggle } from "./toggles";
 
 // Listen's settings panel, docked under the panels in one wrapping row: what's written on the notes, which panels are
 // on screen and how big, then the mode's own settings, from modeOptions. labelsChanged redraws the notes, and
@@ -14,7 +14,7 @@ export function createListenDock(labelsChanged: () => void, panelsChanged: () =>
     saveSettings();
     panelsChanged();
   };
-  const labels = h("div", { role: "group", className: "segments", ariaLabel: t.onTheNotes }, ...(["fingers", "noteNames", "letterNames"] as const).map((key) => createLabelToggle(key, labelsChanged)));
+  const labels = noteLabelToggles(labelsChanged);
   const tuner = wordToggle(t.tuner, panels.tuner, (on) => {
     panels.tuner = on;
     changed();
