@@ -50,8 +50,9 @@
   margin-right: 0.5rem;
 }
 
-/* The run's score, once there is one, stands out from the line it's on. */
-.lane-score {
+/* The run's score, once there is one, and a missed landing stand out from the line they're on. */
+.lane-score,
+.landing-cue {
   color: var(--brass-light);
   font-weight: 700;
 }

@@ -2,7 +2,8 @@ import { localNumber, t } from "../../i18n";
 import { countNotes, noteLabels, type Meter, type PieceNote } from "../../music/notes";
 import { buildEntry, scorePercent } from "../../practice/log";
 import type { Session } from "../../practice/session";
-import { spotScore, troubleSpots, type TroubleSpot } from "../../practice/trouble";
+import { landingSummary, spotScore, troubleSpots, type TroubleSpot } from "../../practice/trouble";
+import { passCents } from "../../storage";
 import { h } from "../dom";
 import type { Section } from "../highway";
 
@@ -16,6 +17,13 @@ function scoreLine(results: Map<number, boolean> | null) {
   if (!results?.size) return "";
   const { hit, missed, percent } = tally(results);
   return `${t.score(percent)} · ${t.hitMissed(hit, missed)}`;
+}
+
+// How the finger landed on the notes played, the first time on each: how many in tune, and the notes it landed off most.
+function landingLine(session: Session) {
+  const { landed, total, off } = landingSummary(session.piece.notes, session.landings, passCents());
+  const offText = off.map(({ pitch, times, flat }) => `${noteLabels(pitch).solfege} ${t.tuningWords[flat ? "flat" : "sharp"]}${times > 1 ? ` ×${times}` : ""}`);
+  return total ? [t.landed(landed, total), ...offText].join(" · ") : "";
 }
 
 // The card after a Keep moving run: the score, and how many notes were hit and missed.
@@ -87,19 +95,28 @@ type Shown = Run & { results: Map<number, boolean> | null; listening: boolean; n
 // After a trouble spot's rounds (spot given), the card goes back to the whole run's, so another spot can be practised.
 export function createResults(board: { showScore(text: string): void }, onPlayAgain: () => void, spotActions: SpotActions) {
   const element = h("div", { className: "stats" });
+  // How the finger landed, for the title row, after the score.
+  const landing = h("span", { className: "landing-score" });
   let whole: { session: Session; shown: Shown } | null = null;
   const spotScores = new Map<string, number>();
 
   function render(session: Session, { results, listening, notes, meter, ...run }: Shown) {
     const waited = !results && listening ? summary(session, run) : null;
+    landing.textContent = listening ? landingLine(session) : "";
+    const landingCard = landing.textContent ? [h("p", {}, landing.textContent)] : [];
     board.showScore(!listening ? t.playedAlong : waited ? `${waited.done} ${waited.totals}` : scoreLine(results));
     const trouble = troubleChips(results && listening ? troubleSpots(notes, results, meter) : [], spotScores, spotActions);
-    const card = !listening ? playedAlongCard() : waited ? [waited.done, waited.totals, waited.slowest].map((line) => h("p", {}, line)) : [...scoreCard(results!), ...trouble];
+    const card = !listening
+      ? playedAlongCard()
+      : waited
+        ? [...[waited.done, waited.totals, waited.slowest].map((line) => h("p", {}, line)), ...landingCard]
+        : [...scoreCard(results!), ...landingCard, ...trouble];
     element.replaceChildren(...resultsCard(card, onPlayAgain, () => element.replaceChildren()));
   }
 
   return {
     element,
+    landing,
     // The score so far, as notes are judged. A play-along with nothing heard has none.
     live: (results: Map<number, boolean> | null) => board.showScore(scoreLine(results)),
     show(session: Session, shown: Shown & { spot?: Section | null }) {
@@ -114,6 +131,7 @@ export function createResults(board: { showScore(text: string): void }, onPlayAg
     },
     clear() {
       element.replaceChildren();
+      landing.textContent = "";
       board.showScore("");
     },
   };

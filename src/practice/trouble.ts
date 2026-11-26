@@ -56,3 +56,16 @@ export function troubleSpots(notes: PieceNote[], results: Map<number, boolean>, 
   }
   return spots.sort((a, b) => b.missed - a.missed || a.firstBar - b.firstBar).slice(0, MOST_SPOTS);
 }
+
+// How the finger landed on the notes, from where it first landed on each: how many in tune, and the notes it landed off
+// most often, worst first, with which way it usually went.
+export function landingSummary(notes: PieceNote[], landings: Map<number, number>, toleranceCents: number) {
+  const off = new Map<string, number[]>();
+  for (const [index, cents] of landings) {
+    const pitch = notes[index].pitch!;
+    if (Math.abs(cents) > toleranceCents) off.set(pitch, [...(off.get(pitch) ?? []), cents]);
+  }
+  const offNotes = [...off].map(([pitch, cents]) => ({ pitch, times: cents.length, flat: cents.reduce((sum, value) => sum + value, 0) < 0 }));
+  const missed = offNotes.reduce((sum, note) => sum + note.times, 0);
+  return { landed: landings.size - missed, total: landings.size, off: offNotes.sort((a, b) => b.times - a.times).slice(0, MOST_SPOTS) };
+}

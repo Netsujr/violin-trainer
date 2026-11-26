@@ -69,6 +69,8 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   const title = h("h1");
   const subtitle = h("span");
   const progress = h("span", { className: "practice-progress" });
+  // Wait for me: shown while the finger has landed off the note, until it's placed again.
+  const landing = h("span", { className: "landing-cue", textContent: t.missedLanding, hidden: true });
   const sectionNotes = h("span", { className: "practice-section" });
   const board = createStaffSection(pickNote, renderNotes, (beat) => track.showBeat(beat));
   const fingerboard = createFingerboard();
@@ -95,7 +97,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
   // Lining the track up, its waveform runs under the lanes, on the same timeline.
   if (track.strip) board.lanesPanel.append(track.strip);
   const following = createFollowing({ metronome, highway, staff, isMuted: tone.isMuted, endIndex, track, moveOn });
-  const waiting = createWaitingRun({ judge, glide, staff, isMuted: tone.isMuted, endIndex, holdMs, showProgress: (value) => (holdProgress = value), moveOn });
+  const waiting = createWaitingRun({ judge, glide, staff, isMuted: tone.isMuted, endIndex, holdMs, showProgress: (value) => (holdProgress = value), showSlid: (slid) => (landing.hidden = !slid), moveOn });
 
   function pickNote(index: number, extend: boolean) {
     spotRun = null;
@@ -132,6 +134,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     const finished = doneAt !== null || (controls.session?.finished ?? false);
     const index = shownIndex();
     const note = finished ? undefined : piece.notes[index];
+    landing.hidden = true; // Until the next reading, as the note may have changed.
     staff.draw(piece.notes, index, { names: settings.toggles.noteNames, fingers: settings.toggles.fingers }, selection.section);
     // Rests aren't counted, and a rest shows the number of the note after it, where a run from it starts.
     const section = selection.section;
@@ -302,7 +305,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     element: h(
       "section",
       { className: "practice fills-window" },
-      h("div", { className: "title-row" }, h("div", { className: "practice-title" }, title, h("p", {}, subtitle, progress, sectionNotes, board.score)), toolbar.tools),
+      h("div", { className: "title-row" }, h("div", { className: "practice-title" }, title, h("p", {}, subtitle, progress, landing, sectionNotes, board.score, results.landing)), toolbar.tools),
       controls.message,
       // Aligning, the controls for lining the track up sit above the panels, and its waveform under the lanes.
       ...(track.panel ? [track.panel] : []),

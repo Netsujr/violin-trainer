@@ -12,12 +12,15 @@ type Deps = {
   holdMs: () => number;
   // How far the current note has got towards counting, from 0 to 1.
   showProgress: (progress: number) => void;
+  // Whether the finger landed off the current note, which then waits until it's placed again.
+  showSlid: (slid: boolean) => void;
   // Called after each note is hit, with the note before it when the bow needn't change to play the next.
   moveOn: (session: Session, previousMidi?: number) => void;
 };
 
 // The usual run: each note waits until it's played in tune for its hold time, then the lanes glide on to the next beat.
-export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdMs, showProgress, moveOn }: Deps) {
+// A note the finger landed off waits until it's placed again, as sliding into tune doesn't count.
+export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdMs, showProgress, showSlid, moveOn }: Deps) {
   // A hit that waited for its beat lands on it.
   function arriveOnBeat(session: Session, { cents, at, arrivesAt }: { cents: number; at: number; arrivesAt: number }) {
     const previousMidi = session.currentMidi;
@@ -33,6 +36,7 @@ export function createWaitingRun({ judge, glide, staff, isMuted, endIndex, holdM
       if (arrived) arriveOnBeat(session, arrived);
       const verdict = judge.update(isMuted(now) ? null : frequency, now);
       showProgress(glide.pending ? 1 : verdict.progress);
+      showSlid(verdict.slid);
       staff.showPlayed(session.index, verdict.cents, verdict.inTune);
       session.heard(verdict.cents);
       if (verdict.hit && !glide.pending) {

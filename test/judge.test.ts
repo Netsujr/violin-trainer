@@ -5,6 +5,7 @@ import { createJudge } from "../src/practice/judge";
 const FRAME_MS = 16;
 const A4 = midiOf("A4");
 const inTune = frequencyOf(A4);
+const off = (cents: number) => inTune * 2 ** (cents / 1200);
 
 function stream(judge: ReturnType<typeof createJudge>, start: number, durationMs: number, frequency: number | null) {
   let hit = false;
@@ -99,6 +100,29 @@ describe("judge", () => {
   it("makes a note an octave from the last one wait for a release too", () => {
     const judge = newJudge(A4 + 12, A4);
     expect(stream(judge, 0, 1000, inTune).hit).toBe(false);
+  });
+
+  it("doesn't count a note the finger landed off and slid into tune, and says so", () => {
+    const judge = newJudge();
+    const landed = stream(judge, 0, 50, off(-45));
+    expect(judge.update(off(-45), landed.now).slid).toBe(true);
+    expect(stream(judge, landed.now + FRAME_MS, 1000, inTune).hit).toBe(false);
+  });
+
+  it("counts it once it's placed again, after the bow stops or the finger lifts to the open string", () => {
+    for (const between of [null, frequencyOf(A4 - 2)]) {
+      const judge = newJudge();
+      const landed = stream(judge, 0, 300, off(-45));
+      const lifted = stream(judge, landed.now, 80, between);
+      expect(stream(judge, lifted.now, 220, inTune).hit).toBe(true);
+    }
+  });
+
+  it("keeps a slide a slide through a dropout under 60 ms", () => {
+    const judge = newJudge();
+    const landed = stream(judge, 0, 100, off(-45));
+    const gap = stream(judge, landed.now, 40, null);
+    expect(stream(judge, gap.now, 400, inTune).hit).toBe(false);
   });
 
   it("reports the average cents of the hold", () => {

@@ -1,9 +1,7 @@
 import { midiOf, type Piece, type PieceNote } from "../music/notes";
+import { NEAR_CENTS } from "./judge";
 
 type NoteHit = { pitch: string; index: number; ms: number; cents: number; at: number };
-
-// Further off than this, it's nearer the next note than the one being played, so it's a wrong note, not an out-of-tune one.
-const NEAR_CENTS = 50;
 
 export class Session {
   readonly piece: Piece;
@@ -23,6 +21,8 @@ export class Session {
   exerciseScore?: number;
   // How each pitch sounded, from every reading near it, in tune or a near miss: cents added up (sharp above 0), and how many.
   tuning = new Map<string, { cents: number; readings: number }>();
+  // Where the finger first landed on each note this time through, in cents, by the note's index.
+  landings = new Map<number, number>();
   private noteStart: number;
   private passStart: number;
   private wholePass = true;
@@ -61,6 +61,7 @@ export class Session {
   // What the mic heard against the current note, in cents, if anything.
   heard(cents: number | null) {
     if (cents === null || Math.abs(cents) > NEAR_CENTS || this.finished) return;
+    if (!this.landings.has(this.index)) this.landings.set(this.index, cents);
     const sounded = this.tuning.get(this.current.pitch!) ?? { cents: 0, readings: 0 };
     this.tuning.set(this.current.pitch!, { cents: sounded.cents + cents, readings: sounded.readings + 1 });
   }
@@ -74,6 +75,7 @@ export class Session {
   jumpTo(index: number, now: number, end = this.piece.notes.length) {
     this.end = end;
     this.index = this.playable(index);
+    this.landings.clear();
     this.noteStart = this.passStart = now;
     this.wholePass = index === 0 && end === this.piece.notes.length && !this.piece.pattern && !this.following;
   }

@@ -3,6 +3,26 @@ import { begin, laneScore, open, nav, start, stop, sleep, check, progress, fresh
 
 const indexOf = (text) => Number(text.match(/Note (\d+) of/)?.[1] ?? 99);
 
+// Wait for me: a note slid into tune waits, saying to place it again, and counts once it's placed again.
+wav(OUT + "slid.wav", [{ ...note(62, 0.3), hz: note(62).hz * 2 ** (-45 / 1200) }, note(62, 1), rest(0.4), note(62, 1), rest(2)]);
+{
+  const s = await open(OUT + "slid.wav");
+  await nav(s.page, "Practice");
+  await s.page.waitForSelector("canvas");
+  await start(s.page);
+  await s.page.waitForSelector(".landing-cue:not([hidden])", { timeout: 3000 }).catch(() => {});
+  check("landing off the note says to lift and place it again", (await s.page.locator(".landing-cue").innerText()) === "Missed the landing: lift and place it again");
+  await sleep(600);
+  check("and the note waits, though it's slid into tune", (await progress(s.page)).startsWith("Note 1 of"), await progress(s.page));
+  await s.page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("Note 2"), null, { timeout: 4000 }).catch(() => {});
+  check("placed again after the bow stops, it counts", (await progress(s.page)).startsWith("Note 2"), await progress(s.page));
+  await stop(s.page);
+  await sleep(100);
+  check("Stop clears the word", await s.page.locator(".landing-cue").isHidden());
+  check("no page errors", s.problems.length === 0, s.problems.join(" | "));
+  await s.close();
+}
+
 // Full D major, looped
 wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), rest(0.5)]);
 {
@@ -29,6 +49,8 @@ wav(OUT + "dmajor.wav", [...D_MAJOR.flatMap((m) => [note(m, 0.5), rest(0.12)]), 
   const stats = await laneScore(s.page);
   console.log("  result:", stats);
   check("the lanes' bar shows 15 hits", stats.includes("15 hit"), stats);
+  const landing = await s.page.locator(".landing-score").innerText();
+  check("and after it, that every note landed in tune first time", landing === "Landed in tune first time: 15 of 15", landing);
   await s.page.waitForSelector('button:text-is("Start"):not([disabled])', { timeout: 3000 }).catch(() => {});
   check("the run ends by itself, offering Start again", (await s.page.locator('button:text-is("Start")').count()) === 1 && (await progress(s.page)) === "All 15 notes done");
   await s.page.screenshot({ path: OUT + "practice-done.png" });

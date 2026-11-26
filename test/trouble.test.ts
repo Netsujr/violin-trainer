@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PieceNote } from "../src/music/notes";
-import { aroundSpot, spotScore, troubleSpots } from "../src/practice/trouble";
+import { aroundSpot, landingSummary, spotScore, troubleSpots } from "../src/practice/trouble";
 
 // Four bars of four quarter notes: bar 1 is notes 0–3, bar 2 notes 4–7, and so on.
 const notes: PieceNote[] = Array.from({ length: 16 }, () => ({ pitch: "D4", beats: 1 }));
@@ -57,5 +57,13 @@ describe("a spot's score", () => {
 
   it("has none when none of its notes were judged", () => {
     expect(spotScore(new Map([[0, true]]), { first: 4, last: 7 })).toBeNull();
+  });
+});
+
+describe("landings", () => {
+  it("counts the notes landed in tune first time, and the ones landed off most, with which way", () => {
+    const tune: PieceNote[] = ["D4", "E4", "F#4", "E4", "F#4", "F#4"].map((pitch) => ({ pitch, beats: 1 }));
+    const landings = new Map([[0, 5], [1, 45], [2, -50], [3, -10], [4, -42], [5, 30]]);
+    expect(landingSummary(tune, landings, 40)).toEqual({ landed: 3, total: 6, off: [{ pitch: "F#4", times: 2, flat: true }, { pitch: "E4", times: 1, flat: false }] });
   });
 });
