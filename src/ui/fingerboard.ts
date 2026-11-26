@@ -94,7 +94,7 @@ function drawTape(semitones: number, index: number) {
 // A violin's fingerboard in first position, drawn across the screen with the nut on the left and the E string at the
 // top, to show where a note is played: a brass circle, with its finger in it, where it's stopped, turning blue once
 // it's played in tune. What's heard shows as a blue ghost where it's played, on whichever string, joined to the circle
-// by a dashed line, with a word saying which way to go. Pressing its head puts beginners' tapes on it. For
+// by a dashed line, with words under it saying which way to go. Pressing its head puts beginners' tapes on it. For
 // use wherever a note to play is shown.
 export function createFingerboard() {
   const settings = getSettings();
@@ -112,9 +112,10 @@ export function createFingerboard() {
   // The drawing is one picture to screen readers, with the head a button beside it.
   const board = svg("g", { role: "img", "aria-label": t.fingerboard }, ...drawBoard(), tapes, ...drawStrings(), nextRing, line, target, finger, ghost);
   const picture = svg("svg", { viewBox: `0 0 ${WIDTH} ${HEIGHT}` }, board, head);
-  const hint = h("p", { className: "fingerboard-hint", hidden: true });
+  // What to do, under the picture so it never covers a string. In tune there's nothing to do, so it's empty.
+  const hint = h("p", { className: "fingerboard-hint" });
   const showTapes = () => (tapes.style.display = settings.fingerboardTapes ? "" : "none");
-  const element = h("div", { className: "fingerboard" }, h("div", { className: "fingerboard-picture" }, picture, hint));
+  const element = h("div", { className: "fingerboard" }, h("div", { className: "fingerboard-picture" }, picture), hint);
   let note: { string: StringName; semitones: number } | null = null;
   showTapes();
 
@@ -122,10 +123,7 @@ export function createFingerboard() {
     element.setAttribute(x, String(point.x));
     element.setAttribute(y, String(point.y));
   };
-  const showHint = (text: string | null) => {
-    hint.hidden = text === null;
-    hint.textContent = text ?? "";
-  };
+  const showHint = (text: string | null) => (hint.textContent = text ?? "");
   const colour = (right: boolean) => {
     target.setAttribute("fill", right ? RIGHT_COLOR : TARGET_COLOR);
     target.setAttribute("stroke", right ? RIGHT_COLOR : TARGET_COLOR);
@@ -162,7 +160,7 @@ export function createFingerboard() {
       const off = (onTarget - note.semitones) * 100;
       const inTune = Math.abs(off) <= toleranceCents;
       colour(inTune && !missedLanding);
-      if (inTune) return showHint(missedLanding ? t.placeAgain : t.rightThere);
+      if (inTune) return showHint(missedLanding ? t.placeAgain : null);
 
       const midi = nearestMidi(frequency);
       const nearTarget = onTarget > -0.5 && onTarget < SHOWN_SEMITONES + 0.5;

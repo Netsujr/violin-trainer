@@ -242,6 +242,8 @@ wav(OUT + "a430.wav", [{ hz: 430, seconds: 5, wave: "sine" }]);
   });
   check("yellow off: 40 cents flat reads out, with no yellow on the dial", seen.zone === "out" && seen.yellow === "hidden", JSON.stringify(seen));
   check("the circle stays brass, the ghost shows, and the word says slide down", seen.stroke === "#e6ae48" && seen.dot && seen.hint === "↓ Slide down", JSON.stringify(seen));
+  const [picture, word] = [await box(".fingerboard svg"), await box(".fingerboard-hint")];
+  check("the word sits under the fingerboard, covering none of it", word.y >= picture.y + picture.height - 1, JSON.stringify({ picture, word }));
   check("and the note isn't counted", (await s.page.locator(".guess-score").innerText()) === "0 of 10 right");
   await s.page.screenshot({ path: OUT + "listen-fingerboard.png" });
   await sizeOf(s.page, ".stage-board").click();

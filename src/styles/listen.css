@@ -373,20 +373,18 @@
   font-weight: 700;
 }
 
-/* Which way to move the finger, over the bottom of the fingerboard. */
+/* What to do with the finger, on a line of its own under the fingerboard. The line stays when it's empty, so the
+   picture never jumps. */
 .fingerboard-hint {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  translate: -50% 0;
-  margin: 0;
-  padding: 0.125rem 0.625rem;
-  color: var(--ground);
+  height: 1.25rem;
+  margin: 0.25rem 0 0;
+  overflow: hidden;
+  color: var(--blue-light);
   font-size: 0.8125rem;
   font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
   white-space: nowrap;
-  background: var(--blue-light);
-  border-radius: 1rem;
 }
 
 /* The head, before the nut: a raised block, plainly a button, brass while the tapes are on. */
