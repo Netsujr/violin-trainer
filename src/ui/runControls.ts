@@ -92,6 +92,7 @@ export function createRunControls(options: {
   return {
     startButton: button,
     message,
+    start,
     stop,
     // Ends the run shortly, unless by then it's been stopped, another started, or it has carried on (stillDone false).
     finish(stillDone: () => boolean) {

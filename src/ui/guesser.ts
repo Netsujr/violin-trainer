@@ -1,11 +1,12 @@
 import { playNotes } from "../audio/reference";
-import { t } from "../i18n";
+import { localNumber, t } from "../i18n";
 import { fillFingering, fingerOn, HIGHEST_MIDI, LOWEST_MIDI, stringFor } from "../music/fingering";
 import { centsFrom, midiOf, pitchOf } from "../music/notes";
 import type { Session } from "../practice/session";
 import { getSettings, passCents, saveSettings, type GuessBy, type GuesserLevel } from "../storage";
 import { h } from "./dom";
 import type { createFingerboard } from "./fingerboard";
+import { openGuessResults } from "./guessResults";
 import { dockOption } from "./panels";
 import type { createStaff } from "./staff";
 import { chipGroup } from "./toggles";
@@ -62,12 +63,19 @@ export function nextTargets(count: number, pool: string[], last?: string, random
 // Listen's note guesser: notes appear on the staff, and each is played in turn. Listen's toggles name them or not, to
 // make it easier or harder. The ghost note shows what's being played against the one to play, and its arrow which way
 // to go; the fingerboard, beside it or on its own, shows where on the violin it's played.
-// A round played right waits for the playing to stop, then the next notes come; a game played right starts another.
+// A round played right waits for the playing to stop, then the next notes come. A game played right ends the run, with
+// onDone, and shows how it went, with Play again, which runs playAgain; nothing starts on its own.
 // The run's score goes on its session, for the log. board is Listen's fingerboard, which shows the note to play.
 // By ear, the notes aren't shown but heard, each sounding on the violin as it comes up once a run's going, again each
 // time the player's been quiet a while without finding it, and when the staff's tapped; a note shows, green, once it's
 // played right. The toggles' labels still show, as hints.
-export function createGuesser(staff: ReturnType<typeof createStaff>, session: () => Session | null, board: ReturnType<typeof createFingerboard>) {
+export function createGuesser(
+  staff: ReturnType<typeof createStaff>,
+  session: () => Session | null,
+  board: ReturnType<typeof createFingerboard>,
+  onDone: () => void,
+  playAgain: () => void,
+) {
   const settings = getSettings();
   let targets: string[] = [];
   let index = 0;
@@ -120,6 +128,18 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
     banner.hidden = true;
     staff.hidePlayed();
     draw();
+  }
+
+  // The game's end, in a dialog: its score, how long the notes took in all and each, and the level and way it was played.
+  function showResults() {
+    const seconds = msPerNote.reduce((sum, ms) => sum + ms, 0) / 1000;
+    const words = [
+      t.score(speedScore(msPerNote)),
+      t.guessTime(localNumber(seconds, 1), localNumber(seconds / GAME_NOTES, 1)),
+      t.levels[settings.guesserLevel],
+      `${t.guessByLabel} ${t.guessBy[settings.guesserBy].toLowerCase()}`,
+    ];
+    openGuessResults(t.guessDone(GAME_NOTES), words, playAgain);
   }
 
   const restart = () => {
@@ -175,6 +195,8 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
     relabel: drawStaff,
     // Each reading from the mic, or null when it hears nothing.
     read(frequency: number | null, now: number) {
+      // A game played to the end waits for Play again.
+      if (right === GAME_NOTES) return;
       if (frequency !== null) soundAt = now;
       const quiet = stopSound === null && now - Math.max(soundAt, listensAt) >= EAR_AGAIN_MS;
       if (byEar() && doneAt === null && targets.length && (sounded !== right || quiet)) {
@@ -185,7 +207,7 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
         const left = NEXT_AFTER_MS - (now - Math.max(doneAt, soundAt));
         if (left <= 0) return newRound(now);
         const seconds = Math.ceil(left / 1000);
-        banner.textContent = right === GAME_NOTES ? t.guessDone(GAME_NOTES, seconds) : t.nextIn(seconds);
+        banner.textContent = t.nextIn(seconds);
         banner.hidden = false;
         return;
       }
@@ -213,6 +235,10 @@ export function createGuesser(staff: ReturnType<typeof createStaff>, session: ()
         doneAt = now;
       }
       draw();
+      if (right === GAME_NOTES) {
+        onDone();
+        showResults();
+      }
     },
     // Silence, or the run stopped. While a round waits, the next reading puts the banner back.
     quiet() {

@@ -41,7 +41,7 @@ export function listenScreen(goProgress: () => void): Screen {
   let midi: number | null = null;
   let lastHeard = 0;
   const board = createFingerboard();
-  const guesser = createGuesser(staff, () => controls.session, board);
+  const guesser = createGuesser(staff, () => controls.session, board, () => controls.finish(() => true), () => controls.stop().then(controls.start));
   const technique = createTechnique(staff, () => controls.session, () => controls.finish(() => true));
   const target = createFreeTarget(staff, () => {
     renderNote();
