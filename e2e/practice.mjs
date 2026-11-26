@@ -14,6 +14,8 @@ wav(OUT + "slid.wav", [{ ...note(62, 0.3), hz: note(62).hz * 2 ** (-45 / 1200) }
   check("landing off the note says to lift and place it again", (await s.page.locator(".landing-cue").innerText()) === "Missed the landing: lift and place it again");
   await sleep(600);
   check("and the note waits, though it's slid into tune", (await progress(s.page)).startsWith("Note 1 of"), await progress(s.page));
+  const hint = await s.page.locator("main .fingerboard-hint").textContent();
+  check("the fingerboard says to place it again, not that it's right there", hint === "Lift and place it again", hint);
   await s.page.waitForFunction(() => document.querySelector(".practice-progress").textContent.startsWith("Note 2"), null, { timeout: 4000 }).catch(() => {});
   check("placed again after the bow stops, it counts", (await progress(s.page)).startsWith("Note 2"), await progress(s.page));
   await stop(s.page);

@@ -153,15 +153,16 @@ export function createFingerboard() {
     },
     // What's heard, or nothing, against the note shown, in tune within toleranceCents. A note near the note's string
     // is shown on it, with which way to slide; one further off on the string it's played on, with which way to go.
-    hear(frequency: number | null, toleranceCents: number) {
+    // missedLanding: the finger landed off the note, so sliding won't do, in tune or not; it's placed again.
+    hear(frequency: number | null, toleranceCents: number, missedLanding = false) {
       if (!note) return;
       hideHeard();
       if (frequency === null) return showHint(null);
       const onTarget = 12 * Math.log2(frequency / frequencyOf(OPEN_STRINGS[note.string]));
       const off = (onTarget - note.semitones) * 100;
       const inTune = Math.abs(off) <= toleranceCents;
-      colour(inTune);
-      if (inTune) return showHint(t.rightThere);
+      colour(inTune && !missedLanding);
+      if (inTune) return showHint(missedLanding ? t.placeAgain : t.rightThere);
 
       const midi = nearestMidi(frequency);
       const nearTarget = onTarget > -0.5 && onTarget < SHOWN_SEMITONES + 0.5;
@@ -172,7 +173,7 @@ export function createFingerboard() {
       at(line, heard, "x1", "y1");
       at(line, pointOn(note.string, note.semitones), "x2", "y2");
       [ghost, line].forEach((part) => (part.style.display = ""));
-      if (string === note.string) return showHint(off < 0 ? t.slideDown : t.slideUp);
+      if (string === note.string) return showHint(missedLanding ? t.placeAgain : off < 0 ? t.slideDown : t.slideUp);
       showHint(t.goToString(t.strings[note.string], STRINGS.indexOf(note.string) > STRINGS.indexOf(string)));
     },
   };

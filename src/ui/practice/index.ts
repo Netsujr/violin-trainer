@@ -244,7 +244,7 @@ export function practiceScreen(pieceId?: string, aligning?: () => void): Screen 
     // The tuner and the fingerboard measure what's heard against the note to play.
     const target = piece.notes[currentIndex()]?.pitch;
     tuner.hear(frequency, target ? midiOf(target) : undefined);
-    fingerboard.hear(frequency, passCents());
+    fingerboard.hear(frequency, passCents(), !landing.hidden);
     highway.draw(piece.notes, shownIndex(), holdProgress);
   }
 
