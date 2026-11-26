@@ -23,11 +23,10 @@ export function calendarScreen(): Screen {
   // While a copied plan's being pasted: picking, each day from today on is tapped to paste into, and shows it's done.
   let picking = false;
   const pasted = new Set<string>();
-  const urls: string[] = [];
 
   const monthTitle = h("h1", { className: "calendar-month" });
   const grid = h("div", { className: "calendar-grid", role: "grid" });
-  const day = createDayPanel({ entries, pieces, urls, onChange: () => rerender(), onPaste: togglePicking });
+  const day = createDayPanel({ entries, pieces, onChange: () => rerender(), onPaste: togglePicking });
   const renderDay = () => day.render(selected, today, picking);
   const planFor = (day: string) => settings.plan[day] ?? [];
 
@@ -151,8 +150,6 @@ export function calendarScreen(): Screen {
       ),
       h("div", { className: "calendar-body" }, h("div", { className: "calendar-month-grid" }, grid), day.element),
     ),
-    leave() {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    },
+    leave() {},
   };
 }

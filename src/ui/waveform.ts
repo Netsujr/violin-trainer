@@ -21,7 +21,8 @@ const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.fl
 
 // A player for a recording: play, the recording drawn as its waveform, the part played coloured in, and the time.
 // Tapping the waveform, or the arrow keys on it, moves through it. One the browser can't decode gets its own player.
-export function waveformPlayer(blob: Blob, audio: HTMLAudioElement) {
+// It starts from seconds in, where the playing starts, and leaves out what's before.
+export function waveformPlayer(blob: Blob, audio: HTMLAudioElement, from = 0) {
   const canvas = h("canvas", { className: "waveform", tabIndex: 0, role: "slider", ariaLabel: t.playPosition });
   const play = h("button", { type: "button", className: "outline icon-button" });
   const time = h("span", { className: "waveform-time" });
@@ -34,7 +35,8 @@ export function waveformPlayer(blob: Blob, audio: HTMLAudioElement) {
     if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height });
     const context = canvas.getContext("2d")!;
     const style = getComputedStyle(canvas);
-    const played = seconds ? audio.currentTime / seconds : 0;
+    const at = Math.max(0, audio.currentTime - from);
+    const played = seconds ? at / seconds : 0;
     const step = width / peaks.length;
     context.clearRect(0, 0, width, height);
     peaks.forEach((peak, bar) => {
@@ -42,7 +44,7 @@ export function waveformPlayer(blob: Blob, audio: HTMLAudioElement) {
       context.fillStyle = bar / peaks.length < played ? style.getPropertyValue("--pico-primary") : style.getPropertyValue("--pico-muted-border-color");
       context.fillRect(bar * step, (height - tall) / 2, Math.max(1, step - devicePixelRatio), tall);
     });
-    time.textContent = `${clock(audio.currentTime)} / ${clock(seconds)}`;
+    time.textContent = `${clock(at)} / ${clock(seconds)}`;
     canvas.ariaValueText = time.textContent;
   }
 
@@ -57,17 +59,19 @@ export function waveformPlayer(blob: Blob, audio: HTMLAudioElement) {
     if (!audio.paused) requestAnimationFrame(tick);
   };
   const seek = (to: number) => {
-    if (seconds) audio.currentTime = Math.min(seconds, Math.max(0, to));
+    if (seconds) audio.currentTime = from + Math.min(seconds, Math.max(0, to));
   };
   ["play", "pause", "seeked", "ended"].forEach((event) => audio.addEventListener(event, tick));
   ["play", "pause", "ended"].forEach((event) => audio.addEventListener(event, showPlaying));
+  // Played again from the end, it starts over from the start of the playing.
+  audio.addEventListener("play", () => audio.currentTime < from && (audio.currentTime = from));
   play.onclick = () => (audio.paused ? audio.play() : audio.pause());
   canvas.onclick = (event) => seek((event.offsetX / canvas.clientWidth) * seconds);
   canvas.onkeydown = (event) => {
     const by = { ArrowLeft: -ARROW_STEP_SECONDS, ArrowRight: ARROW_STEP_SECONDS }[event.key];
     if (by === undefined) return;
     event.preventDefault();
-    seek(audio.currentTime + by);
+    seek(audio.currentTime - from + by);
   };
 
   const element = h("div", { className: "waveform-player" }, play, canvas, time);
@@ -75,8 +79,10 @@ export function waveformPlayer(blob: Blob, audio: HTMLAudioElement) {
     .arrayBuffer()
     .then((bytes) => new OfflineAudioContext(1, 1, 44100).decodeAudioData(bytes))
     .then((decoded) => {
-      seconds = decoded.duration;
-      peaks = peaksOf(decoded.getChannelData(0));
+      from = Math.min(from, decoded.duration);
+      seconds = decoded.duration - from;
+      peaks = peaksOf(decoded.getChannelData(0).subarray(Math.floor(from * decoded.sampleRate)));
+      audio.currentTime = from;
       draw();
     })
     .catch(() => {

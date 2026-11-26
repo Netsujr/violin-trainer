@@ -68,8 +68,19 @@ const LISTEN_PANELS_FROM_VIEW: Record<ListenView, Settings["listenPanels"]> = {
 export type GuessBy = "eye" | "ear";
 
 // view and fullscreen: how the practice screen looked when it was recorded. Older recordings have neither.
+// notes, heard and start replay it on the moving line: the notes as played, the pitch heard through it (null for
+// silence), and where playing starts, a second before the first note hit. Older recordings have none of them, and
+// markers without index.
 export type RecordingView = "lanes" | "bigStaff" | "staffOnly";
-export type Recording = { blob: Blob; markers: { pitch: string; seconds: number }[]; view?: RecordingView; fullscreen?: boolean };
+export type Recording = {
+  blob: Blob;
+  markers: { pitch: string; seconds: number; index?: number }[];
+  view?: RecordingView;
+  fullscreen?: boolean;
+  notes?: PieceNote[];
+  heard?: { seconds: number; frequency: number | null }[];
+  start?: number;
+};
 
 export const COUNT_IN_CHOICES = [2, 4, 6, 8, 10];
 

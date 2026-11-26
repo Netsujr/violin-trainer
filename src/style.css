@@ -130,7 +130,7 @@ a[download] {
   margin-right: 0.75rem;
 }
 
-/* A little note by a piece for each recording, opening it in a modal with its player. */
+/* A little note by a piece for each recording, opening it in a dialog with its player. */
 /* 24px to tap, with the extra taken back by the margin so the line stays the same height. */
 .recording-note {
   display: inline-flex;
@@ -148,9 +148,10 @@ a[download] {
   height: 1rem;
 }
 
-/* A recording, opened under its piece's title, with Download and Delete on the right. */
-.day-recording {
-  margin: 0.5rem 0;
+/* A recording, opened in a dialog: the moving line playing along, the player, then Download and Delete on the right. */
+.recording-staff {
+  height: 11rem;
+  margin-bottom: 0.5rem;
 }
 
 .recording-line {
@@ -177,6 +178,11 @@ a[download] {
   border: none;
 }
 
+.waveform-player .icon-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .waveform-player .icon-button:not(:focus-visible) {
   box-shadow: none;
 }
@@ -194,7 +200,7 @@ a[download] {
   font-size: 0.875rem;
 }
 
-.day-recording audio {
+.recording-dialog audio {
   width: 100%;
 }
 
@@ -212,10 +218,6 @@ a[download] {
   background: none;
   border: none;
   text-decoration: var(--pico-text-decoration);
-}
-
-.recording-note[aria-pressed="true"] {
-  opacity: 0.6;
 }
 
 /* The view a recording was made in, after its time. */

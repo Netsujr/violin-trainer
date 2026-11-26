@@ -289,7 +289,7 @@ check("a new piece joins My songs, which saving goes back to", (await page.locat
 await press(mine.getByRole("button", { name: "Practise", exact: true })); await sleep(400);
 check("Practise opens it in Practice", (await progress(page)) === "Note 1 of 3", await progress(page));
 await tab("Library");
-const modal = page.locator("dialog[open]");
+const modal = page.locator("dialog[open]").last(); // The question, which can open over a recording's dialog.
 const say = async (label) => { await press(modal.getByRole("button", { name: label, exact: true })); await sleep(200); };
 await press(page.locator(".piece", { hasText: "My tune" }).getByRole("button", { name: "Delete", exact: true })); await sleep(200);
 check("deleting asks first, naming the piece", (await modal.innerText()).includes('Delete "My tune"?'));

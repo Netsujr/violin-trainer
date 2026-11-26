@@ -1,6 +1,6 @@
 import { midiOf, type Piece, type PieceNote } from "../music/notes";
 
-type NoteHit = { pitch: string; ms: number; cents: number; at: number };
+type NoteHit = { pitch: string; index: number; ms: number; cents: number; at: number };
 
 // Further off than this, it's nearer the next note than the one being played, so it's a wrong note, not an out-of-tune one.
 const NEAR_CENTS = 50;
@@ -54,7 +54,7 @@ export class Session {
 
   // With tempo on, the next note only starts on the beat, some time after the hit itself.
   hit(cents: number, now: number, nextStartsAt = now) {
-    this.hits.push({ pitch: this.current.pitch!, ms: now - this.noteStart, cents, at: now });
+    this.hits.push({ pitch: this.current.pitch!, index: this.index, ms: now - this.noteStart, cents, at: now });
     this.advance(nextStartsAt);
   }
 

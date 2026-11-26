@@ -213,7 +213,8 @@ export const staffNotes = async (page, title, text) => {
 export const saveStaff = (page) => page.locator('.title-tools button:text-is("Save piece")');
 // Answers the question that's up, by the name of its button.
 export const answer = async (page, label) => {
-  await page.locator("dialog[open]").getByRole("button", { name: label, exact: true }).click();
+  // The last dialog opened, as a question can open over a recording's.
+  await page.locator("dialog[open]").last().getByRole("button", { name: label, exact: true }).click();
   await sleep(100);
 };
 export const begin = async (page) => {
